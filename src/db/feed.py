@@ -42,8 +42,11 @@ class FeedItem:
 
     @property
     def label(self) -> str:
-        parts = [part for part in (self.member_name, self.group_name) if part]
-        return " - ".join(parts) if parts else self.role_id
+        member = (self.member_name or "").strip()
+        group = (self.group_name or "").strip()
+        if member and group and member.casefold() != group.casefold():
+            return f"{member} - {group}"
+        return member or group or self.role_id
 
 
 def _role_ids_for_query(connection, query: str, min_age: str) -> list[str]:

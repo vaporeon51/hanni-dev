@@ -75,6 +75,47 @@ def test_feed_sql_has_a_parameter_for_each_placeholder(monkeypatch):
             assert f"%://{host}/%" in params
 
 
+def test_feed_label_collapses_solo_artist_duplicate():
+    item = feed_db.FeedItem(
+        content_link_id=1,
+        role_id="iu-role",
+        member_name="IU",
+        group_name="iu",
+        url="https://i.imgur.com/iu.png",
+        original_url=None,
+        uploaded_date=None,
+        score=0,
+    )
+
+    assert item.label == "IU"
+
+
+def test_feed_label_uses_whichever_name_is_available():
+    member_only = feed_db.FeedItem(
+        content_link_id=1,
+        role_id="member-role",
+        member_name="BIBI",
+        group_name=None,
+        url="https://i.imgur.com/bibi.png",
+        original_url=None,
+        uploaded_date=None,
+        score=0,
+    )
+    group_only = feed_db.FeedItem(
+        content_link_id=2,
+        role_id="group-role",
+        member_name=None,
+        group_name="TWICE",
+        url="https://i.imgur.com/twice.png",
+        original_url=None,
+        uploaded_date=None,
+        score=0,
+    )
+
+    assert member_only.label == "BIBI"
+    assert group_only.label == "TWICE"
+
+
 def test_role_search_uses_tokenized_best_match(monkeypatch):
     pool = FakePool()
     monkeypatch.setattr(feed_db, "POOL", pool)

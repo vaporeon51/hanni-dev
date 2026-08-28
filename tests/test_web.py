@@ -243,10 +243,15 @@ def test_homepage_renders():
 
     assert response.status_code == 200
     assert "hanni" in response.text
+    assert '<a class="brand-link" href="/" aria-label="hanni home">' in response.text
     assert "search a member or group" in response.text
     assert '<footer class="site-credit">made by glaceon</footer>' in response.text
     assert '/static/app.css?v=' in response.text
     assert '/static/app.js?v=' in response.text
+    assert "fonts.googleapis.com" not in response.text
+    css = (web_app.REPO_ROOT / "static" / "app.css").read_text()
+    assert 'font-family: Georgia, "Times New Roman", serif;' in css
+    assert "font-weight: 400;" in css
     assert '<option value="15" selected>15 links</option>' in response.text
     assert '<option value="random" selected>random</option>' in response.text
     assert '<option value="latest">latest</option>' in response.text

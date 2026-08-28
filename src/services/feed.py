@@ -8,13 +8,16 @@ from src.config.constants import MIN_CONTENT_AGE
 from src.db.feed import FeedItem, FeedSort, get_feed_items, get_role_suggestions
 
 
-async def load_feed(*, query: str | None, sort: FeedSort, limit: int) -> list[FeedItem]:
+async def load_feed(
+    *, query: str | None, sort: FeedSort, limit: int, recent_urls: tuple[str, ...] = ()
+) -> list[FeedItem]:
     return await asyncio.to_thread(
         get_feed_items,
         query=query,
         sort=sort,
         limit=limit,
         min_age=MIN_CONTENT_AGE,
+        recent_urls=recent_urls,
     )
 
 

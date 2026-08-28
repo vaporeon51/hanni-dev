@@ -75,6 +75,24 @@ def test_feed_sql_has_a_parameter_for_each_placeholder(monkeypatch):
             assert f"%://{host}/%" in params
 
 
+def test_random_feed_prioritizes_urls_outside_recent_history(monkeypatch):
+    pool = FakePool()
+    monkeypatch.setattr(feed_db, "POOL", pool)
+
+    feed_db.get_feed_items(
+        sort="random",
+        limit=15,
+        min_age="18 year 1 month",
+        recent_urls=("https://i.imgur.com/old.mp4",),
+    )
+
+    query, params = pool.connection_instance.cursor_instance.calls[-1]
+    assert query.count("%s") == len(params)
+    assert "cl.url = ANY(%s) AS recently_seen" in query
+    assert "ORDER BY recently_seen ASC, random_weight DESC" in query
+    assert ["https://i.imgur.com/old.mp4"] in params
+
+
 def test_feed_label_collapses_solo_artist_duplicate():
     item = feed_db.FeedItem(
         content_link_id=1,

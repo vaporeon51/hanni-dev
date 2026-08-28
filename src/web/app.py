@@ -25,6 +25,7 @@ from src.db import POOL  # noqa: E402
 from src.db.feedback import ContentFeedback, add_content_report, add_content_vote  # noqa: E402
 from src.db.media import get_live_content_url  # noqa: E402
 from src.services.feed import load_feed, load_role_suggestions  # noqa: E402
+from src.services.feed_history import feed_history  # noqa: E402
 from src.services.dead_link_queue import enqueue_priority_url  # noqa: E402
 from src.services.media import MediaUpstreamError, open_media_stream, resolve_media_url_cached  # noqa: E402
 
@@ -178,16 +179,19 @@ async def feed(
             detail="Please wait 10 seconds before searching again.",
             headers={"Retry-After": str(SEARCH_COOLDOWN_SECONDS)},
         )
-    items = await load_feed(query=query, sort=sort, limit=limit)
+    recent_urls = feed_history.recent_urls(visitor_id) if sort == "random" else ()
+    items = await load_feed(query=query, sort=sort, limit=limit, recent_urls=recent_urls)
     return {"items": [_serialize_item(item) for item in items], "count": len(items), "sort": sort, "query": query}
 
 
 @app.get("/api/feed/{content_link_id}/media")
-async def media(content_link_id: int) -> dict[str, str]:
+async def media(content_link_id: int, request: Request, response: Response) -> dict[str, str]:
     url = await asyncio.to_thread(get_live_content_url, content_link_id)
     if url is None:
         raise HTTPException(status_code=404, detail="Content item not found")
     # This endpoint is requested as each delayed feed card is actually shown.
+    visitor_id = _ensure_visitor_cookie(request, response)
+    feed_history.remember(visitor_id, url)
     enqueue_priority_url(url)
     resolved = await asyncio.to_thread(resolve_media_url_cached, url)
     if resolved.kind in {"video", "image"}:

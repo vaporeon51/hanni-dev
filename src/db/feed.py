@@ -95,6 +95,7 @@ def get_feed_items(
     sort: FeedSort = "random",
     limit: int = 24,
     min_age: str,
+    recent_urls: tuple[str, ...] = (),
 ) -> list[FeedItem]:
     """Return live, low-report content for the web feed.
 
@@ -128,11 +129,16 @@ def get_feed_items(
             where.append("cl.role_id = ANY(%s)")
             params.append(role_ids)
 
+        prioritize_fresh = sort == "random" and bool(recent_urls)
         order_by = {
             "latest": "cl.uploaded_date DESC, cl.content_link_id DESC",
             "oldest": "cl.uploaded_date ASC, cl.content_link_id ASC",
             "top": "feed_score DESC, cl.uploaded_date DESC, cl.content_link_id DESC",
-            "random": "random_weight DESC, cl.content_link_id DESC",
+            "random": (
+                "recently_seen ASC, random_weight DESC, cl.content_link_id DESC"
+                if prioritize_fresh
+                else "random_weight DESC, cl.content_link_id DESC"
+            ),
         }[sort]
         score_expression = """(
             LEAST(COALESCE(cl.initial_reaction_count, 0), %s)
@@ -145,9 +151,12 @@ def get_feed_items(
         # SELECT expressions precede the WHERE clause in SQL placeholder
         # order. The random sort embeds the score expression a second time.
         random_select = f",\n                    {random_expression} AS random_weight" if sort == "random" else ""
+        recent_select = ",\n                    cl.url = ANY(%s) AS recently_seen" if prioritize_fresh else ""
         select_params: list[object] = [INITIAL_REACT_CAP]
         if sort == "random":
             select_params = [INITIAL_REACT_CAP, INITIAL_REACT_CAP, SAMPLING_EXPONENT]
+        if prioritize_fresh:
+            select_params.append(list(recent_urls))
         query_params = [*select_params, *params, limit]
 
         with connection.cursor() as cursor:
@@ -175,7 +184,7 @@ def get_feed_items(
                     cl.num_downvotes,
                     cl.num_reports,
                     cl.recovery_generation,
-                    recovery_dates.recovered_at{random_select}
+                    recovery_dates.recovered_at{random_select}{recent_select}
                 FROM content_links AS cl
                 JOIN role_info AS ri ON ri.role_id = cl.role_id
                 LEFT JOIN recovery_dates

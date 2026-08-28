@@ -84,6 +84,31 @@ def test_feed_endpoint_rate_limits_repeated_searches(monkeypatch):
     assert second.headers["retry-after"] == "10"
 
 
+def test_random_feed_uses_the_visitors_recent_media_history(monkeypatch):
+    async def fake_load_feed(**kwargs):
+        assert kwargs["recent_urls"] == ("https://i.imgur.com/recent.mp4",)
+        return []
+
+    monkeypatch.setattr(web_app, "load_feed", fake_load_feed)
+    monkeypatch.setattr(
+        web_app.feed_history,
+        "recent_urls",
+        lambda visitor_id: ("https://i.imgur.com/recent.mp4",),
+    )
+
+    async def request():
+        transport = httpx.ASGITransport(app=web_app.app)
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="http://test",
+            cookies={web_app.VISITOR_COOKIE: "feed-history-test"},
+        ) as client:
+            return await client.get("/api/feed?sort=random")
+
+    response = asyncio.run(request())
+    assert response.status_code == 200
+
+
 def test_vote_endpoint_returns_updated_feedback(monkeypatch):
     def fake_add_vote(content_link_id, direction):
         assert content_link_id == 4201
@@ -170,8 +195,10 @@ def test_report_endpoint_requires_known_reason():
 
 def test_media_endpoint_returns_one_resolved_asset(monkeypatch):
     queued = []
+    remembered = []
     monkeypatch.setattr(web_app, "get_live_content_url", lambda content_link_id: "https://imgur.com/abc123")
     monkeypatch.setattr(web_app, "enqueue_priority_url", queued.append)
+    monkeypatch.setattr(web_app.feed_history, "remember", lambda visitor_id, url: remembered.append((visitor_id, url)))
     monkeypatch.setattr(
         web_app,
         "resolve_media_url_cached",
@@ -180,7 +207,11 @@ def test_media_endpoint_returns_one_resolved_asset(monkeypatch):
 
     async def request():
         transport = httpx.ASGITransport(app=web_app.app)
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="http://test",
+            cookies={web_app.VISITOR_COOKIE: "media-history-test"},
+        ) as client:
             return await client.get("/api/feed/42/media")
 
     response = asyncio.run(request())
@@ -188,6 +219,7 @@ def test_media_endpoint_returns_one_resolved_asset(monkeypatch):
     assert response.status_code == 200
     assert response.json() == {"kind": "video", "url": "/api/feed/42/asset"}
     assert queued == ["https://imgur.com/abc123"]
+    assert remembered == [("media-history-test", "https://imgur.com/abc123")]
 
 
 def test_media_asset_proxies_range_response(monkeypatch):

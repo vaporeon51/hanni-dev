@@ -1466,6 +1466,127 @@ def apply_success(
                 )
 
 
+def record_dead_replacement(
+    connection: psycopg.Connection[Any],
+    candidate: Candidate,
+    replacement_url: str,
+    batch_id: str,
+    recovery_method: str | None,
+    downloaded_size: int,
+    trimmed_size: int,
+    trimmed_sha256: str,
+    imgur_id: str,
+    replacement_generation: int,
+) -> None:
+    """Advance the derivative generation after an explicitly dead Discord embed."""
+
+    with connection.transaction():
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE content_links
+                SET recovery_generation = %s,
+                    is_dead = TRUE,
+                    is_recovery_exhausted = %s,
+                    processed_date = NOW()
+                WHERE url = %s
+                  AND is_dead = TRUE
+                RETURNING num_reports;
+                """,
+                (
+                    replacement_generation,
+                    replacement_generation >= CONTENT_RECOVERY_MAX_GENERATION,
+                    candidate.url,
+                ),
+            )
+            result = cursor.fetchone()
+            if result is None:
+                raise RuntimeError(
+                    f"Database rows changed or disappeared for url={candidate.url}; "
+                    "the dead replacement was not recorded"
+                )
+            num_reports_after = int(result[0])
+            cursor.execute(
+                """
+                UPDATE content_link_recovery_items
+                SET status = 'dead',
+                    replacement_url = %s,
+                    recovery_method = %s,
+                    imgur_id = %s,
+                    downloaded_size = %s,
+                    trimmed_size = %s,
+                    trimmed_sha256 = %s,
+                    replacement_generation = %s,
+                    num_reports_after = %s,
+                    finished_at = NOW(),
+                    error = 'Discord rendered the uploaded URL as a broken article embed in the revival channel'
+                WHERE batch_id = %s AND content_link_id = %s;
+                """,
+                (
+                    replacement_url,
+                    recovery_method,
+                    imgur_id,
+                    downloaded_size,
+                    trimmed_size,
+                    trimmed_sha256,
+                    replacement_generation,
+                    num_reports_after,
+                    batch_id,
+                    candidate.content_link_id,
+                ),
+            )
+            if cursor.rowcount != 1:
+                raise RuntimeError(
+                    f"Recovery audit row disappeared for batch_id={batch_id}, "
+                    f"content_link_id={candidate.content_link_id}"
+                )
+
+
+def recovery_role_labels(connection: psycopg.Connection[Any], url: str) -> tuple[str, ...]:
+    """Return every idol/group label still associated with a recovery source URL."""
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT DISTINCT
+                CASE
+                    WHEN ri.member_name IS NOT NULL AND ri.group_name IS NOT NULL
+                        THEN ri.member_name || ' (' || ri.group_name || ')'
+                    ELSE COALESCE(ri.member_name, ri.group_name, cl.role_id)
+                END AS role_label
+            FROM content_links AS cl
+            LEFT JOIN role_info AS ri ON ri.role_id = cl.role_id
+            WHERE cl.url = %s
+            ORDER BY role_label;
+            """,
+            (url,),
+        )
+        return tuple(str(row[0]) for row in cursor.fetchall())
+
+
+def dead_link_role_notice(url: str, role_labels: tuple[str, ...]) -> str:
+    """Format the recovery warning used by the old bot."""
+
+    roles = ", ".join(role_labels) or "Unknown role"
+    return f"⚠️ Dead link detected: <{url}>\nAffected roles: {roles}"[:2000]
+
+
+def send_recovery_dead_link_notice(
+    connection: psycopg.Connection[Any],
+    webhook_url: str,
+    replacement_url: str,
+    source_url: str,
+) -> None:
+    """Log an explicitly dead replacement without changing its committed status."""
+
+    try:
+        notice = dead_link_role_notice(replacement_url, recovery_role_labels(connection, source_url))
+        if error := post_discord_notice(notice, webhook_url=webhook_url):
+            print(f"Failed to send dead-link notice for recovered URL {replacement_url}: {error}")
+    except Exception as error:
+        print(f"Failed to send dead-link notice for recovered URL {replacement_url}: {error}")
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as input_file:
@@ -1569,18 +1690,35 @@ def process_candidate(
             uploaded = imgur_client.upload(trimmed)
             imgur_client.verify_direct_url(uploaded.url)
             discord_result = probe_discord_embed(uploaded.url, webhook_url=revival_webhook_url)
-            if discord_result.status != "live":
+            if discord_result.status == "dead":
                 detail = discord_result.error or "Discord did not produce a media embed"
-                status = "dead" if discord_result.status == "dead" else "failed"
-                mark_failure(status, f"Discord revival validation was {discord_result.status}: {detail}")
-                notice_error = post_discord_notice(
-                    f"⚠️ Revival {discord_result.status}; database not updated\n<{uploaded.url}>",
-                    webhook_url=revival_webhook_url,
+                record_dead_replacement(
+                    connection,
+                    candidate,
+                    uploaded.url,
+                    batch_id,
+                    downloaded.recovery_method,
+                    downloaded.size,
+                    trimmed.stat().st_size,
+                    trimmed_sha256,
+                    uploaded.media_id,
+                    target_generation,
                 )
-                if notice_error:
-                    print(f"Revival Discord notice failed for {uploaded.url}: {notice_error}")
-                print(f"{status.upper()} ON ARRIVAL {candidate.content_link_id}: {detail}")
+                send_recovery_dead_link_notice(
+                    connection,
+                    revival_webhook_url,
+                    uploaded.url,
+                    candidate.url,
+                )
+                print(f"DEAD {candidate.content_link_id}: {detail}")
                 return None
+            if discord_result.status == "unknown" and not discord_result.embed_pending:
+                detail = discord_result.error or "Discord revival verification failed"
+                mark_failure("failed", f"Discord revival validation failed: {detail}")
+                print(f"FAILED {candidate.content_link_id}: Discord revival validation failed: {detail}")
+                return None
+            # Match Tsuki's delayed-unfurl behavior: direct media was already
+            # verified, so no embed is not evidence that the replacement died.
             return PendingRecovery(
                 candidate=candidate,
                 uploaded=uploaded,

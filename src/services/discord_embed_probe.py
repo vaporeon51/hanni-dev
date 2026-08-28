@@ -25,6 +25,7 @@ class DiscordEmbedProbeResult:
     status: ProbeStatus
     embed_type: str | None = None
     error: str | None = None
+    embed_pending: bool = False
 
 
 def post_discord_notice(
@@ -225,6 +226,7 @@ def probe_discord_embed(
             url=url,
             status="unknown",
             error=f"Discord produced no embed within {max(0.0, wait_seconds):g} seconds",
+            embed_pending=True,
         )
     except requests.RequestException as error:
         return DiscordEmbedProbeResult(

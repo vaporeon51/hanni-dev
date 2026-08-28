@@ -129,6 +129,7 @@ def test_no_embed_is_unknown_not_dead():
     )
 
     assert result.status == "unknown"
+    assert result.embed_pending is True
     assert result.error == "Discord produced no embed within 4 seconds"
     assert [call[0] for call in session.calls] == ["POST", "GET", "GET"]
 
@@ -139,6 +140,7 @@ def test_request_errors_do_not_expose_webhook_token():
     result = probe_discord_embed(MEDIA_URL, webhook_url=WEBHOOK_URL, session=session)
 
     assert result.status == "unknown"
+    assert result.embed_pending is False
     assert "very-secret-token" not in (result.error or "")
 
 

@@ -41,7 +41,7 @@ python -m src.worker recovery
 
 The dead-link worker applies `MIN_CONTENT_AGE`, posts each eligible candidate URL to its private channel, waits up to 30 seconds for Discord's embed, and records the old `article`-embed behavior as dead. Messages remain in the channel as an audit trail. A missing embed is unknown rather than dead, and two separate dead checks are still required before content leaves the feed. When the second failure marks the URL dead, the same channel receives an explicit notice. Checks are sequential and capped at 10 per batch by default to respect Discord's webhook rate limits. Without `DISCORD_DEAD_LINK_WEBHOOK_URL`, the job skips safely instead of applying a different definition of dead.
 
-Recovery requires `IMGUR_CLIENT_ID`, `DISCORD_REVIVAL_WEBHOOK_URL`, and `ffmpeg`. Candidates use the same `MIN_CONTENT_AGE` eligibility rule as the public feed. After direct media validation, each new URL is posted to the separate revival channel and is committed only if Discord produces a non-`article` embed. Those messages also remain in the channel.
+Recovery requires `IMGUR_CLIENT_ID`, `DISCORD_REVIVAL_WEBHOOK_URL`, and `ffmpeg`. Candidates use the same `MIN_CONTENT_AGE` eligibility rule as the public feed. After direct media validation, each new URL is posted to the separate revival channel. An explicit Discord `article` embed advances the failed derivative generation and leaves the source dead; a delayed embed is accepted like the old Tsuki pipeline because no embed is not proof of failure. Those messages remain in the channel.
 
 ## Background process choices
 

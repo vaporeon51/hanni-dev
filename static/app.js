@@ -182,6 +182,26 @@ function feedbackButton(className, action, text, count, label) {
   return button;
 }
 
+function reportSelect() {
+  const select = document.createElement("select");
+  select.className = "report-select";
+  select.dataset.action = "report";
+  select.setAttribute("aria-label", "Report this link");
+  [
+    ["", "report"],
+    ["dead_link", "dead link"],
+    ["wrong_idol", "wrong idol"],
+  ].forEach(([value, text], index) => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = text;
+    option.disabled = index === 0;
+    option.selected = index === 0;
+    select.appendChild(option);
+  });
+  return select;
+}
+
 function renderCard(item) {
   const card = document.createElement("article");
   card.className = "card";
@@ -221,7 +241,7 @@ function renderCard(item) {
   score.title = "upvotes minus downvotes";
   actions.appendChild(score);
   actions.appendChild(feedbackButton("downvote", "downvote", "↓", item.downvotes || 0, "Downvote this link"));
-  actions.appendChild(feedbackButton("report", "report", "report", undefined, "Report this link"));
+  actions.appendChild(reportSelect());
   actions.appendChild(feedbackButton("copy", "copy", "copy link", undefined, "Copy the Imgur link"));
   body.appendChild(actions);
 
@@ -286,26 +306,37 @@ function updateFeedback(card, payload) {
   if (score) score.textContent = `${payload.vote_score >= 0 ? "+" : ""}${payload.vote_score}`;
 }
 
-async function handleFeedback(card, button) {
+async function handleFeedback(card, control) {
   const id = card.dataset.contentLinkId;
-  const action = button.dataset.action;
+  const action = control.dataset.action;
   if (action === "copy") {
-    await copyLink(card, button);
+    await copyLink(card, control);
     return;
   }
 
-  const endpoint = action === "report" ? `/api/feed/${id}/report` : `/api/feed/${id}/vote/${action === "upvote" ? "up" : "down"}`;
-  button.disabled = true;
+  const reportReason = action === "report" ? control.value : "";
+  if (action === "report" && !reportReason) return;
+  const endpoint = action === "report"
+    ? `/api/feed/${id}/report?reason=${encodeURIComponent(reportReason)}`
+    : `/api/feed/${id}/vote/${action === "upvote" ? "up" : "down"}`;
+  control.disabled = true;
   try {
     const response = await fetch(endpoint, { method: "POST" });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.detail || "That action could not be recorded.");
     updateFeedback(card, payload);
-    setFeedbackMessage(card, action === "report" ? "thanks — report recorded ♡" : "vote recorded ♡");
+    if (reportReason === "dead_link") {
+      setFeedbackMessage(card, "thanks — dead link report recorded ♡");
+    } else if (reportReason === "wrong_idol") {
+      setFeedbackMessage(card, "thanks — wrong idol report recorded ♡");
+    } else {
+      setFeedbackMessage(card, "vote recorded ♡");
+    }
   } catch (error) {
     setFeedbackMessage(card, error.message || "That action could not be recorded.");
   } finally {
-    button.disabled = false;
+    control.disabled = false;
+    if (action === "report") control.selectedIndex = 0;
   }
 }
 
@@ -374,4 +405,10 @@ $("feed").addEventListener("click", (event) => {
   if (!button) return;
   const card = button.closest(".card");
   if (card) handleFeedback(card, button);
+});
+$("feed").addEventListener("change", (event) => {
+  const select = event.target.closest('select[data-action="report"]');
+  if (!select) return;
+  const card = select.closest(".card");
+  if (card) handleFeedback(card, select);
 });

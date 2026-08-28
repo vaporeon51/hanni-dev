@@ -100,12 +100,18 @@ def test_vote_endpoint_returns_updated_feedback(monkeypatch):
     response = asyncio.run(request())
 
     assert response.status_code == 200
-    assert response.json() == {"upvotes": 4, "downvotes": 1, "reports": 0, "vote_score": 3}
+    assert response.json() == {
+        "upvotes": 4,
+        "downvotes": 1,
+        "reports": 0,
+        "vote_score": 3,
+    }
 
 
-def test_report_endpoint_returns_updated_feedback(monkeypatch):
-    def fake_add_report(content_link_id):
+def test_wrong_idol_report_endpoint_returns_updated_feedback(monkeypatch):
+    def fake_add_report(content_link_id, reason):
         assert content_link_id == 4202
+        assert reason == "wrong_idol"
         return ContentFeedback(upvotes=2, downvotes=0, reports=1)
 
     monkeypatch.setattr(web_app, "add_content_report", fake_add_report)
@@ -113,12 +119,53 @@ def test_report_endpoint_returns_updated_feedback(monkeypatch):
     async def request():
         transport = httpx.ASGITransport(app=web_app.app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-            return await client.post("/api/feed/4202/report")
+            return await client.post("/api/feed/4202/report?reason=wrong_idol")
 
     response = asyncio.run(request())
 
     assert response.status_code == 200
     assert response.json()["reports"] == 1
+    assert "dead_link_reports" not in response.json()
+
+
+def test_dead_link_report_endpoint_returns_threshold_state(monkeypatch):
+    def fake_add_report(content_link_id, reason):
+        assert content_link_id == 4203
+        assert reason == "dead_link"
+        return ContentFeedback(
+            upvotes=1,
+            downvotes=0,
+            reports=0,
+            dead_link_reports=3,
+            is_dead=True,
+        )
+
+    monkeypatch.setattr(web_app, "add_content_report", fake_add_report)
+
+    async def request():
+        transport = httpx.ASGITransport(app=web_app.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            return await client.post("/api/feed/4203/report?reason=dead_link")
+
+    response = asyncio.run(request())
+
+    assert response.status_code == 200
+    assert "dead_link_reports" not in response.json()
+    assert "is_dead" not in response.json()
+
+
+def test_report_endpoint_requires_known_reason():
+    async def request():
+        transport = httpx.ASGITransport(app=web_app.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            missing = await client.post("/api/feed/4204/report")
+            unknown = await client.post("/api/feed/4204/report?reason=spam")
+            return missing, unknown
+
+    missing, unknown = asyncio.run(request())
+
+    assert missing.status_code == 422
+    assert unknown.status_code == 422
 
 
 def test_media_endpoint_returns_one_resolved_asset(monkeypatch):
@@ -218,6 +265,10 @@ def test_client_waits_for_search_and_autoplays_video():
     assert '$("query").blur()' in script
     assert '$("stop-feed").addEventListener("click", stopFeed)' in script
     assert '$("skip-latest").addEventListener("click", skipToLatest)' in script
+    assert 'select[data-action="report"]' in script
+    assert '["dead_link", "dead link"]' in script
+    assert '["wrong_idol", "wrong idol"]' in script
+    assert "dead link report ${payload.dead_link_reports} of 3" not in script
     assert "state.visibleCount > 1" not in script
     assert 'removeAttribute("src")' not in script
     assert "dataset.mediaSrc" not in script

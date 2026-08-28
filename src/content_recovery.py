@@ -1384,7 +1384,7 @@ def apply_success(
     imgur_id: str,
     replacement_generation: int,
 ) -> None:
-    """Atomically replace every dead row sharing a URL while preserving report counts."""
+    """Atomically replace every dead row sharing a URL while preserving moderation reports."""
 
     with connection.transaction():
         with connection.cursor() as cursor:
@@ -1396,6 +1396,7 @@ def apply_success(
                     recovery_generation = %s,
                     is_dead = FALSE,
                     is_recovery_exhausted = FALSE,
+                    dead_link_reports = 0,
                     processed_date = NOW()
                 WHERE url = %s
                   AND is_dead = TRUE

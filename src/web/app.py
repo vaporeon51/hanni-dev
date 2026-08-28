@@ -84,7 +84,7 @@ def _ensure_visitor_cookie(request: Request, response: Response) -> str:
     return visitor_id
 
 
-def _serialize_feedback(feedback: ContentFeedback) -> dict[str, int]:
+def _serialize_feedback(feedback: ContentFeedback) -> dict[str, int | bool]:
     return {
         "upvotes": feedback.upvotes,
         "downvotes": feedback.downvotes,
@@ -224,7 +224,8 @@ async def _run_feedback_action(
     content_link_id: int,
     action: Literal["vote", "report"],
     direction: Literal["up", "down"] | None = None,
-) -> dict[str, int]:
+    report_reason: Literal["dead_link", "wrong_idol"] | None = None,
+) -> dict[str, int | bool]:
     visitor_id = _ensure_visitor_cookie(request, response)
     limiter = _vote_rate_limiter if action == "vote" else _report_rate_limiter
     if not limiter.allow(visitor_id, content_link_id):
@@ -237,7 +238,7 @@ async def _run_feedback_action(
     if action == "vote":
         feedback = await asyncio.to_thread(add_content_vote, content_link_id, direction or "")
     else:
-        feedback = await asyncio.to_thread(add_content_report, content_link_id)
+        feedback = await asyncio.to_thread(add_content_report, content_link_id, report_reason or "")
     if feedback is None:
         raise HTTPException(status_code=404, detail="Content item not found")
     return _serialize_feedback(feedback)
@@ -249,7 +250,7 @@ async def vote(
     direction: Literal["up", "down"],
     request: Request,
     response: Response,
-) -> dict[str, int]:
+) -> dict[str, int | bool]:
     return await _run_feedback_action(
         request=request,
         response=response,
@@ -264,12 +265,14 @@ async def report(
     content_link_id: int,
     request: Request,
     response: Response,
-) -> dict[str, int]:
+    reason: Literal["dead_link", "wrong_idol"] = Query(...),
+) -> dict[str, int | bool]:
     return await _run_feedback_action(
         request=request,
         response=response,
         content_link_id=content_link_id,
         action="report",
+        report_reason=reason,
     )
 
 

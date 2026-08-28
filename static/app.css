@@ -198,16 +198,18 @@ button:disabled { cursor: wait; opacity: .55; }
 .recovered { color: var(--green); }
 
 .card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 13px; }
-.card-actions button {
+.card-actions button, .card-actions select {
   border: 1px solid var(--line);
   border-radius: 999px;
   background: #fff;
   color: var(--text);
+  cursor: pointer;
   font-size: .74rem;
   line-height: 1;
   padding: 7px 10px;
 }
-.card-actions button:hover { border-color: var(--pink); color: var(--pink-dark); }
+.card-actions button:hover, .card-actions select:hover { border-color: var(--pink); color: var(--pink-dark); }
+.card-actions select:disabled { cursor: wait; opacity: .55; }
 .card-actions .upvote:hover { border-color: var(--green); color: var(--green); }
 .card-actions .downvote:hover { border-color: var(--red); color: var(--red); }
 .card-actions .copy { margin-left: auto; padding-inline: 12px; }
@@ -250,7 +252,7 @@ button:disabled { cursor: wait; opacity: .55; }
   .card-media { padding: 7px; }
   .card-media img, .card-media video { max-height: 72svh; border-radius: 8px; }
   .card-actions { row-gap: 8px; }
-  .card-actions button { min-height: 38px; padding-inline: 12px; }
+  .card-actions button, .card-actions select { min-height: 38px; padding-inline: 12px; }
   .card-actions .copy { margin-left: 0; }
 }
 

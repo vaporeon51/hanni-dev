@@ -19,7 +19,7 @@ conda activate hanni-web
 cp .env.example .env
 ```
 
-Fill in the small set of required values in `.env`: `DATABASE_URL`, `USER_AUTH`, and `IMGUR_CLIENT_ID` (plus the source channel IDs if they differ from the defaults). Apply the numbered SQL migrations to the database in order. If you are reusing the existing Heroku Postgres database, leave its data intact and apply only migrations it does not already have; `migrations/table_updates30.sql` adds the web dead-link state.
+Fill in the small set of required values in `.env`: `DATABASE_URL`, `USER_AUTH`, and `IMGUR_CLIENT_ID` (plus the source channel IDs if they differ from the defaults). Apply the numbered SQL migrations to the database in order. If you are reusing the existing Heroku Postgres database, leave its data intact and apply only migrations it does not already have; `migrations/table_updates30.sql` adds the web dead-link state and `migrations/table_updates31.sql` adds user-reported dead-link counts.
 
 The worker's intervals, batch sizes, connection-pool sizing, media allowlist, and recovery limits have safe code defaults. They can be overridden later with Heroku config vars when needed, but do not need to live in local `.env`.
 

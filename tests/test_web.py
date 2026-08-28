@@ -285,7 +285,11 @@ def test_client_waits_for_search_and_autoplays_video():
     assert '$("move-top").addEventListener("click", moveToTop)' in script
     assert 'search.scrollIntoView' in script
     assert 'query").focus({ preventScroll: true })' in script
-    assert 'feedbackButton("report", "report", "report", undefined, "Report wrong idol")' in script
+    assert 'feedbackButton("upvote", "upvote", "↑", "Upvote this link")' in script
+    assert 'feedbackButton("downvote", "downvote", "↓", "Downvote this link")' in script
+    assert 'feedbackButton("report", "report", "report", "Report wrong idol")' in script
+    assert 'data-count="upvotes"' not in script
+    assert 'data-count="downvotes"' not in script
     assert 'const reportReason = action === "report" ? "wrong_idol" : "";' in script
     assert 'select[data-action="report"]' not in script
     assert '["dead_link", "dead link"]' not in script

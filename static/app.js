@@ -181,19 +181,13 @@ function appendMeta(meta, text, className = "") {
   meta.appendChild(element);
 }
 
-function feedbackButton(className, action, text, count, label) {
+function feedbackButton(className, action, text, label) {
   const button = document.createElement("button");
   button.type = "button";
   button.className = className;
   button.dataset.action = action;
   button.setAttribute("aria-label", label);
   button.textContent = text;
-  if (count !== undefined) {
-    const countElement = document.createElement("span");
-    countElement.dataset.count = action === "upvote" ? "upvotes" : "downvotes";
-    countElement.textContent = ` ${count}`;
-    button.appendChild(countElement);
-  }
   return button;
 }
 
@@ -228,16 +222,16 @@ function renderCard(item) {
 
   const actions = document.createElement("div");
   actions.className = "card-actions";
-  actions.appendChild(feedbackButton("upvote", "upvote", "↑", item.upvotes || 0, "Upvote this link"));
+  actions.appendChild(feedbackButton("upvote", "upvote", "↑", "Upvote this link"));
   const score = document.createElement("span");
   score.className = "vote-score";
   score.dataset.count = "vote-score";
   score.textContent = `${(item.vote_score || 0) >= 0 ? "+" : ""}${item.vote_score || 0}`;
   score.title = "upvotes minus downvotes";
   actions.appendChild(score);
-  actions.appendChild(feedbackButton("downvote", "downvote", "↓", item.downvotes || 0, "Downvote this link"));
-  actions.appendChild(feedbackButton("report", "report", "report", undefined, "Report wrong idol"));
-  actions.appendChild(feedbackButton("copy", "copy", "copy link", undefined, "Copy the Imgur link"));
+  actions.appendChild(feedbackButton("downvote", "downvote", "↓", "Downvote this link"));
+  actions.appendChild(feedbackButton("report", "report", "report", "Report wrong idol"));
+  actions.appendChild(feedbackButton("copy", "copy", "copy link", "Copy the Imgur link"));
   body.appendChild(actions);
 
   const message = document.createElement("p");
@@ -294,11 +288,7 @@ function setFeedbackMessage(card, text) {
 }
 
 function updateFeedback(card, payload) {
-  const upvotes = card.querySelector('[data-count="upvotes"]');
-  const downvotes = card.querySelector('[data-count="downvotes"]');
   const score = card.querySelector('[data-count="vote-score"]');
-  if (upvotes) upvotes.textContent = ` ${payload.upvotes}`;
-  if (downvotes) downvotes.textContent = ` ${payload.downvotes}`;
   if (score) score.textContent = `${payload.vote_score >= 0 ? "+" : ""}${payload.vote_score}`;
 }
 

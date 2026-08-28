@@ -99,8 +99,15 @@ button:disabled { cursor: wait; opacity: .55; }
   background: var(--page);
   box-shadow: 0 8px 28px rgba(82, 45, 60, .13);
 }
-.feed-status-line { display: inline-flex; align-items: center; gap: 9px; }
-.stop-feed, .skip-latest {
+.feed-status-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+#status { flex: 1 1 100%; overflow-wrap: anywhere; }
+.stop-feed, .skip-latest, .move-top {
   border: 0;
   border-bottom: 1px solid currentColor;
   background: transparent;
@@ -109,7 +116,7 @@ button:disabled { cursor: wait; opacity: .55; }
   line-height: 1.2;
   padding: 0;
 }
-.stop-feed[hidden], .skip-latest[hidden] { display: none; }
+.stop-feed[hidden], .skip-latest[hidden], .move-top[hidden] { display: none; }
 .reveal-progress {
   display: block;
   width: 132px;

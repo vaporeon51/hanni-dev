@@ -45,6 +45,10 @@ function setSkipLatestVisible(visible) {
   $("skip-latest").hidden = !visible;
 }
 
+function setMoveTopVisible(visible) {
+  $("move-top").hidden = !visible;
+}
+
 function setFeedOverlayFloating(floating) {
   $("status").closest(".feed-status").classList.toggle("is-floating", floating);
 }
@@ -75,11 +79,22 @@ function skipToLatest() {
   });
 }
 
+function moveToTop() {
+  const search = $("feed-form");
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  search.scrollIntoView({
+    behavior: reducedMotion ? "auto" : "smooth",
+    block: "start",
+  });
+  window.setTimeout(() => $("query").focus({ preventScroll: true }), reducedMotion ? 0 : 350);
+}
+
 function clearFeed() {
   const feed = $("feed");
   if (videoPlaybackObserver) feed.querySelectorAll("video").forEach((video) => videoPlaybackObserver.unobserve(video));
   while (feed.firstChild) feed.removeChild(feed.firstChild);
   setSkipLatestVisible(false);
+  setMoveTopVisible(false);
   setFeedOverlayFloating(false);
 }
 
@@ -277,6 +292,7 @@ function renderFeed() {
     state.visibleCount += 1;
     setFeedOverlayFloating(true);
     setSkipLatestVisible(true);
+    setMoveTopVisible(true);
 
     if (state.visibleCount < state.items.length) {
       setStatus(`showing ${state.visibleCount} of ${state.items.length} · next link in 2 seconds`);
@@ -400,6 +416,7 @@ async function loadFeed(event) {
 $("feed-form").addEventListener("submit", loadFeed);
 $("stop-feed").addEventListener("click", stopFeed);
 $("skip-latest").addEventListener("click", skipToLatest);
+$("move-top").addEventListener("click", moveToTop);
 $("feed").addEventListener("click", (event) => {
   const button = event.target.closest("button[data-action]");
   if (!button) return;

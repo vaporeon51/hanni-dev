@@ -265,6 +265,9 @@ def test_client_waits_for_search_and_autoplays_video():
     assert '$("query").blur()' in script
     assert '$("stop-feed").addEventListener("click", stopFeed)' in script
     assert '$("skip-latest").addEventListener("click", skipToLatest)' in script
+    assert '$("move-top").addEventListener("click", moveToTop)' in script
+    assert 'search.scrollIntoView' in script
+    assert 'query").focus({ preventScroll: true })' in script
     assert 'select[data-action="report"]' in script
     assert '["dead_link", "dead link"]' in script
     assert '["wrong_idol", "wrong idol"]' in script

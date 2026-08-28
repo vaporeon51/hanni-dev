@@ -119,9 +119,20 @@ app = FastAPI(title="Hanni", description="A web feed for ingested and recovered 
 app.mount("/static", StaticFiles(directory=str(REPO_ROOT / "static")), name="static")
 
 
+def _static_version() -> str:
+    """Change asset URLs whenever local CSS or JavaScript changes."""
+
+    assets = (REPO_ROOT / "static" / "app.css", REPO_ROOT / "static" / "app.js")
+    return str(max(asset.stat().st_mtime_ns for asset in assets))
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request) -> HTMLResponse:
-    response = templates.TemplateResponse(request=request, name="index.html", context={})
+    response = templates.TemplateResponse(
+        request=request,
+        name="index.html",
+        context={"static_version": _static_version()},
+    )
     _ensure_visitor_cookie(request, response)
     return response
 

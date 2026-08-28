@@ -245,6 +245,8 @@ def test_homepage_renders():
     assert "hanni" in response.text
     assert "search a member or group" in response.text
     assert '<footer class="site-credit">made by glaceon</footer>' in response.text
+    assert '/static/app.css?v=' in response.text
+    assert '/static/app.js?v=' in response.text
     assert '<option value="15" selected>15 links</option>' in response.text
     assert '<option value="random" selected>random</option>' in response.text
     assert '<option value="latest">latest</option>' in response.text
@@ -272,9 +274,10 @@ def test_client_waits_for_search_and_autoplays_video():
     assert '$("move-top").addEventListener("click", moveToTop)' in script
     assert 'search.scrollIntoView' in script
     assert 'query").focus({ preventScroll: true })' in script
-    assert 'select[data-action="report"]' in script
-    assert '["dead_link", "dead link"]' in script
-    assert '["wrong_idol", "wrong idol"]' in script
+    assert 'feedbackButton("report", "report", "report", undefined, "Report wrong idol")' in script
+    assert 'const reportReason = action === "report" ? "wrong_idol" : "";' in script
+    assert 'select[data-action="report"]' not in script
+    assert '["dead_link", "dead link"]' not in script
     assert "dead link report ${payload.dead_link_reports} of 3" not in script
     assert "state.visibleCount > 1" not in script
     assert 'removeAttribute("src")' not in script

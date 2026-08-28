@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.services.media import ResolvedMedia, resolve_media_url
+from src.services.media import MediaUpstreamError, ResolvedMedia, open_media_stream, resolve_media_url
 
 
 class FakeResponse:
@@ -61,3 +61,50 @@ def test_imgur_metadata_cannot_redirect_media_to_another_host():
     result = resolve_media_url("https://imgur.com/abc123", client_id="client-id", session=session)
 
     assert result == ResolvedMedia("link", "https://imgur.com/abc123")
+
+
+class FakeStreamResponse:
+    def __init__(self, status_code=206, content_type="video/mp4", url="https://i.imgur.com/abc123.mp4"):
+        self.status_code = status_code
+        self.url = url
+        self.headers = {"Content-Type": content_type}
+        self.closed = False
+
+    def close(self):
+        self.closed = True
+
+
+class FakeStreamSession:
+    def __init__(self, responses):
+        self.responses = iter(responses)
+        self.requests = []
+
+    def get(self, url, **kwargs):
+        self.requests.append((url, kwargs))
+        return next(self.responses)
+
+
+def test_media_stream_forwards_a_valid_range_header():
+    session = FakeStreamSession([FakeStreamResponse()])
+
+    response = open_media_stream(
+        "https://i.imgur.com/abc123.mp4",
+        range_header="bytes=0-1023",
+        session=session,
+    )
+
+    assert response.status_code == 206
+    assert session.requests[0][1]["headers"]["Range"] == "bytes=0-1023"
+
+
+def test_media_stream_rejects_non_imgur_urls_without_requesting():
+    session = FakeStreamSession([])
+
+    try:
+        open_media_stream("https://example.com/tracker.mp4", session=session)
+    except MediaUpstreamError as error:
+        assert "allowlisted" in str(error)
+    else:  # pragma: no cover
+        raise AssertionError("Expected a MediaUpstreamError")
+
+    assert session.requests == []

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+import re
+import time
 from dataclasses import asdict, dataclass
 from functools import lru_cache
 from typing import Literal
@@ -15,6 +17,11 @@ IMGUR_IMAGE_API = "https://api.imgur.com/3/image/{media_id}"
 IMGUR_HOSTS = {"imgur.com", "www.imgur.com", "i.imgur.com"}
 VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".m4v"}
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif"}
+TRANSIENT_UPSTREAM_STATUSES = {429, 502, 503, 504}
+
+
+class MediaUpstreamError(RuntimeError):
+    """Imgur did not return a browser-playable media response."""
 
 
 @dataclass(frozen=True)
@@ -112,3 +119,55 @@ def resolve_media_url(
 @lru_cache(maxsize=512)
 def resolve_media_url_cached(url: str) -> ResolvedMedia:
     return resolve_media_url(url)
+
+
+def open_media_stream(
+    url: str,
+    *,
+    range_header: str | None = None,
+    session: requests.Session | None = None,
+) -> requests.Response:
+    """Open one allowlisted Imgur asset and preserve browser Range requests."""
+
+    if _safe_imgur_asset(url) is None:
+        raise MediaUpstreamError("Media URL is not an allowlisted Imgur asset")
+
+    headers = {
+        "Accept": "image/*,video/*",
+        "User-Agent": "hanni-media-proxy/1.0",
+    }
+    if range_header and re.fullmatch(r"bytes=\d*-\d*", range_header):
+        headers["Range"] = range_header
+
+    requester = session or requests
+    response: requests.Response | None = None
+    for attempt in range(2):
+        try:
+            response = requester.get(url, headers=headers, timeout=(5, 30), stream=True)
+        except requests.RequestException as error:
+            if attempt == 0:
+                time.sleep(0.5)
+                continue
+            raise MediaUpstreamError("Imgur media request failed") from error
+
+        if response.status_code in {200, 206}:
+            break
+        status_code = response.status_code
+        response.close()
+        response = None
+        if attempt == 0 and status_code in TRANSIENT_UPSTREAM_STATUSES:
+            time.sleep(0.5)
+            continue
+        raise MediaUpstreamError(f"Imgur returned HTTP {status_code}")
+
+    if response is None:
+        raise MediaUpstreamError("Imgur media request failed")
+    if _safe_imgur_asset(response.url) is None:
+        response.close()
+        raise MediaUpstreamError("Imgur redirected media to a disallowed host")
+
+    content_type = response.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
+    if not (content_type.startswith("image/") or content_type.startswith("video/")):
+        response.close()
+        raise MediaUpstreamError("Imgur returned a non-media response")
+    return response

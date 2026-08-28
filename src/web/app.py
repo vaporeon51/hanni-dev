@@ -13,7 +13,7 @@ from typing import Any, Literal
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query, Request, Response
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -25,7 +25,7 @@ from src.db import POOL  # noqa: E402
 from src.db.feedback import ContentFeedback, add_content_report, add_content_vote  # noqa: E402
 from src.db.media import get_live_content_url  # noqa: E402
 from src.services.feed import load_feed, load_role_suggestions  # noqa: E402
-from src.services.media import resolve_media_url_cached  # noqa: E402
+from src.services.media import MediaUpstreamError, open_media_stream, resolve_media_url_cached  # noqa: E402
 
 templates = Jinja2Templates(directory=str(REPO_ROOT / "templates"))
 
@@ -176,7 +176,45 @@ async def media(content_link_id: int) -> dict[str, str]:
     if url is None:
         raise HTTPException(status_code=404, detail="Content item not found")
     resolved = await asyncio.to_thread(resolve_media_url_cached, url)
+    if resolved.kind in {"video", "image"}:
+        return {"kind": resolved.kind, "url": f"/api/feed/{content_link_id}/asset"}
     return resolved.as_dict()
+
+
+@app.get("/api/feed/{content_link_id}/asset")
+def media_asset(content_link_id: int, request: Request) -> StreamingResponse:
+    """Proxy one live Imgur asset so browsers do not hotlink the CDN."""
+
+    url = get_live_content_url(content_link_id)
+    if url is None:
+        raise HTTPException(status_code=404, detail="Content item not found")
+    resolved = resolve_media_url_cached(url)
+    if resolved.kind not in {"video", "image"}:
+        raise HTTPException(status_code=404, detail="Media asset is unavailable")
+
+    try:
+        upstream = open_media_stream(resolved.url, range_header=request.headers.get("range"))
+    except MediaUpstreamError as error:
+        raise HTTPException(status_code=502, detail=str(error)) from error
+
+    response_headers = {"Cache-Control": "public, max-age=3600"}
+    for header in ("Content-Length", "Content-Range", "Accept-Ranges", "ETag", "Last-Modified"):
+        value = upstream.headers.get(header)
+        if value:
+            response_headers[header] = value
+
+    def chunks():
+        try:
+            yield from upstream.iter_content(chunk_size=64 * 1024)
+        finally:
+            upstream.close()
+
+    return StreamingResponse(
+        chunks(),
+        status_code=upstream.status_code,
+        media_type=upstream.headers.get("Content-Type", "application/octet-stream"),
+        headers=response_headers,
+    )
 
 
 async def _run_feedback_action(

@@ -1,35 +1,51 @@
 const ALLOWED_LIMITS = new Set([1, 15, 30]);
+const ALLOWED_SORTS = new Set(["random", "latest", "oldest", "top"]);
 const REVEAL_DELAY_MS = 2000;
-const state = { items: [], revealTimer: null, revealToken: 0 };
+const state = { items: [], revealTimer: null, revealToken: 0, visibleCount: 0 };
 
 const $ = (id) => document.getElementById(id);
 
 const videoPlaybackObserver = "IntersectionObserver" in window
   ? new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
-        if (entry.isIntersecting) entry.target.play().catch(() => {});
-        else entry.target.pause();
+        if (entry.isIntersecting) {
+          if (!entry.target.src && entry.target.dataset.mediaSrc) {
+            entry.target.src = entry.target.dataset.mediaSrc;
+            entry.target.load();
+          }
+          entry.target.play().catch(() => {});
+        } else {
+          entry.target.pause();
+          entry.target.removeAttribute("src");
+          entry.target.load();
+        }
       });
-    }, { threshold: 0.35 })
+    }, { threshold: 0.25 })
   : null;
 
 function setStatus(text) {
   const status = $("status");
   status.textContent = text;
   status.hidden = !text;
-  status.parentElement.hidden = !text && $("reveal-progress").hidden;
+  status.closest(".feed-status").hidden = !text && $("reveal-progress").hidden;
 }
 
 function setRevealProgress(active) {
   const progress = $("reveal-progress");
+  const statusContainer = progress.closest(".feed-status");
   progress.hidden = !active;
+  statusContainer.classList.toggle("is-revealing", active);
   progress.classList.remove("is-counting");
   if (active) {
     // Restart the two-second fill animation for each incoming card.
     void progress.offsetWidth;
     progress.classList.add("is-counting");
   }
-  progress.parentElement.hidden = !active && $("status").hidden;
+  statusContainer.hidden = !active && $("status").hidden;
+}
+
+function setStopVisible(visible) {
+  $("stop-feed").hidden = !visible;
 }
 
 function cancelReveal() {
@@ -37,6 +53,14 @@ function cancelReveal() {
   state.revealTimer = null;
   state.revealToken += 1;
   setRevealProgress(false);
+  setStopVisible(false);
+}
+
+function stopFeed() {
+  if (state.revealTimer === null) return;
+  const visibleCount = state.visibleCount;
+  cancelReveal();
+  setStatus(`stopped at ${visibleCount} of ${state.items.length}`);
 }
 
 function clearFeed() {
@@ -87,6 +111,7 @@ function createMedia(item) {
       media.muted = true;
       media.preload = "auto";
       media.playsInline = true;
+      media.dataset.mediaSrc = resolved.url;
     } else {
       media.alt = item.label || "Feed item";
       media.loading = "eager";
@@ -210,30 +235,32 @@ function renderFeed() {
   }
 
   const token = state.revealToken;
-  let visibleCount = 0;
+  state.visibleCount = 0;
   const revealNext = () => {
     if (token !== state.revealToken) return;
-    const card = renderCard(state.items[visibleCount]);
+    const card = renderCard(state.items[state.visibleCount]);
     $("feed").appendChild(card);
     card._pendingMediaLoad();
-    visibleCount += 1;
+    state.visibleCount += 1;
 
-    if (visibleCount > 1) {
+    if (state.visibleCount > 1) {
       const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       window.requestAnimationFrame(() => card.scrollIntoView({
         behavior: reducedMotion ? "auto" : "smooth",
-        block: "start",
+        block: "center",
       }));
     }
 
-    if (visibleCount < state.items.length) {
-      setStatus(`showing ${visibleCount} of ${state.items.length} · next link in 2 seconds`);
+    if (state.visibleCount < state.items.length) {
+      setStatus(`showing ${state.visibleCount} of ${state.items.length} · next link in 2 seconds`);
       setRevealProgress(true);
+      setStopVisible(true);
       state.revealTimer = window.setTimeout(revealNext, REVEAL_DELAY_MS);
     } else {
       state.revealTimer = null;
       setRevealProgress(false);
-      setStatus(`${visibleCount} link${visibleCount === 1 ? "" : "s"} shown`);
+      setStopVisible(false);
+      setStatus(`${state.visibleCount} link${state.visibleCount === 1 ? "" : "s"} shown`);
     }
   };
   revealNext();
@@ -300,12 +327,15 @@ async function copyLink(card, button) {
 
 async function loadFeed(event) {
   if (event) event.preventDefault();
+  $("query").blur();
   cancelReveal();
   setStatus("finding little links…");
   const query = $("query").value.trim();
   const requestedLimit = Number($("limit").value);
   const limit = ALLOWED_LIMITS.has(requestedLimit) ? requestedLimit : 15;
-  const params = new URLSearchParams({ limit: String(limit) });
+  const requestedSort = $("sort").value;
+  const sort = ALLOWED_SORTS.has(requestedSort) ? requestedSort : "random";
+  const params = new URLSearchParams({ limit: String(limit), sort });
   const submitButton = $("feed-form").querySelector('button[type="submit"]');
   submitButton.disabled = true;
   if (query) params.set("query", query);
@@ -330,6 +360,7 @@ async function loadFeed(event) {
 }
 
 $("feed-form").addEventListener("submit", loadFeed);
+$("stop-feed").addEventListener("click", stopFeed);
 $("feed").addEventListener("click", (event) => {
   const button = event.target.closest("button[data-action]");
   if (!button) return;

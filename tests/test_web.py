@@ -37,7 +37,7 @@ def test_feed_endpoint_serializes_feed_items(monkeypatch):
     response = asyncio.run(request())
 
     assert response.status_code == 200
-    assert response.json()["items"][0]["label"] == "Hanni — NewJeans"
+    assert response.json()["items"][0]["label"] == "Hanni - NewJeans"
     assert response.json()["items"][0]["uploaded_date"] == "2026-01-01T00:00:00+00:00"
 
 
@@ -137,7 +137,50 @@ def test_media_endpoint_returns_one_resolved_asset(monkeypatch):
     response = asyncio.run(request())
 
     assert response.status_code == 200
-    assert response.json() == {"kind": "video", "url": "https://i.imgur.com/abc123.mp4"}
+    assert response.json() == {"kind": "video", "url": "/api/feed/42/asset"}
+
+
+def test_media_asset_proxies_range_response(monkeypatch):
+    class FakeUpstream:
+        status_code = 206
+        headers = {
+            "Content-Type": "video/mp4",
+            "Content-Length": "4",
+            "Content-Range": "bytes 0-3/20",
+            "Accept-Ranges": "bytes",
+        }
+
+        def iter_content(self, chunk_size):
+            assert chunk_size == 64 * 1024
+            yield b"test"
+
+        def close(self):
+            return None
+
+    monkeypatch.setattr(web_app, "get_live_content_url", lambda content_link_id: "https://i.imgur.com/abc123.mp4")
+    monkeypatch.setattr(
+        web_app,
+        "resolve_media_url_cached",
+        lambda url: ResolvedMedia("video", "https://i.imgur.com/abc123.mp4"),
+    )
+
+    def fake_open_media_stream(url, range_header):
+        assert url == "https://i.imgur.com/abc123.mp4"
+        assert range_header == "bytes=0-3"
+        return FakeUpstream()
+
+    monkeypatch.setattr(web_app, "open_media_stream", fake_open_media_stream)
+
+    async def request():
+        transport = httpx.ASGITransport(app=web_app.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            return await client.get("/api/feed/42/asset", headers={"Range": "bytes=0-3"})
+
+    response = asyncio.run(request())
+
+    assert response.status_code == 206
+    assert response.content == b"test"
+    assert response.headers["content-range"] == "bytes 0-3/20"
 
 
 def test_homepage_renders():
@@ -152,9 +195,12 @@ def test_homepage_renders():
     assert "hanni" in response.text
     assert "search a member or group" in response.text
     assert '<option value="15" selected>15 links</option>' in response.text
+    assert '<option value="random" selected>random</option>' in response.text
+    assert '<option value="latest">latest</option>' in response.text
     assert "Loading little links" not in response.text
     assert "a tiny corner for good links" not in response.text
     assert "autofeed" not in response.text.lower()
+    assert response.text.index('id="feed"') < response.text.index('class="feed-status"')
 
 
 def test_client_waits_for_search_and_autoplays_video():
@@ -162,8 +208,13 @@ def test_client_waits_for_search_and_autoplays_video():
 
     assert not script.rstrip().endswith("loadFeed();")
     assert "new Set([1, 15, 30])" in script
+    assert 'new Set(["random", "latest", "oldest", "top"])' in script
+    assert "new URLSearchParams({ limit: String(limit), sort })" in script
     assert "media.autoplay = true" in script
     assert "videoPlaybackObserver" in script
     assert "REVEAL_DELAY_MS = 2000" in script
     assert "scrollIntoView" in script
+    assert 'block: "center"' in script
+    assert '$("query").blur()' in script
+    assert '$("stop-feed").addEventListener("click", stopFeed)' in script
     assert "mediaCandidates" not in script

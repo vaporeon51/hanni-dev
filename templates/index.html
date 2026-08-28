@@ -3,18 +3,25 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>hanni ♡</title>
+    <title>hanni♡</title>
     <link rel="stylesheet" href="/static/app.css" />
   </head>
   <body>
     <main class="shell">
       <header class="brand">
-        <h1>hanni <span aria-hidden="true">♡</span></h1>
+        <h1>hanni<span aria-hidden="true">♡</span></h1>
       </header>
 
       <form id="feed-form" class="search" role="search">
         <label class="sr-only" for="query">Search by member or group</label>
         <input id="query" name="query" type="search" placeholder="search a member or group" autocomplete="off" />
+        <label class="sr-only" for="sort">Sort feed</label>
+        <select id="sort" name="sort" aria-label="Sort feed">
+          <option value="random" selected>random</option>
+          <option value="latest">latest</option>
+          <option value="oldest">oldest</option>
+          <option value="top">top</option>
+        </select>
         <label class="sr-only" for="limit">Number of links</label>
         <select id="limit" name="limit" aria-label="Number of links">
           <option value="1">1 link</option>
@@ -24,11 +31,14 @@
         <button type="submit">Search</button>
       </form>
 
+      <section id="feed" class="feed-list" aria-live="polite" aria-label="Content feed"></section>
       <div class="feed-status" aria-live="polite" hidden>
-        <span id="status" hidden></span>
+        <span class="feed-status-line">
+          <span id="status" hidden></span>
+          <button id="stop-feed" class="stop-feed" type="button" hidden>stop</button>
+        </span>
         <span id="reveal-progress" class="reveal-progress" hidden aria-hidden="true"><span></span></span>
       </div>
-      <section id="feed" class="feed-list" aria-live="polite" aria-label="Content feed"></section>
     </main>
     <script src="/static/app.js" defer></script>
   </body>

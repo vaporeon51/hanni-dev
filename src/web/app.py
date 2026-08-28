@@ -25,6 +25,7 @@ from src.db import POOL  # noqa: E402
 from src.db.feedback import ContentFeedback, add_content_report, add_content_vote  # noqa: E402
 from src.db.media import get_live_content_url  # noqa: E402
 from src.services.feed import load_feed, load_role_suggestions  # noqa: E402
+from src.services.dead_link_queue import enqueue_priority_url  # noqa: E402
 from src.services.media import MediaUpstreamError, open_media_stream, resolve_media_url_cached  # noqa: E402
 
 templates = Jinja2Templates(directory=str(REPO_ROOT / "templates"))
@@ -175,6 +176,8 @@ async def media(content_link_id: int) -> dict[str, str]:
     url = await asyncio.to_thread(get_live_content_url, content_link_id)
     if url is None:
         raise HTTPException(status_code=404, detail="Content item not found")
+    # This endpoint is requested as each delayed feed card is actually shown.
+    enqueue_priority_url(url)
     resolved = await asyncio.to_thread(resolve_media_url_cached, url)
     if resolved.kind in {"video", "image"}:
         return {"kind": resolved.kind, "url": f"/api/feed/{content_link_id}/asset"}

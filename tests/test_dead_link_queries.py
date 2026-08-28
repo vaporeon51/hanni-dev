@@ -91,14 +91,40 @@ def test_confirmed_dead_check_marks_every_row_for_the_url(monkeypatch):
     transition_query, transition_params = cursor.calls[1]
     assert "dead_check_failures = dead_check_failures + 1" in increment_query
     assert increment_params == ("article", "https://i.imgur.com/shared.mp4", REPORT_THRESHOLD)
-    assert "EXISTS" in transition_query
-    assert "confirmed.dead_check_failures" in transition_query
+    assert "EXISTS" not in transition_query
+    assert "dead_check_failures" not in transition_query
     assert "num_reports" not in transition_query
     assert transition_params == (
         CONTENT_RECOVERY_MAX_GENERATION,
         "https://i.imgur.com/shared.mp4",
-        "https://i.imgur.com/shared.mp4",
-        dead_links.DEAD_LINK_MAX_FAILURES,
+    )
+
+
+def test_priority_candidates_preserve_queue_order(monkeypatch):
+    cursor = CapturingCursor(
+        [
+            ("https://i.imgur.com/two.mp4", 1, ["Minji (NewJeans)"], 1),
+            ("https://i.imgur.com/one.mp4", 1, ["Hanni (NewJeans)"], 2),
+        ]
+    )
+    monkeypatch.setattr(dead_links, "POOL", FakePool(FakeConnection(cursor)))
+
+    rows = dead_links.get_candidates_by_urls(
+        ["https://i.imgur.com/two.mp4", "https://i.imgur.com/one.mp4"],
+        min_age="21 years",
+    )
+
+    assert [row.url for row in rows] == [
+        "https://i.imgur.com/two.mp4",
+        "https://i.imgur.com/one.mp4",
+    ]
+    assert "WITH ORDINALITY" in cursor.query
+    assert "ORDER BY position" in cursor.query
+    assert cursor.params == (
+        ["https://i.imgur.com/two.mp4", "https://i.imgur.com/one.mp4"],
+        REPORT_THRESHOLD,
+        "21 years",
+        *(f"%://{host}/%" for host in sorted(EPHEMERAL_MEDIA_HOSTS)),
     )
 
 

@@ -16,9 +16,8 @@ load_dotenv(REPO_ROOT / ".env.local", override=True)
 
 from src.config.constants import (  # noqa: E402
     CONTENT_RECOVERY_BATCH_SIZE,
-    DEAD_LINK_BATCH_SIZE,
     DEAD_LINK_INTERVAL_SECONDS,
-    DISCORD_DEAD_LINK_BATCH_SIZE,
+    DEAD_LINK_RUN_INTERVAL_SECONDS,
     DISCORD_DEAD_LINK_WEBHOOK_URL,
     INGESTION_INTERVAL_SECONDS,
     MIN_CONTENT_AGE,
@@ -27,9 +26,10 @@ from src.config.constants import (  # noqa: E402
 from src.content_recovery import RecoveryBatchConfig, dead_link_role_notice, run_recovery_batch  # noqa: E402
 from src.content_update import run_incremental_update  # noqa: E402
 from src.db import POOL  # noqa: E402
-from src.db.dead_links import get_due_urls, record_check  # noqa: E402
+from src.db.dead_links import get_candidates_by_urls, get_due_urls, record_check  # noqa: E402
 from src.db.locks import advisory_lock  # noqa: E402
 from src.services.discord_embed_probe import post_discord_notice, probe_discord_embed  # noqa: E402
+from src.services.dead_link_queue import take_priority_urls  # noqa: E402
 
 
 def run_ingestion_once() -> object:
@@ -54,11 +54,15 @@ def run_dead_link_checks_once() -> dict[str, int | str]:
                 "unknown": 0,
             }
 
-        candidates = get_due_urls(
-            limit=min(DEAD_LINK_BATCH_SIZE, DISCORD_DEAD_LINK_BATCH_SIZE),
-            min_interval_seconds=DEAD_LINK_INTERVAL_SECONDS,
-            min_age=MIN_CONTENT_AGE,
-        )
+        priority_urls = take_priority_urls(1)
+        priority_candidates = get_candidates_by_urls(priority_urls, min_age=MIN_CONTENT_AGE)
+        candidates = list(priority_candidates)
+        if not candidates:
+            candidates = get_due_urls(
+                limit=1,
+                min_interval_seconds=DEAD_LINK_INTERVAL_SECONDS,
+                min_age=MIN_CONTENT_AGE,
+            )
         summary = {"status": "completed", "checked": 0, "live": 0, "dead": 0, "unknown": 0}
         # Webhook requests share a tight Discord rate-limit bucket. Keep them
         # sequential and let the probe honor Retry-After responses.
@@ -126,15 +130,18 @@ async def scheduler_loop() -> None:
         if now - last_ingestion >= INGESTION_INTERVAL_SECONDS:
             jobs.append(("ingestion", run_ingestion_once))
             last_ingestion = now
-        if now - last_dead_links >= DEAD_LINK_INTERVAL_SECONDS:
+        if now - last_dead_links >= DEAD_LINK_RUN_INTERVAL_SECONDS:
             jobs.append(("dead-link checks", run_dead_link_checks_once))
-            last_dead_links = now
         if now - last_recovery >= RECOVERY_INTERVAL_SECONDS:
             jobs.append(("recovery", run_recovery_once))
             last_recovery = now
         for name, function in jobs:
             await _run_blocking(name, function)
-        await asyncio.sleep(5)
+            if name == "dead-link checks":
+                # Measure cadence from completion, not start. This keeps one
+                # serial checker with a real pause between Discord batches.
+                last_dead_links = loop.time()
+        await asyncio.sleep(min(5, max(0.1, float(DEAD_LINK_RUN_INTERVAL_SECONDS))))
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:

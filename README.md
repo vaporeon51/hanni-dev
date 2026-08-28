@@ -4,7 +4,7 @@ This repository is the web-only version of Hanni. It has four responsibilities:
 
 1. Read content from the configured Discord channel with `USER_AUTH` and store it in Postgres.
 2. Serve a searchable, single-page feed at `/` and `/api/feed`.
-3. Check whether media URLs embed in Discord and mark repeatedly confirmed failures as dead.
+3. Check whether media URLs embed in Discord and mark confirmed failures as dead.
 4. Recover dead Imgur media, upload a trimmed replacement, and update the related rows.
 
 Signed Discord CDN and media-proxy attachment URLs are intentionally excluded from ingestion and feed selection because their query-string signatures expire. Historical rows remain in Postgres but are not served or checked.
@@ -39,7 +39,7 @@ python -m src.worker dead-links
 python -m src.worker recovery
 ```
 
-The dead-link worker applies `MIN_CONTENT_AGE`, posts each eligible candidate URL to its private channel, waits up to 30 seconds for Discord's embed, and records the old `article`-embed behavior as dead. Messages remain in the channel as an audit trail. A missing embed is unknown rather than dead, and two separate dead checks are still required before content leaves the feed. When the second failure marks the URL dead, the same channel receives an explicit notice. Checks are sequential and capped at 10 per batch by default to respect Discord's webhook rate limits. Without `DISCORD_DEAD_LINK_WEBHOOK_URL`, the job skips safely instead of applying a different definition of dead.
+The dead-link worker applies `MIN_CONTENT_AGE`, posts each eligible candidate URL to its private channel, waits up to 15 seconds for Discord's embed, and records the old `article`-embed behavior as dead. Messages remain in the channel as an audit trail. A missing embed is unknown rather than dead; an explicit `article` embed marks every row for that URL dead immediately and posts a notice in the same channel. URLs whose cards are actually revealed in the web feed enter a process-local, de-duplicated FIFO priority queue capped at 100 items. The checker is serial: it takes one queued URL when available, otherwise one regular database-sweep URL, processes it fully, waits two seconds, and repeats. Individual database URLs retain a five-minute minimum recheck interval. The queue is shared with the scheduler in the one-dyno `RUN_BACKGROUND_TASKS=true` deployment. Without `DISCORD_DEAD_LINK_WEBHOOK_URL`, the job skips safely instead of applying a different definition of dead.
 
 Recovery requires `IMGUR_CLIENT_ID`, `DISCORD_REVIVAL_WEBHOOK_URL`, and `ffmpeg`. Candidates use the same `MIN_CONTENT_AGE` eligibility rule as the public feed. After direct media validation, each new URL is posted to the separate revival channel. An explicit Discord `article` embed advances the failed derivative generation and leaves the source dead; a delayed embed is accepted like the old Tsuki pipeline because no embed is not proof of failure. Those messages remain in the channel.
 

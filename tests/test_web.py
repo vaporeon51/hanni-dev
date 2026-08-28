@@ -169,7 +169,9 @@ def test_report_endpoint_requires_known_reason():
 
 
 def test_media_endpoint_returns_one_resolved_asset(monkeypatch):
+    queued = []
     monkeypatch.setattr(web_app, "get_live_content_url", lambda content_link_id: "https://imgur.com/abc123")
+    monkeypatch.setattr(web_app, "enqueue_priority_url", queued.append)
     monkeypatch.setattr(
         web_app,
         "resolve_media_url_cached",
@@ -185,6 +187,7 @@ def test_media_endpoint_returns_one_resolved_asset(monkeypatch):
 
     assert response.status_code == 200
     assert response.json() == {"kind": "video", "url": "/api/feed/42/asset"}
+    assert queued == ["https://imgur.com/abc123"]
 
 
 def test_media_asset_proxies_range_response(monkeypatch):
@@ -241,6 +244,7 @@ def test_homepage_renders():
     assert response.status_code == 200
     assert "hanni" in response.text
     assert "search a member or group" in response.text
+    assert '<footer class="site-credit">made by glaceon</footer>' in response.text
     assert '<option value="15" selected>15 links</option>' in response.text
     assert '<option value="random" selected>random</option>' in response.text
     assert '<option value="latest">latest</option>' in response.text

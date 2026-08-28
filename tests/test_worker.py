@@ -29,8 +29,7 @@ def test_dead_link_worker_uses_discord_when_webhook_is_configured(monkeypatch):
 
     monkeypatch.setattr(worker, "advisory_lock", acquired_lock)
     monkeypatch.setattr(worker, "DISCORD_DEAD_LINK_WEBHOOK_URL", WEBHOOK_URL := "https://discord.com/api/webhooks/1/token")
-    monkeypatch.setattr(worker, "DEAD_LINK_BATCH_SIZE", 50)
-    monkeypatch.setattr(worker, "DISCORD_DEAD_LINK_BATCH_SIZE", 10)
+    monkeypatch.setattr(worker, "take_priority_urls", lambda limit: [])
     monkeypatch.setattr(worker, "get_due_urls", get_candidates)
     monkeypatch.setattr(
         worker,
@@ -51,7 +50,7 @@ def test_dead_link_worker_uses_discord_when_webhook_is_configured(monkeypatch):
     summary = worker.run_dead_link_checks_once()
 
     assert WEBHOOK_URL.endswith("/1/token")
-    assert query["limit"] == 10
+    assert query["limit"] == 1
     assert query["min_age"] == worker.MIN_CONTENT_AGE
     assert recorded == [("https://i.imgur.com/abc.mp4", "dead", "article")]
     assert notices == [
@@ -64,9 +63,56 @@ def test_dead_link_worker_uses_discord_when_webhook_is_configured(monkeypatch):
     assert summary == {"status": "completed", "checked": 1, "live": 0, "dead": 1, "unknown": 0}
 
 
+def test_dead_link_worker_checks_revealed_feed_url_instead_of_sweep(monkeypatch):
+    priority = DeadLinkCandidate(
+        url="https://i.imgur.com/priority.mp4",
+        content_link_count=1,
+        role_labels=("Hanni (NewJeans)",),
+    )
+    checked = []
+    queue_limits = []
+
+    monkeypatch.setattr(worker, "advisory_lock", acquired_lock)
+    monkeypatch.setattr(worker, "DISCORD_DEAD_LINK_WEBHOOK_URL", "https://discord.com/api/webhooks/1/token")
+    monkeypatch.setattr(
+        worker,
+        "take_priority_urls",
+        lambda limit: queue_limits.append(limit) or [priority.url],
+    )
+    monkeypatch.setattr(
+        worker,
+        "get_candidates_by_urls",
+        lambda urls, *, min_age: [priority],
+    )
+    monkeypatch.setattr(
+        worker,
+        "get_due_urls",
+        lambda **kwargs: (_ for _ in ()).throw(AssertionError("queried sweep while queue had work")),
+    )
+    monkeypatch.setattr(
+        worker,
+        "probe_discord_embed",
+        lambda url, *, webhook_url: (
+            checked.append(url) or DiscordEmbedProbeResult(url=url, status="live")
+        ),
+    )
+    monkeypatch.setattr(worker, "record_check", lambda **kwargs: 1)
+
+    summary = worker.run_dead_link_checks_once()
+
+    assert queue_limits == [1]
+    assert checked == [priority.url]
+    assert summary == {"status": "completed", "checked": 1, "live": 1, "dead": 0, "unknown": 0}
+
+
 def test_dead_link_worker_skips_without_webhook(monkeypatch):
     monkeypatch.setattr(worker, "advisory_lock", acquired_lock)
     monkeypatch.setattr(worker, "DISCORD_DEAD_LINK_WEBHOOK_URL", "")
+    monkeypatch.setattr(
+        worker,
+        "take_priority_urls",
+        lambda limit: (_ for _ in ()).throw(AssertionError("drained priority queue")),
+    )
     monkeypatch.setattr(worker, "get_due_urls", lambda **_kwargs: (_ for _ in ()).throw(AssertionError("queried DB")))
 
     summary = worker.run_dead_link_checks_once()

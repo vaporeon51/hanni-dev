@@ -109,10 +109,16 @@ def run_all_once() -> dict[str, object]:
     }
 
 
-async def _run_blocking(name: str, function: Callable[[], object]) -> None:
+async def _run_blocking(
+    name: str,
+    function: Callable[[], object],
+    *,
+    log_result: bool = True,
+) -> None:
     try:
         result = await asyncio.to_thread(function)
-        print(f"{name}: {result}", flush=True)
+        if log_result:
+            print(f"{name}: {result}", flush=True)
     except Exception as error:  # keep the scheduler alive after one bad external call
         print(f"{name} failed: {type(error).__name__}: {error}", flush=True)
 
@@ -136,7 +142,7 @@ async def scheduler_loop() -> None:
             jobs.append(("recovery", run_recovery_once))
             last_recovery = now
         for name, function in jobs:
-            await _run_blocking(name, function)
+            await _run_blocking(name, function, log_result=name != "dead-link checks")
             if name == "dead-link checks":
                 # Measure cadence from completion, not start. This keeps one
                 # serial checker with a real pause between Discord batches.

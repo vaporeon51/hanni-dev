@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from contextlib import contextmanager
 
 from src.db.dead_links import DeadLinkCandidate
@@ -120,3 +121,14 @@ def test_dead_link_worker_skips_without_webhook(monkeypatch):
     assert summary["status"] == "skipped"
     assert summary["checked"] == 0
     assert "not configured" in summary["reason"]
+
+
+def test_background_runner_can_suppress_success_without_hiding_failure(capsys):
+    asyncio.run(worker._run_blocking("dead-link checks", lambda: {"checked": 1}, log_result=False))
+    assert capsys.readouterr().out == ""
+
+    def fail():
+        raise RuntimeError("Discord unavailable")
+
+    asyncio.run(worker._run_blocking("dead-link checks", fail, log_result=False))
+    assert "dead-link checks failed: RuntimeError: Discord unavailable" in capsys.readouterr().out

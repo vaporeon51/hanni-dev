@@ -306,7 +306,13 @@ async function handleFeedback(card, control) {
   const id = card.dataset.contentLinkId;
   const action = control.dataset.action;
   if (action === "copy") {
-    await copyLink(card, control);
+    control.disabled = true;
+    try {
+      const copied = await copyLink(card, control);
+      if (copied) await recordImplicitUpvote(card, id);
+    } finally {
+      control.disabled = false;
+    }
     return;
   }
 
@@ -349,10 +355,24 @@ async function copyLink(card, button) {
       textarea.remove();
     }
     message.textContent = "link copied ♡";
+    return true;
   } catch (_) {
     message.textContent = "couldn't copy automatically — use the source link";
+    return false;
+  } finally {
+    button.blur();
   }
-  button.blur();
+}
+
+async function recordImplicitUpvote(card, id) {
+  try {
+    const response = await fetch(`/api/feed/${id}/vote/up`, { method: "POST" });
+    if (!response.ok) return;
+    const payload = await response.json().catch(() => ({}));
+    updateFeedback(card, payload);
+  } catch (_) {
+    // Copying is the primary action; voting failures should remain unobtrusive.
+  }
 }
 
 async function loadFeed(event) {

@@ -294,3 +294,5 @@ def test_client_waits_for_search_and_autoplays_video():
     assert 'removeAttribute("src")' not in script
     assert "dataset.mediaSrc" not in script
     assert "mediaCandidates" not in script
+    assert "if (copied) await recordImplicitUpvote(card, id);" in script
+    assert "async function recordImplicitUpvote(card, id)" in script

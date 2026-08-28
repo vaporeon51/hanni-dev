@@ -1,10 +1,16 @@
-"""Persistent state for non-Discord dead-link checks."""
+"""Persistent state for Discord-based dead-link checks."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.config.constants import CONTENT_RECOVERY_MAX_GENERATION, DEAD_LINK_MAX_FAILURES, REPORT_THRESHOLD
+from src.config.constants import (
+    CONTENT_RECOVERY_MAX_GENERATION,
+    DEAD_LINK_MAX_FAILURES,
+    EPHEMERAL_MEDIA_HOSTS,
+    MIN_CONTENT_AGE,
+    REPORT_THRESHOLD,
+)
 from src.db import POOL
 
 
@@ -14,28 +20,47 @@ class DeadLinkCandidate:
     content_link_count: int
 
 
-def get_due_urls(*, limit: int, min_interval_seconds: int) -> list[DeadLinkCandidate]:
-    """Return distinct URLs whose check interval has elapsed."""
+def get_due_urls(
+    *,
+    limit: int,
+    min_interval_seconds: int,
+    min_age: str = MIN_CONTENT_AGE,
+) -> list[DeadLinkCandidate]:
+    """Return age-eligible URLs whose Discord check interval has elapsed."""
 
     limit = max(1, int(limit))
     interval = max(0, int(min_interval_seconds))
+    excluded_hosts = sorted(EPHEMERAL_MEDIA_HOSTS)
+    excluded_sql = "\n              " + "\n              ".join(
+        "AND LOWER(cl.url) NOT LIKE %s" for _host in excluded_hosts
+    )
     with POOL.connection() as connection, connection.cursor() as cursor:
         cursor.execute(
-            """
-            SELECT url, COUNT(*)::integer AS content_link_count
-            FROM content_links
-            WHERE is_dead = FALSE
-              AND num_reports < %s
-              AND url IS NOT NULL
+            f"""
+            SELECT cl.url, COUNT(*)::integer AS content_link_count
+            FROM content_links AS cl
+            JOIN role_info AS ri ON ri.role_id = cl.role_id
+            WHERE cl.is_dead = FALSE
+              AND cl.num_reports < %s
+              AND cl.url IS NOT NULL
+              AND cl.uploaded_date IS NOT NULL
+              AND cl.uploaded_date > ri.birthday + %s::interval
+              {excluded_sql}
               AND (
-                    last_checked_at IS NULL
-                 OR last_checked_at <= NOW() - (%s * INTERVAL '1 second')
+                    cl.last_checked_at IS NULL
+                 OR cl.last_checked_at <= NOW() - (%s * INTERVAL '1 second')
               )
-            GROUP BY url
-            ORDER BY MIN(last_checked_at) NULLS FIRST, url
+            GROUP BY cl.url
+            ORDER BY MIN(cl.last_checked_at) NULLS FIRST, cl.url
             LIMIT %s
             """,
-            (REPORT_THRESHOLD, interval, limit),
+            (
+                REPORT_THRESHOLD,
+                min_age,
+                *(f"%://{host}/%" for host in excluded_hosts),
+                interval,
+                limit,
+            ),
         )
         return [DeadLinkCandidate(url=str(row[0]), content_link_count=int(row[1])) for row in cursor.fetchall()]
 

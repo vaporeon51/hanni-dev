@@ -4,8 +4,10 @@ This repository is the web-only version of Hanni. It has four responsibilities:
 
 1. Read content from the configured Discord channel with `USER_AUTH` and store it in Postgres.
 2. Serve a searchable, single-page feed at `/` and `/api/feed`.
-3. Check allowlisted media URLs directly over HTTP and mark confirmed dead URLs.
+3. Check whether media URLs embed in Discord and mark repeatedly confirmed failures as dead.
 4. Recover dead Imgur media, upload a trimmed replacement, and update the related rows.
+
+Signed Discord CDN and media-proxy attachment URLs are intentionally excluded from ingestion and feed selection because their query-string signatures expire. Historical rows remain in Postgres but are not served or checked.
 
 There is no Discord bot, gateway connection, Discord message sender, or personal `/bias` feed here. Discord is a read-only historical source for ingestion and recovery fallback.
 
@@ -19,7 +21,7 @@ conda activate hanni-web
 cp .env.example .env
 ```
 
-Fill in the small set of required values in `.env`: `DATABASE_URL`, `USER_AUTH`, and `IMGUR_CLIENT_ID` (plus the source channel IDs if they differ from the defaults). Apply the numbered SQL migrations to the database in order. If you are reusing the existing Heroku Postgres database, leave its data intact and apply only migrations it does not already have; `migrations/table_updates30.sql` adds the web dead-link state and `migrations/table_updates31.sql` adds user-reported dead-link counts.
+Fill in the small set of required values in `.env`: `DATABASE_URL`, `USER_AUTH`, `IMGUR_CLIENT_ID`, `DISCORD_DEAD_LINK_WEBHOOK_URL`, and `DISCORD_REVIVAL_WEBHOOK_URL` (plus the source channel IDs if they differ from the defaults). Use two private channels: the first webhook receives routine dead-link probes, and the second receives newly uploaded revival links for dead-on-arrival validation. Webhook URLs are secrets and must never be committed. Apply the numbered SQL migrations to the database in order. If you are reusing the existing Heroku Postgres database, leave its data intact and apply only migrations it does not already have; `migrations/table_updates30.sql` adds the web dead-link state and `migrations/table_updates31.sql` adds user-reported dead-link counts.
 
 The worker's intervals, batch sizes, connection-pool sizing, media allowlist, and recovery limits have safe code defaults. They can be overridden later with Heroku config vars when needed, but do not need to live in local `.env`.
 
@@ -37,7 +39,9 @@ python -m src.worker dead-links
 python -m src.worker recovery
 ```
 
-Recovery requires `IMGUR_CLIENT_ID` and `ffmpeg`. It only uploads after direct media validation and never posts a verification message to Discord.
+The dead-link worker applies `MIN_CONTENT_AGE`, posts each eligible candidate URL to its private channel, waits up to 30 seconds for Discord's embed, and records the old `article`-embed behavior as dead. Messages remain in the channel as an audit trail. A missing embed is unknown rather than dead, and two separate dead checks are still required before content leaves the feed. When the second failure marks the URL dead, the same channel receives an explicit notice. Checks are sequential and capped at 10 per batch by default to respect Discord's webhook rate limits. Without `DISCORD_DEAD_LINK_WEBHOOK_URL`, the job skips safely instead of applying a different definition of dead.
+
+Recovery requires `IMGUR_CLIENT_ID`, `DISCORD_REVIVAL_WEBHOOK_URL`, and `ffmpeg`. Candidates use the same `MIN_CONTENT_AGE` eligibility rule as the public feed. After direct media validation, each new URL is posted to the separate revival channel and is committed only if Discord produces a non-`article` embed. Those messages also remain in the channel.
 
 ## Background process choices
 

@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import asyncio
 import os
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Callable
 
@@ -19,7 +18,10 @@ from src.config.constants import (  # noqa: E402
     CONTENT_RECOVERY_BATCH_SIZE,
     DEAD_LINK_BATCH_SIZE,
     DEAD_LINK_INTERVAL_SECONDS,
+    DISCORD_DEAD_LINK_BATCH_SIZE,
+    DISCORD_DEAD_LINK_WEBHOOK_URL,
     INGESTION_INTERVAL_SECONDS,
+    MIN_CONTENT_AGE,
     RECOVERY_INTERVAL_SECONDS,
 )
 from src.content_recovery import RecoveryBatchConfig, run_recovery_batch  # noqa: E402
@@ -27,7 +29,7 @@ from src.content_update import run_incremental_update  # noqa: E402
 from src.db import POOL  # noqa: E402
 from src.db.dead_links import get_due_urls, record_check  # noqa: E402
 from src.db.locks import advisory_lock  # noqa: E402
-from src.services.media_probe import probe_url  # noqa: E402
+from src.services.discord_embed_probe import post_discord_notice, probe_discord_embed  # noqa: E402
 
 
 def run_ingestion_once() -> object:
@@ -42,18 +44,36 @@ def run_dead_link_checks_once() -> dict[str, int | str]:
         if not acquired:
             return {"status": "skipped", "checked": 0, "live": 0, "dead": 0, "unknown": 0}
 
+        if not DISCORD_DEAD_LINK_WEBHOOK_URL:
+            return {
+                "status": "skipped",
+                "reason": "DISCORD_DEAD_LINK_WEBHOOK_URL is not configured",
+                "checked": 0,
+                "live": 0,
+                "dead": 0,
+                "unknown": 0,
+            }
+
         candidates = get_due_urls(
-            limit=DEAD_LINK_BATCH_SIZE,
+            limit=min(DEAD_LINK_BATCH_SIZE, DISCORD_DEAD_LINK_BATCH_SIZE),
             min_interval_seconds=DEAD_LINK_INTERVAL_SECONDS,
+            min_age=MIN_CONTENT_AGE,
         )
         summary = {"status": "completed", "checked": 0, "live": 0, "dead": 0, "unknown": 0}
-        with ThreadPoolExecutor(max_workers=min(8, max(1, len(candidates)))) as executor:
-            futures = {candidate.url: executor.submit(probe_url, candidate.url) for candidate in candidates}
-            for url, future in futures.items():
-                result = future.result()
-                record_check(url=url, status=result.status, error=result.error)
-                summary["checked"] += 1
-                summary[result.status] += 1
+        # Webhook requests share a tight Discord rate-limit bucket. Keep them
+        # sequential and let the probe honor Retry-After responses.
+        for candidate in candidates:
+            result = probe_discord_embed(candidate.url, webhook_url=DISCORD_DEAD_LINK_WEBHOOK_URL)
+            transitioned_count = record_check(url=candidate.url, status=result.status, error=result.error)
+            if result.status == "dead" and transitioned_count > 0:
+                notice_error = post_discord_notice(
+                    f"⚠️ Marked dead after repeated Discord embed failures\n<{candidate.url}>",
+                    webhook_url=DISCORD_DEAD_LINK_WEBHOOK_URL,
+                )
+                if notice_error:
+                    print(f"Dead-link Discord notice failed for {candidate.url}: {notice_error}", flush=True)
+            summary["checked"] += 1
+            summary[result.status] += 1
         return summary
 
 
@@ -70,6 +90,7 @@ def run_recovery_once() -> dict[str, object]:
                 auth_env="USER_AUTH",
                 max_pages=int(os.getenv("CONTENT_RECOVERY_MAX_PAGES", "0")) or None,
                 history_fallback=os.getenv("CONTENT_RECOVERY_HISTORY_FALLBACK", "false").lower() in {"1", "true", "yes"},
+                min_age=MIN_CONTENT_AGE,
             )
         )
 

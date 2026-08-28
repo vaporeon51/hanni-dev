@@ -5,6 +5,9 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Literal
+from urllib.parse import urlsplit
+
+from src.config.constants import EPHEMERAL_MEDIA_HOSTS
 
 SUPPORTED_VIDEO_EMBED_TYPES = frozenset({"gifv", "video"})
 ANIMATED_MEDIA_FLAG = 1 << 5
@@ -52,7 +55,8 @@ def media_urls(message: dict[str, Any]) -> list[str]:
         if embed_type not in SUPPORTED_VIDEO_EMBED_TYPES and not _is_animated_image_embed(embed):
             continue
         url = embed.get("url")
-        if isinstance(url, str) and url and url not in seen:
+        hostname = (urlsplit(url).hostname or "").lower() if isinstance(url, str) else ""
+        if isinstance(url, str) and url and hostname not in EPHEMERAL_MEDIA_HOSTS and url not in seen:
             seen.add(url)
             urls.append(url)
     return urls

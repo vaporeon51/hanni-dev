@@ -12,6 +12,8 @@ from urllib.parse import urlsplit
 
 import requests
 
+from src.config.constants import EPHEMERAL_MEDIA_HOSTS
+
 MediaKind = Literal["video", "image", "link"]
 IMGUR_IMAGE_API = "https://api.imgur.com/3/image/{media_id}"
 IMGUR_ALBUM_IMAGES_API = "https://api.imgur.com/3/album/{media_id}/images"
@@ -103,6 +105,9 @@ def resolve_media_url(
     A single authenticated metadata request replaces the old browser behavior
     of probing several possible file extensions for every item.
     """
+
+    if (urlsplit(url).hostname or "").lower() in EPHEMERAL_MEDIA_HOSTS:
+        return ResolvedMedia("link", url)
 
     extension = _extension(url)
     if extension in VIDEO_EXTENSIONS:

@@ -30,6 +30,12 @@ def test_direct_mp4_does_not_need_an_imgur_lookup():
     assert result == ResolvedMedia("video", "https://i.imgur.com/abc123.mp4")
 
 
+def test_discord_attachment_is_left_as_an_external_link():
+    url = "https://cdn.discordapp.com/attachments/1/2/video.mp4?ex=expired"
+
+    assert resolve_media_url(url) == ResolvedMedia("link", url)
+
+
 def test_imgur_page_resolves_to_animated_mp4():
     session = FakeSession(
         {

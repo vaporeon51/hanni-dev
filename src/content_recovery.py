@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """Recover, transform, re-upload, and replace broken Imgur content links.
 
-Recovery uses direct HTTP media validation. Discord is only a read-only source
-of historical URLs when the original media is not available directly.
+Recovery uses direct HTTP media validation and a dedicated Discord webhook to
+ensure each uploaded replacement embeds before it is committed. Discord user
+authorization is otherwise only a read-only source of historical URLs.
 
 Usage:
     python scripts/recover_content.py https://imgur.com/t5wnHGu
     python scripts/recover_content.py batch --role-id 1000863360776147054 --limit 50 --apply
 
 By default this uses USER_AUTH from the repository's .env and searches the
-configured source channel. It never posts to Discord.
+configured source channel. Revival verification messages are posted to the
+private channel configured by DISCORD_REVIVAL_WEBHOOK_URL.
 """
 
 from __future__ import annotations
@@ -43,7 +45,9 @@ from src.config.constants import (  # isort: skip
     CONTENT_RECOVERY_MAX_GENERATION,
     CONTENT_RECOVERY_MAX_UPLOADS_PER_HOUR,
     CONTENT_RECOVERY_UPLOAD_INTERVAL,
+    MIN_CONTENT_AGE,
 )
+from src.services.discord_embed_probe import post_discord_notice, probe_discord_embed  # isort: skip
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_GUILD_ID = "124767749099618304"
@@ -1076,6 +1080,8 @@ class RecoveryBatchConfig:
     imgur_client_id_env: str = "IMGUR_CLIENT_ID"
     upload_interval: float = CONTENT_RECOVERY_UPLOAD_INTERVAL
     max_uploads_per_hour: int = CONTENT_RECOVERY_MAX_UPLOADS_PER_HOUR
+    min_age: str = MIN_CONTENT_AGE
+    revival_webhook_url_env: str = "DISCORD_REVIVAL_WEBHOOK_URL"
 
 
 @dataclass(frozen=True)
@@ -1093,7 +1099,12 @@ def get_database_url() -> str:
     return database_url
 
 
-def fetch_candidates(connection: psycopg.Connection[Any], role_id: str | None, limit: int) -> list[Candidate]:
+def fetch_candidates(
+    connection: psycopg.Connection[Any],
+    role_id: str | None,
+    limit: int,
+    min_age: str = MIN_CONTENT_AGE,
+) -> list[Candidate]:
     """Select one dead Imgur row per URL in the order with the most user impact first."""
 
     if limit < 1:
@@ -1102,29 +1113,32 @@ def fetch_candidates(connection: psycopg.Connection[Any], role_id: str | None, l
         raise ValueError("--role-id must contain only digits")
 
     role_filter = ""
-    params: list[object] = [CONTENT_RECOVERY_MAX_GENERATION]
+    params: list[object] = [CONTENT_RECOVERY_MAX_GENERATION, min_age]
     if role_id:
-        role_filter = "AND role_id = %s"
+        role_filter = "AND cl.role_id = %s"
         params.append(role_id)
     params.append(limit)
 
     query = f"""
         WITH eligible_candidates AS (
             SELECT
-                content_link_id,
-                role_id,
-                url,
-                original_url,
-                recovery_generation,
-                num_reports,
-                COALESCE(initial_reaction_count, 0) AS initial_reaction_count,
-                author,
-                uploaded_date
-            FROM content_links
-            WHERE is_dead = TRUE
-              AND is_recovery_exhausted = FALSE
-              AND recovery_generation < %s
-              AND url ILIKE '%%imgur.com/%%'
+                cl.content_link_id,
+                cl.role_id,
+                cl.url,
+                cl.original_url,
+                cl.recovery_generation,
+                cl.num_reports,
+                COALESCE(cl.initial_reaction_count, 0) AS initial_reaction_count,
+                cl.author,
+                cl.uploaded_date
+            FROM content_links AS cl
+            JOIN role_info AS ri ON ri.role_id = cl.role_id
+            WHERE cl.is_dead = TRUE
+              AND cl.is_recovery_exhausted = FALSE
+              AND cl.recovery_generation < %s
+              AND cl.uploaded_date IS NOT NULL
+              AND cl.uploaded_date > ri.birthday + %s::interval
+              AND cl.url ILIKE '%%imgur.com/%%'
               {role_filter}
         ),
         one_candidate_per_url AS (
@@ -1480,6 +1494,7 @@ def process_candidate(
     media_client: DiscordReadClient,
     imgur_client: ImgurClient,
     batch_id: str,
+    revival_webhook_url: str,
 ) -> PendingRecovery | None:
     """Recover, trim, and upload a single candidate for database commit."""
 
@@ -1553,6 +1568,19 @@ def process_candidate(
             trimmed_sha256 = sha256(trimmed)
             uploaded = imgur_client.upload(trimmed)
             imgur_client.verify_direct_url(uploaded.url)
+            discord_result = probe_discord_embed(uploaded.url, webhook_url=revival_webhook_url)
+            if discord_result.status != "live":
+                detail = discord_result.error or "Discord did not produce a media embed"
+                status = "dead" if discord_result.status == "dead" else "failed"
+                mark_failure(status, f"Discord revival validation was {discord_result.status}: {detail}")
+                notice_error = post_discord_notice(
+                    f"⚠️ Revival {discord_result.status}; database not updated\n<{uploaded.url}>",
+                    webhook_url=revival_webhook_url,
+                )
+                if notice_error:
+                    print(f"Revival Discord notice failed for {uploaded.url}: {notice_error}")
+                print(f"{status.upper()} ON ARRIVAL {candidate.content_link_id}: {detail}")
+                return None
             return PendingRecovery(
                 candidate=candidate,
                 uploaded=uploaded,
@@ -1582,7 +1610,7 @@ def process_candidate(
 
 
 def finalize_pending_recovery(connection: psycopg.Connection[Any], pending: PendingRecovery) -> None:
-    """Commit an uploaded replacement after its direct HTTP check succeeds."""
+    """Commit an uploaded replacement after HTTP and Discord checks succeed."""
 
     try:
         apply_success(
@@ -1619,16 +1647,19 @@ def finalize_pending_recovery(connection: psycopg.Connection[Any], pending: Pend
 def run_recovery_batch(config: RecoveryBatchConfig, *, print_candidates_output: bool = True) -> dict[str, object]:
     """Run one recovery batch and return its database-backed summary.
 
-    The replacement is validated against Imgur directly before it is committed;
-    there is no Discord posting or unfurl-verification step.
+    The replacement is validated against Imgur directly and then in a separate
+    private Discord revival channel before it is committed.
     """
 
     client_id = os.getenv(config.imgur_client_id_env, "").strip()
     if not client_id:
         raise RuntimeError(f"{config.imgur_client_id_env} is not loaded")
+    revival_webhook_url = os.getenv(config.revival_webhook_url_env, "").strip()
+    if not revival_webhook_url:
+        raise RuntimeError(f"{config.revival_webhook_url_env} is not loaded")
 
     with psycopg.connect(get_database_url()) as connection:
-        candidates = fetch_candidates(connection, config.role_id, config.limit)
+        candidates = fetch_candidates(connection, config.role_id, config.limit, config.min_age)
         connection.commit()
         print(
             f"Content recovery starting: selected={len(candidates)} limit={config.limit} "
@@ -1674,6 +1705,7 @@ def run_recovery_batch(config: RecoveryBatchConfig, *, print_candidates_output: 
                         media_client,
                         imgur_client,
                         batch_id,
+                        revival_webhook_url,
                     )
                     if pending:
                         finalize_pending_recovery(connection, pending)
@@ -1796,7 +1828,7 @@ def run_batch_cli(argv: list[str] | None = None) -> int:
         )
         if not args.apply:
             with psycopg.connect(get_database_url()) as connection:
-                candidates = fetch_candidates(connection, config.role_id, config.limit)
+                candidates = fetch_candidates(connection, config.role_id, config.limit, config.min_age)
             print_candidates(candidates)
             print("Dry run only; pass --apply to recover, upload, and update rows.")
             return 0

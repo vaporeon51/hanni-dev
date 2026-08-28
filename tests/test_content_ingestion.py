@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.content_ingestion import ContentMessageClassifier
+from src.content_ingestion import ContentMessageClassifier, media_urls
 
 
 def message(message_id: str, timestamp: str, *, content: str = "", roles=None, embeds=None, reference=None):
@@ -56,3 +56,24 @@ def test_unrelated_media_message_is_not_attributed_to_previous_role():
     )
 
     assert classifier.consume(unrelated) == []
+
+
+def test_ephemeral_discord_attachment_urls_are_not_ingested():
+    payload = message(
+        "200",
+        "2026-08-28T00:00:00+00:00",
+        roles=["role-1"],
+        embeds=[
+            {
+                "type": "video",
+                "url": "https://cdn.discordapp.com/attachments/1/2/video.mp4?ex=expired",
+            },
+            {
+                "type": "video",
+                "url": "https://media.discordapp.net/attachments/1/2/video.mp4?ex=expired",
+            },
+        ],
+    )
+
+    assert media_urls(payload) == []
+    assert ContentMessageClassifier().consume(payload) == []

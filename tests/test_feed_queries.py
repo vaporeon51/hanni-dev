@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from src.config.constants import EPHEMERAL_MEDIA_HOSTS
 from src.db import feed as feed_db
 
 
@@ -69,7 +70,9 @@ def test_feed_sql_has_a_parameter_for_each_placeholder(monkeypatch):
         feed_db.get_feed_items(sort=sort, limit=1, min_age="18 year 1 month")
         query, params = pool.connection_instance.cursor_instance.calls[-1]
         assert query.count("%s") == len(params)
-        assert len(params) == expected_select_parameters + 3
+        assert len(params) == expected_select_parameters + 3 + len(EPHEMERAL_MEDIA_HOSTS)
+        for host in EPHEMERAL_MEDIA_HOSTS:
+            assert f"%://{host}/%" in params
 
 
 def test_role_search_uses_tokenized_best_match(monkeypatch):

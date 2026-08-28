@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Literal
 
 from src.config.constants import (
+    EPHEMERAL_MEDIA_HOSTS,
     INITIAL_REACT_CAP,
     MAX_FEED_ITEMS,
     REPORT_THRESHOLD,
@@ -15,6 +16,12 @@ from src.config.constants import (
 from src.db import POOL
 
 FeedSort = Literal["random", "latest", "oldest", "top"]
+
+
+def _ephemeral_url_filters(alias: str = "cl") -> tuple[list[str], list[str]]:
+    filters = [f"LOWER({alias}.url) NOT LIKE %s" for _host in sorted(EPHEMERAL_MEDIA_HOSTS)]
+    params = [f"%://{host}/%" for host in sorted(EPHEMERAL_MEDIA_HOSTS)]
+    return filters, params
 
 
 @dataclass(frozen=True)
@@ -111,6 +118,9 @@ def get_feed_items(
             "cl.uploaded_date > ri.birthday + %s::interval",
         ]
         params: list[object] = [REPORT_THRESHOLD, min_age]
+        ephemeral_filters, ephemeral_params = _ephemeral_url_filters()
+        where.extend(ephemeral_filters)
+        params.extend(ephemeral_params)
         if role_ids is not None:
             where.append("cl.role_id = ANY(%s)")
             params.append(role_ids)
@@ -203,9 +213,11 @@ def get_role_suggestions(*, query: str, limit: int = 8, min_age: str) -> list[di
     if not query:
         return []
     limit = max(1, min(int(limit), 20))
+    ephemeral_filters, ephemeral_params = _ephemeral_url_filters()
+    ephemeral_sql = "\n                    " + "\n                    ".join(f"AND {item}" for item in ephemeral_filters)
     with POOL.connection() as connection, connection.cursor() as cursor:
         cursor.execute(
-            r"""
+            rf"""
             WITH query AS (
                 SELECT string_to_array(
                     regexp_replace(LOWER(TRIM(%s)), '[^a-zA-Z0-9\s]', '', 'g'),
@@ -240,11 +252,12 @@ def get_role_suggestions(*, query: str, limit: int = 8, min_age: str) -> list[di
                   WHERE cl.role_id = matches.role_id
                     AND cl.is_dead = FALSE
                     AND cl.num_reports < %s
+                    {ephemeral_sql}
               )
             ORDER BY RANDOM(), role_id
             LIMIT %s
             """,
-            (query, min_age, REPORT_THRESHOLD, limit),
+            (query, min_age, REPORT_THRESHOLD, *ephemeral_params, limit),
         )
         return [
             {"role_id": str(row[0]), "member_name": row[1], "group_name": row[2]}

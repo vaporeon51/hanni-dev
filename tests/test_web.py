@@ -258,6 +258,8 @@ def test_homepage_renders():
     assert "max-width: min(100%, 520px)" in css
     assert "width: min(560px, 100%)" in css
     assert "max-height: min(62vh, 540px)" in css
+    assert "max-height: var(--mobile-media-max-height)" in css
+    assert ".card-actions .upvote, .card-actions .downvote { min-width: 42px; }" in css
     assert '<option value="15" selected>15 links</option>' in response.text
     assert '<option value="random" selected>random</option>' in response.text
     assert '<option value="latest">latest</option>' in response.text
@@ -277,6 +279,8 @@ def test_client_waits_for_search_and_autoplays_video():
     assert "media.autoplay = true" in script
     assert "videoPlaybackObserver" in script
     assert "REVEAL_DELAY_MS = 2000" in script
+    assert "function lockMobileMediaHeight()" in script
+    assert 'window.addEventListener("orientationchange"' in script
     assert "scrollIntoView" in script
     assert 'block: "end"' in script
     assert '$("query").blur()' in script

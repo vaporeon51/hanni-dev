@@ -1,5 +1,6 @@
 :root {
   color-scheme: light;
+  --mobile-media-max-height: 72svh;
   --page: #fffafb;
   --card: #ffffff;
   --text: #33272d;
@@ -232,6 +233,7 @@ button:disabled { cursor: wait; opacity: .55; }
   padding: 7px 10px;
 }
 .card-actions button:hover { border-color: var(--pink); color: var(--pink-dark); }
+.card-actions .upvote, .card-actions .downvote { min-width: 42px; }
 .card-actions .upvote:hover { border-color: var(--green); color: var(--green); }
 .card-actions .downvote:hover { border-color: var(--red); color: var(--red); }
 .card-actions .copy { margin-left: auto; padding-inline: 12px; white-space: nowrap; }
@@ -272,7 +274,12 @@ button:disabled { cursor: wait; opacity: .55; }
   .card { border-radius: 13px; scroll-margin-top: 10px; }
   .card-body { padding: 15px; }
   .card-media { padding: 7px; }
-  .card-media img, .card-media video { width: 100%; max-width: 100%; max-height: 72svh; border-radius: 8px; }
+  .card-media img, .card-media video {
+    width: 100%;
+    max-width: 100%;
+    max-height: var(--mobile-media-max-height);
+    border-radius: 8px;
+  }
   .card-actions { gap: 4px; }
   .card-actions button { min-height: 34px; padding-inline: 8px; }
   .card-actions .copy { margin-left: auto; }

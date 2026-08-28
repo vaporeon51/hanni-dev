@@ -5,6 +5,23 @@ const state = { items: [], revealTimer: null, revealToken: 0, visibleCount: 0 };
 
 const $ = (id) => document.getElementById(id);
 
+function lockMobileMediaHeight() {
+  if (!window.matchMedia("(max-width: 620px)").matches) {
+    document.documentElement.style.removeProperty("--mobile-media-max-height");
+    return;
+  }
+  const viewportHeight = window.visualViewport?.height || window.innerHeight;
+  document.documentElement.style.setProperty(
+    "--mobile-media-max-height",
+    `${Math.floor(viewportHeight * 0.72)}px`,
+  );
+}
+
+lockMobileMediaHeight();
+window.addEventListener("orientationchange", () => {
+  window.setTimeout(lockMobileMediaHeight, 250);
+});
+
 const videoPlaybackObserver = "IntersectionObserver" in window
   ? new IntersectionObserver((entries) => {
       entries.forEach((entry) => {

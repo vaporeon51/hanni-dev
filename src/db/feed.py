@@ -40,30 +40,41 @@ class FeedItem:
 
 
 def _role_ids_for_query(connection, query: str, min_age: str) -> list[str]:
-    """Resolve a friendly member/group search to role IDs.
+    """Resolve a query using the old token-based best-match behavior."""
 
-    This intentionally uses the stable role columns instead of the old Discord
-    command's fuzzy-ranking helpers. The web feed only needs a predictable,
-    bounded set of matches.
-    """
-
-    pattern = f"%{query.strip()}%"
     with connection.cursor() as cursor:
         cursor.execute(
-            """
+            r"""
+            WITH query AS (
+                SELECT string_to_array(
+                    regexp_replace(LOWER(TRIM(%s)), '[^a-zA-Z0-9\s]', '', 'g'),
+                    ' '
+                ) AS terms
+            ),
+            matches AS (
+                SELECT
+                    role_id,
+                    (
+                        SELECT COUNT(*)
+                        FROM unnest(member_group_array) AS mga
+                        WHERE mga = ANY (query.terms)
+                    ) AS match_count
+                FROM role_info, query
+                WHERE birthday IS NOT NULL
+                  AND NOW() > birthday + %s::interval
+            ),
+            maxmatches AS (
+                SELECT MAX(match_count) AS max_matches
+                FROM matches
+            )
             SELECT role_id
-            FROM role_info
-            WHERE birthday IS NOT NULL
-              AND NOW() > birthday + %s::interval
-              AND (
-                    member_name ILIKE %s
-                 OR group_name ILIKE %s
-                 OR string_tag ILIKE %s
-              )
-            ORDER BY member_name NULLS LAST, group_name NULLS LAST, role_id
+            FROM matches
+            JOIN maxmatches ON matches.match_count = maxmatches.max_matches
+            WHERE matches.match_count > 0
+            ORDER BY RANDOM(), role_id
             LIMIT 100
             """,
-            (min_age, pattern, pattern, pattern),
+            (query, min_age),
         )
         return [str(row[0]) for row in cursor.fetchall()]
 
@@ -192,31 +203,48 @@ def get_role_suggestions(*, query: str, limit: int = 8, min_age: str) -> list[di
     if not query:
         return []
     limit = max(1, min(int(limit), 20))
-    pattern = f"%{query}%"
-
     with POOL.connection() as connection, connection.cursor() as cursor:
         cursor.execute(
-            """
+            r"""
+            WITH query AS (
+                SELECT string_to_array(
+                    regexp_replace(LOWER(TRIM(%s)), '[^a-zA-Z0-9\s]', '', 'g'),
+                    ' '
+                ) AS terms
+            ),
+            matches AS (
+                SELECT
+                    role_id,
+                    member_name,
+                    group_name,
+                    (
+                        SELECT COUNT(*)
+                        FROM unnest(member_group_array) AS mga
+                        WHERE mga = ANY (query.terms)
+                    ) AS match_count
+                FROM role_info, query
+                WHERE birthday IS NOT NULL
+                  AND NOW() > birthday + %s::interval
+            ),
+            maxmatches AS (
+                SELECT MAX(match_count) AS max_matches
+                FROM matches
+            )
             SELECT role_id, member_name, group_name
-            FROM role_info
-            WHERE birthday IS NOT NULL
-              AND NOW() > birthday + %s::interval
-              AND (
-                    member_name ILIKE %s
-                 OR group_name ILIKE %s
-                 OR string_tag ILIKE %s
-              )
+            FROM matches
+            JOIN maxmatches ON matches.match_count = maxmatches.max_matches
+            WHERE matches.match_count > 0
               AND EXISTS (
                   SELECT 1
                   FROM content_links AS cl
-                  WHERE cl.role_id = role_info.role_id
+                  WHERE cl.role_id = matches.role_id
                     AND cl.is_dead = FALSE
                     AND cl.num_reports < %s
               )
-            ORDER BY member_name NULLS LAST, group_name NULLS LAST, role_id
+            ORDER BY RANDOM(), role_id
             LIMIT %s
             """,
-            (min_age, pattern, pattern, pattern, REPORT_THRESHOLD, limit),
+            (query, min_age, REPORT_THRESHOLD, limit),
         )
         return [
             {"role_id": str(row[0]), "member_name": row[1], "group_name": row[2]}

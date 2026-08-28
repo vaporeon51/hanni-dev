@@ -70,3 +70,22 @@ def test_feed_sql_has_a_parameter_for_each_placeholder(monkeypatch):
         query, params = pool.connection_instance.cursor_instance.calls[-1]
         assert query.count("%s") == len(params)
         assert len(params) == expected_select_parameters + 3
+
+
+def test_role_search_uses_tokenized_best_match(monkeypatch):
+    pool = FakePool()
+    monkeypatch.setattr(feed_db, "POOL", pool)
+
+    role_ids = feed_db._role_ids_for_query(
+        pool.connection_instance,
+        "chaewon sserafim",
+        "18 year 1 month",
+    )
+
+    query, params = pool.connection_instance.cursor_instance.calls[-1]
+    assert role_ids == ["1"]
+    assert "string_to_array" in query
+    assert "regexp_replace" in query
+    assert "unnest(member_group_array)" in query
+    assert "maxmatches" in query
+    assert params == ("chaewon sserafim", "18 year 1 month")

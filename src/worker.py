@@ -24,7 +24,7 @@ from src.config.constants import (  # noqa: E402
     MIN_CONTENT_AGE,
     RECOVERY_INTERVAL_SECONDS,
 )
-from src.content_recovery import RecoveryBatchConfig, run_recovery_batch  # noqa: E402
+from src.content_recovery import RecoveryBatchConfig, dead_link_role_notice, run_recovery_batch  # noqa: E402
 from src.content_update import run_incremental_update  # noqa: E402
 from src.db import POOL  # noqa: E402
 from src.db.dead_links import get_due_urls, record_check  # noqa: E402
@@ -67,7 +67,7 @@ def run_dead_link_checks_once() -> dict[str, int | str]:
             transitioned_count = record_check(url=candidate.url, status=result.status, error=result.error)
             if result.status == "dead" and transitioned_count > 0:
                 notice_error = post_discord_notice(
-                    f"⚠️ Marked dead after repeated Discord embed failures\n<{candidate.url}>",
+                    dead_link_role_notice(candidate.url, candidate.role_labels),
                     webhook_url=DISCORD_DEAD_LINK_WEBHOOK_URL,
                 )
                 if notice_error:

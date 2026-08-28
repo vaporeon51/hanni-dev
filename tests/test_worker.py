@@ -19,7 +19,13 @@ def test_dead_link_worker_uses_discord_when_webhook_is_configured(monkeypatch):
 
     def get_candidates(*, limit: int, min_interval_seconds: int, min_age: str):
         query.update(limit=limit, min_interval_seconds=min_interval_seconds, min_age=min_age)
-        return [DeadLinkCandidate(url="https://i.imgur.com/abc.mp4", content_link_count=1)]
+        return [
+            DeadLinkCandidate(
+                url="https://i.imgur.com/abc.mp4",
+                content_link_count=1,
+                role_labels=("Hanni (NewJeans)", "Minji (NewJeans)"),
+            )
+        ]
 
     monkeypatch.setattr(worker, "advisory_lock", acquired_lock)
     monkeypatch.setattr(worker, "DISCORD_DEAD_LINK_WEBHOOK_URL", WEBHOOK_URL := "https://discord.com/api/webhooks/1/token")
@@ -50,7 +56,8 @@ def test_dead_link_worker_uses_discord_when_webhook_is_configured(monkeypatch):
     assert recorded == [("https://i.imgur.com/abc.mp4", "dead", "article")]
     assert notices == [
         (
-            "⚠️ Marked dead after repeated Discord embed failures\n<https://i.imgur.com/abc.mp4>",
+            "⚠️ Dead link detected: <https://i.imgur.com/abc.mp4>\n"
+            "Affected roles: Hanni (NewJeans), Minji (NewJeans)",
             WEBHOOK_URL,
         )
     ]

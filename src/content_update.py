@@ -1,0 +1,70 @@
+"""Incremental content ingestion from the configured Discord channel."""
+
+import asyncio
+from datetime import datetime, timezone
+
+from src import content_discord, content_ingestion
+from src.db import content_update as content_update_db
+
+
+async def run_content_links_update() -> None:
+    """Ingest new content messages and safe media continuations."""
+
+    print("Starting content update...")
+    last_message_id = await asyncio.to_thread(content_update_db.get_latest_message_id)
+    known_role_ids = await asyncio.to_thread(content_update_db.get_known_role_ids)
+    classifier = content_ingestion.ContentMessageClassifier(fallback_role_ids=known_role_ids)
+    context_messages = await asyncio.to_thread(content_discord.get_messages_around, last_message_id)
+    recent_links: list[content_ingestion.ContentLinkDraft] = []
+    for message in sorted(context_messages, key=lambda item: int(item["id"])):
+        if int(message["id"]) <= int(last_message_id):
+            recent_links.extend(classifier.consume(message))
+
+    reconciled_links = 0
+    if recent_links:
+        reconciled_links = await asyncio.to_thread(
+            content_update_db.reconcile_content_links,
+            datetime.now(timezone.utc),
+            recent_links,
+        )
+
+    new_messages = await asyncio.to_thread(content_discord.get_messages_after, last_message_id)
+    if not new_messages:
+        print(f"Completed content updates: no new messages; reconciled={reconciled_links:,}.")
+        return
+
+    processed_messages = 0
+    inserted_links = 0
+    while True:
+        new_messages.sort(key=lambda message: int(message["id"]))
+        page_links: list[content_ingestion.ContentLinkDraft] = []
+        for message in new_messages:
+            page_links.extend(classifier.consume(message))
+
+        last_message_id = str(new_messages[-1]["id"])
+        inserted_links += await asyncio.to_thread(
+            content_update_db.persist_content_update,
+            datetime.now(timezone.utc),
+            last_message_id,
+            page_links,
+        )
+        processed_messages += len(new_messages)
+        print(
+            f"Processed {processed_messages:,} messages through {new_messages[-1]['timestamp']}; "
+            f"inserted={inserted_links:,}."
+        )
+        await asyncio.sleep(content_discord.REQUEST_DELAY_SECONDS)
+        new_messages = await asyncio.to_thread(content_discord.get_messages_after, last_message_id)
+        if not new_messages:
+            break
+
+    print(
+        f"Completed content updates: messages={processed_messages:,} "
+        f"inserted={inserted_links:,} reconciled={reconciled_links:,}."
+    )
+
+
+def run_incremental_update() -> None:
+    """Synchronous worker entrypoint for one ingestion pass."""
+
+    asyncio.run(run_content_links_update())

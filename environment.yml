@@ -1,0 +1,9 @@
+name: hanni-web
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - ffmpeg
+  - pip
+  - pip:
+      - -r requirements.txt

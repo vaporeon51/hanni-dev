@@ -1,0 +1,338 @@
+const ALLOWED_LIMITS = new Set([1, 15, 30]);
+const REVEAL_DELAY_MS = 2000;
+const state = { items: [], revealTimer: null, revealToken: 0 };
+
+const $ = (id) => document.getElementById(id);
+
+const videoPlaybackObserver = "IntersectionObserver" in window
+  ? new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) entry.target.play().catch(() => {});
+        else entry.target.pause();
+      });
+    }, { threshold: 0.35 })
+  : null;
+
+function setStatus(text) {
+  const status = $("status");
+  status.textContent = text;
+  status.hidden = !text;
+  status.parentElement.hidden = !text && $("reveal-progress").hidden;
+}
+
+function setRevealProgress(active) {
+  const progress = $("reveal-progress");
+  progress.hidden = !active;
+  progress.classList.remove("is-counting");
+  if (active) {
+    // Restart the two-second fill animation for each incoming card.
+    void progress.offsetWidth;
+    progress.classList.add("is-counting");
+  }
+  progress.parentElement.hidden = !active && $("status").hidden;
+}
+
+function cancelReveal() {
+  if (state.revealTimer !== null) window.clearTimeout(state.revealTimer);
+  state.revealTimer = null;
+  state.revealToken += 1;
+  setRevealProgress(false);
+}
+
+function clearFeed() {
+  const feed = $("feed");
+  if (videoPlaybackObserver) feed.querySelectorAll("video").forEach((video) => videoPlaybackObserver.unobserve(video));
+  while (feed.firstChild) feed.removeChild(feed.firstChild);
+}
+
+function formatDate(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(date);
+}
+
+function externalLink(item, text = "open source") {
+  const link = document.createElement("a");
+  link.href = item.url;
+  link.target = "_blank";
+  link.rel = "noreferrer noopener";
+  link.textContent = text;
+  return link;
+}
+
+function createMedia(item) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "card-media is-loading";
+  wrapper.textContent = "loading media…";
+  let started = false;
+
+  const showSourceLink = () => {
+    wrapper.replaceChildren(externalLink(item, "open source link"));
+    wrapper.className = "card-media is-ready card-link";
+  };
+
+  const showResolvedMedia = (resolved) => {
+    if (!resolved || !["video", "image"].includes(resolved.kind) || !resolved.url) {
+      showSourceLink();
+      return;
+    }
+    const media = document.createElement(resolved.kind === "video" ? "video" : "img");
+    media.referrerPolicy = "no-referrer";
+    if (resolved.kind === "video") {
+      media.autoplay = true;
+      media.controls = false;
+      media.defaultMuted = true;
+      media.loop = true;
+      media.muted = true;
+      media.preload = "auto";
+      media.playsInline = true;
+    } else {
+      media.alt = item.label || "Feed item";
+      media.loading = "eager";
+      media.decoding = "async";
+    }
+    media.addEventListener("error", showSourceLink, { once: true });
+    media.addEventListener(resolved.kind === "video" ? "loadeddata" : "load", () => {
+      wrapper.className = "card-media is-ready";
+      if (resolved.kind === "video") {
+        if (videoPlaybackObserver) videoPlaybackObserver.observe(media);
+        else media.play().catch(() => {});
+      }
+    }, { once: true });
+    wrapper.replaceChildren(media);
+    media.src = resolved.url;
+    if (resolved.kind === "video") media.load();
+  };
+
+  const load = async () => {
+    if (started) return;
+    started = true;
+    try {
+      const response = await fetch(`/api/feed/${item.content_link_id}/media`);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.detail || "media unavailable");
+      showResolvedMedia(payload);
+    } catch (_) {
+      showSourceLink();
+    }
+  };
+  return { element: wrapper, load };
+}
+
+function appendMeta(meta, text, className = "") {
+  if (!text) return;
+  const element = document.createElement("span");
+  if (className) element.className = className;
+  element.textContent = text;
+  meta.appendChild(element);
+}
+
+function feedbackButton(className, action, text, count, label) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = className;
+  button.dataset.action = action;
+  button.setAttribute("aria-label", label);
+  button.textContent = text;
+  if (count !== undefined) {
+    const countElement = document.createElement("span");
+    countElement.dataset.count = action === "upvote" ? "upvotes" : "downvotes";
+    countElement.textContent = ` ${count}`;
+    button.appendChild(countElement);
+  }
+  return button;
+}
+
+function renderCard(item) {
+  const card = document.createElement("article");
+  card.className = "card";
+  card.dataset.contentLinkId = String(item.content_link_id);
+  card._item = item;
+
+  const media = createMedia(item);
+  if (media) card.appendChild(media.element);
+
+  const body = document.createElement("div");
+  body.className = "card-body";
+
+  const title = document.createElement("div");
+  title.className = "card-title";
+  title.textContent = item.label || "untitled link";
+  body.appendChild(title);
+
+  const meta = document.createElement("div");
+  meta.className = "card-meta";
+  appendMeta(meta, item.uploaded_date ? `uploaded ${formatDate(item.uploaded_date)}` : "upload date unknown");
+  if (item.recovered_at || item.recovery_generation > 0) {
+    appendMeta(
+      meta,
+      item.recovered_at ? `recovered ${formatDate(item.recovered_at)}` : "recovered",
+      "recovered",
+    );
+  }
+  body.appendChild(meta);
+
+  const actions = document.createElement("div");
+  actions.className = "card-actions";
+  actions.appendChild(feedbackButton("upvote", "upvote", "↑", item.upvotes || 0, "Upvote this link"));
+  const score = document.createElement("span");
+  score.className = "vote-score";
+  score.dataset.count = "vote-score";
+  score.textContent = `${(item.vote_score || 0) >= 0 ? "+" : ""}${item.vote_score || 0}`;
+  score.title = "upvotes minus downvotes";
+  actions.appendChild(score);
+  actions.appendChild(feedbackButton("downvote", "downvote", "↓", item.downvotes || 0, "Downvote this link"));
+  actions.appendChild(feedbackButton("report", "report", "report", undefined, "Report this link"));
+  actions.appendChild(feedbackButton("copy", "copy", "copy link", undefined, "Copy the Imgur link"));
+  body.appendChild(actions);
+
+  const message = document.createElement("p");
+  message.className = "feedback-message";
+  message.setAttribute("aria-live", "polite");
+  body.appendChild(message);
+
+  card.appendChild(body);
+  card._pendingMediaLoad = media.load;
+  return card;
+}
+
+function renderFeed() {
+  cancelReveal();
+  clearFeed();
+  if (!state.items.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty";
+    empty.textContent = "no little links found — try another search ♡";
+    $("feed").appendChild(empty);
+    setStatus("0 links");
+    return;
+  }
+
+  const token = state.revealToken;
+  let visibleCount = 0;
+  const revealNext = () => {
+    if (token !== state.revealToken) return;
+    const card = renderCard(state.items[visibleCount]);
+    $("feed").appendChild(card);
+    card._pendingMediaLoad();
+    visibleCount += 1;
+
+    if (visibleCount > 1) {
+      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      window.requestAnimationFrame(() => card.scrollIntoView({
+        behavior: reducedMotion ? "auto" : "smooth",
+        block: "start",
+      }));
+    }
+
+    if (visibleCount < state.items.length) {
+      setStatus(`showing ${visibleCount} of ${state.items.length} · next link in 2 seconds`);
+      setRevealProgress(true);
+      state.revealTimer = window.setTimeout(revealNext, REVEAL_DELAY_MS);
+    } else {
+      state.revealTimer = null;
+      setRevealProgress(false);
+      setStatus(`${visibleCount} link${visibleCount === 1 ? "" : "s"} shown`);
+    }
+  };
+  revealNext();
+}
+
+function setFeedbackMessage(card, text) {
+  card.querySelector(".feedback-message").textContent = text;
+}
+
+function updateFeedback(card, payload) {
+  const upvotes = card.querySelector('[data-count="upvotes"]');
+  const downvotes = card.querySelector('[data-count="downvotes"]');
+  const score = card.querySelector('[data-count="vote-score"]');
+  if (upvotes) upvotes.textContent = ` ${payload.upvotes}`;
+  if (downvotes) downvotes.textContent = ` ${payload.downvotes}`;
+  if (score) score.textContent = `${payload.vote_score >= 0 ? "+" : ""}${payload.vote_score}`;
+}
+
+async function handleFeedback(card, button) {
+  const id = card.dataset.contentLinkId;
+  const action = button.dataset.action;
+  if (action === "copy") {
+    await copyLink(card, button);
+    return;
+  }
+
+  const endpoint = action === "report" ? `/api/feed/${id}/report` : `/api/feed/${id}/vote/${action === "upvote" ? "up" : "down"}`;
+  button.disabled = true;
+  try {
+    const response = await fetch(endpoint, { method: "POST" });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.detail || "That action could not be recorded.");
+    updateFeedback(card, payload);
+    setFeedbackMessage(card, action === "report" ? "thanks — report recorded ♡" : "vote recorded ♡");
+  } catch (error) {
+    setFeedbackMessage(card, error.message || "That action could not be recorded.");
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function copyLink(card, button) {
+  const message = card.querySelector(".feedback-message");
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(card._item.url);
+    } else {
+      const textarea = document.createElement("textarea");
+      textarea.value = card._item.url;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      textarea.remove();
+    }
+    message.textContent = "link copied ♡";
+  } catch (_) {
+    message.textContent = "couldn't copy automatically — use the source link";
+  }
+  button.blur();
+}
+
+async function loadFeed(event) {
+  if (event) event.preventDefault();
+  cancelReveal();
+  setStatus("finding little links…");
+  const query = $("query").value.trim();
+  const requestedLimit = Number($("limit").value);
+  const limit = ALLOWED_LIMITS.has(requestedLimit) ? requestedLimit : 15;
+  const params = new URLSearchParams({ limit: String(limit) });
+  const submitButton = $("feed-form").querySelector('button[type="submit"]');
+  submitButton.disabled = true;
+  if (query) params.set("query", query);
+  try {
+    const response = await fetch(`/api/feed?${params.toString()}`);
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.detail || "feed unavailable");
+    state.items = payload.items || [];
+    renderFeed();
+  } catch (error) {
+    if (!state.items.length) {
+      clearFeed();
+      const message = document.createElement("p");
+      message.className = "empty";
+      message.textContent = error.message || "feed unavailable — try again shortly";
+      $("feed").appendChild(message);
+    }
+    setStatus(error.message || "something went wrong");
+  } finally {
+    submitButton.disabled = false;
+  }
+}
+
+$("feed-form").addEventListener("submit", loadFeed);
+$("feed").addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-action]");
+  if (!button) return;
+  const card = button.closest(".card");
+  if (card) handleFeedback(card, button);
+});

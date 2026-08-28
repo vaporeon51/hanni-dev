@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>hanni ♡</title>
+    <link rel="stylesheet" href="/static/app.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="brand">
+        <h1>hanni <span aria-hidden="true">♡</span></h1>
+      </header>
+
+      <form id="feed-form" class="search" role="search">
+        <label class="sr-only" for="query">Search by member or group</label>
+        <input id="query" name="query" type="search" placeholder="search a member or group" autocomplete="off" />
+        <label class="sr-only" for="limit">Number of links</label>
+        <select id="limit" name="limit" aria-label="Number of links">
+          <option value="1">1 link</option>
+          <option value="15" selected>15 links</option>
+          <option value="30">30 links</option>
+        </select>
+        <button type="submit">Search</button>
+      </form>
+
+      <div class="feed-status" aria-live="polite" hidden>
+        <span id="status" hidden></span>
+        <span id="reveal-progress" class="reveal-progress" hidden aria-hidden="true"><span></span></span>
+      </div>
+      <section id="feed" class="feed-list" aria-live="polite" aria-label="Content feed"></section>
+    </main>
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>

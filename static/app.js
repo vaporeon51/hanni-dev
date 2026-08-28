@@ -9,15 +9,9 @@ const videoPlaybackObserver = "IntersectionObserver" in window
   ? new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) {
-          if (!entry.target.src && entry.target.dataset.mediaSrc) {
-            entry.target.src = entry.target.dataset.mediaSrc;
-            entry.target.load();
-          }
           entry.target.play().catch(() => {});
         } else {
           entry.target.pause();
-          entry.target.removeAttribute("src");
-          entry.target.load();
         }
       });
     }, { threshold: 0.25 })
@@ -34,7 +28,6 @@ function setRevealProgress(active) {
   const progress = $("reveal-progress");
   const statusContainer = progress.closest(".feed-status");
   progress.hidden = !active;
-  statusContainer.classList.toggle("is-revealing", active);
   progress.classList.remove("is-counting");
   if (active) {
     // Restart the two-second fill animation for each incoming card.
@@ -46,6 +39,14 @@ function setRevealProgress(active) {
 
 function setStopVisible(visible) {
   $("stop-feed").hidden = !visible;
+}
+
+function setSkipLatestVisible(visible) {
+  $("skip-latest").hidden = !visible;
+}
+
+function setFeedOverlayFloating(floating) {
+  $("status").closest(".feed-status").classList.toggle("is-floating", floating);
 }
 
 function cancelReveal() {
@@ -63,10 +64,23 @@ function stopFeed() {
   setStatus(`stopped at ${visibleCount} of ${state.items.length}`);
 }
 
+function skipToLatest() {
+  const cards = $("feed").querySelectorAll(".card");
+  const latestCard = cards[cards.length - 1];
+  if (!latestCard) return;
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  latestCard.scrollIntoView({
+    behavior: reducedMotion ? "auto" : "smooth",
+    block: "end",
+  });
+}
+
 function clearFeed() {
   const feed = $("feed");
   if (videoPlaybackObserver) feed.querySelectorAll("video").forEach((video) => videoPlaybackObserver.unobserve(video));
   while (feed.firstChild) feed.removeChild(feed.firstChild);
+  setSkipLatestVisible(false);
+  setFeedOverlayFloating(false);
 }
 
 function formatDate(value) {
@@ -111,7 +125,6 @@ function createMedia(item) {
       media.muted = true;
       media.preload = "auto";
       media.playsInline = true;
-      media.dataset.mediaSrc = resolved.url;
     } else {
       media.alt = item.label || "Feed item";
       media.loading = "eager";
@@ -242,14 +255,8 @@ function renderFeed() {
     $("feed").appendChild(card);
     card._pendingMediaLoad();
     state.visibleCount += 1;
-
-    if (state.visibleCount > 1) {
-      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      window.requestAnimationFrame(() => card.scrollIntoView({
-        behavior: reducedMotion ? "auto" : "smooth",
-        block: "center",
-      }));
-    }
+    setFeedOverlayFloating(true);
+    setSkipLatestVisible(true);
 
     if (state.visibleCount < state.items.length) {
       setStatus(`showing ${state.visibleCount} of ${state.items.length} · next link in 2 seconds`);
@@ -361,6 +368,7 @@ async function loadFeed(event) {
 
 $("feed-form").addEventListener("submit", loadFeed);
 $("stop-feed").addEventListener("click", stopFeed);
+$("skip-latest").addEventListener("click", skipToLatest);
 $("feed").addEventListener("click", (event) => {
   const button = event.target.closest("button[data-action]");
   if (!button) return;

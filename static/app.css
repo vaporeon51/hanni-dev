@@ -84,25 +84,23 @@ button:disabled { cursor: wait; opacity: .55; }
   font-size: .75rem;
   text-align: center;
 }
-.feed-status.is-revealing {
+.feed-status.is-floating {
   position: fixed;
   z-index: 20;
-  right: auto;
+  right: 10px;
   bottom: max(14px, env(safe-area-inset-bottom));
-  left: 50%;
-  width: max-content;
+  left: 10px;
+  width: fit-content;
   max-width: calc(100% - 20px);
-  margin: 0;
+  margin: 0 auto;
   padding: 10px 16px 9px;
-  transform: translateX(-50%);
   border: 1px solid rgba(236, 222, 228, .92);
   border-radius: 999px;
-  background: rgba(255, 250, 251, .94);
+  background: var(--page);
   box-shadow: 0 8px 28px rgba(82, 45, 60, .13);
-  backdrop-filter: blur(10px);
 }
 .feed-status-line { display: inline-flex; align-items: center; gap: 9px; }
-.stop-feed {
+.stop-feed, .skip-latest {
   border: 0;
   border-bottom: 1px solid currentColor;
   background: transparent;
@@ -111,7 +109,7 @@ button:disabled { cursor: wait; opacity: .55; }
   line-height: 1.2;
   padding: 0;
 }
-.stop-feed[hidden] { display: none; }
+.stop-feed[hidden], .skip-latest[hidden] { display: none; }
 .reveal-progress {
   display: block;
   width: 132px;
@@ -245,7 +243,7 @@ button:disabled { cursor: wait; opacity: .55; }
   .search input { grid-column: 1 / -1; }
   .search button { padding-inline: 17px; }
   .feed-status { margin-top: 14px; }
-  .feed-status.is-revealing { margin: 0; padding-inline: 14px; }
+  .feed-status.is-floating { margin: 0; padding-inline: 14px; }
   .feed-list { gap: 20px; margin-top: 22px; }
   .card { border-radius: 13px; scroll-margin-top: 10px; }
   .card-body { padding: 15px; }

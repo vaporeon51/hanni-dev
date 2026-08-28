@@ -214,7 +214,11 @@ def test_client_waits_for_search_and_autoplays_video():
     assert "videoPlaybackObserver" in script
     assert "REVEAL_DELAY_MS = 2000" in script
     assert "scrollIntoView" in script
-    assert 'block: "center"' in script
+    assert 'block: "end"' in script
     assert '$("query").blur()' in script
     assert '$("stop-feed").addEventListener("click", stopFeed)' in script
+    assert '$("skip-latest").addEventListener("click", skipToLatest)' in script
+    assert "state.visibleCount > 1" not in script
+    assert 'removeAttribute("src")' not in script
+    assert "dataset.mediaSrc" not in script
     assert "mediaCandidates" not in script

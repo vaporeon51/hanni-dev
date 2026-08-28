@@ -18,13 +18,17 @@ MediaKind = Literal["video", "image", "link"]
 IMGUR_IMAGE_API = "https://api.imgur.com/3/image/{media_id}"
 IMGUR_ALBUM_IMAGES_API = "https://api.imgur.com/3/album/{media_id}/images"
 IMGUR_HOSTS = {"imgur.com", "www.imgur.com", "i.imgur.com"}
+# These durable CDN hosts may be streamed through the public feed asset endpoint.
+# Keep this narrower than the worker's URL-check allowlist: every host here is an
+# SSRF boundary for a user-accessible proxy.
+PROXIED_MEDIA_HOSTS = IMGUR_HOSTS | {"cdn.goyangi.pics"}
 VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".m4v"}
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif"}
 TRANSIENT_UPSTREAM_STATUSES = {429, 502, 503, 504}
 
 
 class MediaUpstreamError(RuntimeError):
-    """Imgur did not return a browser-playable media response."""
+    """An allowlisted host did not return a browser-playable media response."""
 
 
 @dataclass(frozen=True)
@@ -70,6 +74,15 @@ def _safe_imgur_asset(value: object) -> str | None:
         return None
     parsed = urlsplit(value)
     if parsed.scheme != "https" or parsed.hostname not in IMGUR_HOSTS:
+        return None
+    return value
+
+
+def _safe_proxied_asset(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    parsed = urlsplit(value)
+    if parsed.scheme != "https" or parsed.hostname not in PROXIED_MEDIA_HOSTS:
         return None
     return value
 
@@ -166,10 +179,10 @@ def open_media_stream(
     range_header: str | None = None,
     session: requests.Session | None = None,
 ) -> requests.Response:
-    """Open one allowlisted Imgur asset and preserve browser Range requests."""
+    """Open one allowlisted media asset and preserve browser Range requests."""
 
-    if _safe_imgur_asset(url) is None:
-        raise MediaUpstreamError("Media URL is not an allowlisted Imgur asset")
+    if _safe_proxied_asset(url) is None:
+        raise MediaUpstreamError("Media URL is not an allowlisted asset")
 
     headers = {
         "Accept": "image/*,video/*",
@@ -187,7 +200,7 @@ def open_media_stream(
             if attempt == 0:
                 time.sleep(0.5)
                 continue
-            raise MediaUpstreamError("Imgur media request failed") from error
+            raise MediaUpstreamError("Upstream media request failed") from error
 
         if response.status_code in {200, 206}:
             break
@@ -197,16 +210,16 @@ def open_media_stream(
         if attempt == 0 and status_code in TRANSIENT_UPSTREAM_STATUSES:
             time.sleep(0.5)
             continue
-        raise MediaUpstreamError(f"Imgur returned HTTP {status_code}")
+        raise MediaUpstreamError(f"Upstream host returned HTTP {status_code}")
 
     if response is None:
-        raise MediaUpstreamError("Imgur media request failed")
-    if _safe_imgur_asset(response.url) is None:
+        raise MediaUpstreamError("Upstream media request failed")
+    if _safe_proxied_asset(response.url) is None:
         response.close()
-        raise MediaUpstreamError("Imgur redirected media to a disallowed host")
+        raise MediaUpstreamError("Media redirected to a disallowed host")
 
     content_type = response.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
     if not (content_type.startswith("image/") or content_type.startswith("video/")):
         response.close()
-        raise MediaUpstreamError("Imgur returned a non-media response")
+        raise MediaUpstreamError("Upstream host returned a non-media response")
     return response

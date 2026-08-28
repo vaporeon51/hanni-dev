@@ -30,6 +30,12 @@ def test_direct_mp4_does_not_need_an_imgur_lookup():
     assert result == ResolvedMedia("video", "https://i.imgur.com/abc123.mp4")
 
 
+def test_direct_goyangi_webp_is_browser_ready():
+    url = "https://cdn.goyangi.pics/v1/babymonster/260824-babymonster-ahyeon-asa-5084.webp"
+
+    assert resolve_media_url(url, client_id="") == ResolvedMedia("image", url)
+
+
 def test_discord_attachment_is_left_as_an_external_link():
     url = "https://cdn.discordapp.com/attachments/1/2/video.mp4?ex=expired"
 
@@ -149,6 +155,18 @@ def test_media_stream_forwards_a_valid_range_header():
 
     assert response.status_code == 206
     assert session.requests[0][1]["headers"]["Range"] == "bytes=0-1023"
+
+
+def test_media_stream_allows_goyangi_webp():
+    url = "https://cdn.goyangi.pics/v1/babymonster/260824-babymonster-ahyeon-asa-5084.webp"
+    session = FakeStreamSession(
+        [FakeStreamResponse(status_code=200, content_type="image/webp", url=url)]
+    )
+
+    response = open_media_stream(url, session=session)
+
+    assert response.status_code == 200
+    assert session.requests[0][0] == url
 
 
 def test_media_stream_rejects_non_imgur_urls_without_requesting():

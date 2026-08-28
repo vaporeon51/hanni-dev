@@ -183,7 +183,7 @@ async def media(content_link_id: int) -> dict[str, str]:
 
 @app.get("/api/feed/{content_link_id}/asset")
 def media_asset(content_link_id: int, request: Request) -> StreamingResponse:
-    """Proxy one live Imgur asset so browsers do not hotlink the CDN."""
+    """Proxy one live, allowlisted asset so browsers do not hotlink its CDN."""
 
     url = get_live_content_url(content_link_id)
     if url is None:

@@ -252,6 +252,12 @@ def test_homepage_renders():
     css = (web_app.REPO_ROOT / "static" / "app.css").read_text()
     assert 'font-family: Georgia, "Times New Roman", serif;' in css
     assert "font-weight: 400;" in css
+    assert ".card-media video" in css
+    assert ".card-media img, .card-media video" in css
+    assert "width: auto" in css
+    assert "max-width: min(100%, 520px)" in css
+    assert "width: min(560px, 100%)" in css
+    assert "max-height: min(62vh, 540px)" in css
     assert '<option value="15" selected>15 links</option>' in response.text
     assert '<option value="random" selected>random</option>' in response.text
     assert '<option value="latest">latest</option>' in response.text

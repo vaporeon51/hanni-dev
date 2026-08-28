@@ -58,12 +58,12 @@ function setStopVisible(visible) {
   $("stop-feed").hidden = !visible;
 }
 
-function setSkipLatestVisible(visible) {
-  $("skip-latest").hidden = !visible;
+function setJumpBottomVisible(visible) {
+  $("jump-bottom").hidden = !visible;
 }
 
-function setMoveTopVisible(visible) {
-  $("move-top").hidden = !visible;
+function setJumpTopVisible(visible) {
+  $("jump-top").hidden = !visible;
 }
 
 function setFeedOverlayFloating(floating) {
@@ -85,7 +85,7 @@ function stopFeed() {
   setStatus(`stopped at ${visibleCount} of ${state.items.length}`);
 }
 
-function skipToLatest() {
+function jumpToBottom() {
   const cards = $("feed").querySelectorAll(".card");
   const latestCard = cards[cards.length - 1];
   if (!latestCard) return;
@@ -96,7 +96,7 @@ function skipToLatest() {
   });
 }
 
-function moveToTop() {
+function jumpToTop() {
   const search = $("feed-form");
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   search.scrollIntoView({
@@ -110,8 +110,8 @@ function clearFeed() {
   const feed = $("feed");
   if (videoPlaybackObserver) feed.querySelectorAll("video").forEach((video) => videoPlaybackObserver.unobserve(video));
   while (feed.firstChild) feed.removeChild(feed.firstChild);
-  setSkipLatestVisible(false);
-  setMoveTopVisible(false);
+  setJumpBottomVisible(false);
+  setJumpTopVisible(false);
   setFeedOverlayFloating(false);
 }
 
@@ -282,8 +282,8 @@ function renderFeed() {
     card._pendingMediaLoad();
     state.visibleCount += 1;
     setFeedOverlayFloating(true);
-    setSkipLatestVisible(true);
-    setMoveTopVisible(true);
+    setJumpBottomVisible(true);
+    setJumpTopVisible(true);
 
     if (state.visibleCount < state.items.length) {
       setStatus(`showing ${state.visibleCount} of ${state.items.length} · next link in 2 seconds`);
@@ -418,8 +418,8 @@ async function loadFeed(event) {
 
 $("feed-form").addEventListener("submit", loadFeed);
 $("stop-feed").addEventListener("click", stopFeed);
-$("skip-latest").addEventListener("click", skipToLatest);
-$("move-top").addEventListener("click", moveToTop);
+$("jump-bottom").addEventListener("click", jumpToBottom);
+$("jump-top").addEventListener("click", jumpToTop);
 $("feed").addEventListener("click", (event) => {
   const button = event.target.closest("button[data-action]");
   if (!button) return;

@@ -122,7 +122,7 @@ button:disabled { cursor: wait; opacity: .55; }
   gap: 9px;
 }
 #status { flex: 1 1 100%; overflow-wrap: anywhere; }
-.stop-feed, .skip-latest, .move-top {
+.stop-feed, .jump-top, .jump-bottom {
   border: 0;
   border-bottom: 1px solid currentColor;
   background: transparent;
@@ -131,7 +131,7 @@ button:disabled { cursor: wait; opacity: .55; }
   line-height: 1.2;
   padding: 0;
 }
-.stop-feed[hidden], .skip-latest[hidden], .move-top[hidden] { display: none; }
+.stop-feed[hidden], .jump-top[hidden], .jump-bottom[hidden] { display: none; }
 .reveal-progress {
   display: block;
   width: 132px;

@@ -317,8 +317,8 @@ def test_client_waits_for_search_and_autoplays_video():
     assert 'block: "end"' in script
     assert '$("query").blur()' in script
     assert '$("stop-feed").addEventListener("click", stopFeed)' in script
-    assert '$("skip-latest").addEventListener("click", skipToLatest)' in script
-    assert '$("move-top").addEventListener("click", moveToTop)' in script
+    assert '$("jump-bottom").addEventListener("click", jumpToBottom)' in script
+    assert '$("jump-top").addEventListener("click", jumpToTop)' in script
     assert 'search.scrollIntoView' in script
     assert 'query").focus({ preventScroll: true })' in script
     assert 'feedbackButton("upvote", "upvote", "↑", "Upvote this link")' in script

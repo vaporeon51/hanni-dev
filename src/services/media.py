@@ -14,6 +14,7 @@ import requests
 
 MediaKind = Literal["video", "image", "link"]
 IMGUR_IMAGE_API = "https://api.imgur.com/3/image/{media_id}"
+IMGUR_ALBUM_IMAGES_API = "https://api.imgur.com/3/album/{media_id}/images"
 IMGUR_HOSTS = {"imgur.com", "www.imgur.com", "i.imgur.com"}
 VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".m4v"}
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif"}
@@ -50,6 +51,18 @@ def _imgur_id(url: str) -> str | None:
     return media_id if media_id.isalnum() else None
 
 
+def _imgur_album_id(url: str) -> str | None:
+    parsed = urlsplit(url)
+    if parsed.scheme not in {"http", "https"} or parsed.hostname not in IMGUR_HOSTS:
+        return None
+    parts = [part for part in parsed.path.split("/") if part]
+    if len(parts) != 2 or parts[0].lower() != "a":
+        return None
+    # Imgur accepts both /a/<id> and /a/<title-slug>-<id>.
+    media_id = parts[1].split(".", 1)[0].rsplit("-", 1)[-1]
+    return media_id if media_id.isalnum() else None
+
+
 def _safe_imgur_asset(value: object) -> str | None:
     if not isinstance(value, str):
         return None
@@ -57,6 +70,26 @@ def _safe_imgur_asset(value: object) -> str | None:
     if parsed.scheme != "https" or parsed.hostname not in IMGUR_HOSTS:
         return None
     return value
+
+
+def _resolved_imgur_item(data: object) -> ResolvedMedia | None:
+    if not isinstance(data, dict):
+        return None
+
+    mp4_url = _safe_imgur_asset(data.get("mp4"))
+    if mp4_url:
+        return ResolvedMedia("video", mp4_url)
+
+    direct_url = _safe_imgur_asset(data.get("link"))
+    if not direct_url:
+        return None
+    media_type = str(data.get("type") or "").lower()
+    kind: MediaKind = (
+        "video"
+        if _extension(direct_url) in VIDEO_EXTENSIONS or media_type.startswith("video/")
+        else "image"
+    )
+    return ResolvedMedia(kind, direct_url)
 
 
 def resolve_media_url(
@@ -78,15 +111,21 @@ def resolve_media_url(
         return ResolvedMedia("image", url)
 
     media_id = _imgur_id(url)
+    album_id = _imgur_album_id(url)
     resolved_client_id = (client_id if client_id is not None else os.getenv("IMGUR_CLIENT_ID", "")).strip()
-    if not media_id or not resolved_client_id:
+    if not (media_id or album_id) or not resolved_client_id:
         return ResolvedMedia("link", url)
 
     requester = session or requests.Session()
     should_close = session is None
     try:
+        metadata_url = (
+            IMGUR_ALBUM_IMAGES_API.format(media_id=album_id)
+            if album_id
+            else IMGUR_IMAGE_API.format(media_id=media_id)
+        )
         response = requester.get(
-            IMGUR_IMAGE_API.format(media_id=media_id),
+            metadata_url,
             headers={
                 "Authorization": f"Client-ID {resolved_client_id}",
                 "User-Agent": "hanni-web/1.0",
@@ -102,17 +141,12 @@ def resolve_media_url(
             requester.close()
 
     data = payload.get("data") if isinstance(payload, dict) else None
-    if not isinstance(data, dict):
-        return ResolvedMedia("link", url)
-
-    mp4_url = _safe_imgur_asset(data.get("mp4"))
-    if mp4_url:
-        return ResolvedMedia("video", mp4_url)
-
-    direct_url = _safe_imgur_asset(data.get("link"))
-    if direct_url:
-        kind: MediaKind = "video" if _extension(direct_url) in VIDEO_EXTENSIONS else "image"
-        return ResolvedMedia(kind, direct_url)
+    if album_id and isinstance(data, list):
+        for item in data:
+            if resolved := _resolved_imgur_item(item):
+                return resolved
+    elif resolved := _resolved_imgur_item(data):
+        return resolved
     return ResolvedMedia("link", url)
 
 

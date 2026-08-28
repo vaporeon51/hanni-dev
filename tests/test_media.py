@@ -55,6 +55,54 @@ def test_imgur_page_resolves_static_direct_image():
     assert result == ResolvedMedia("image", "https://i.imgur.com/abc123.jpg")
 
 
+def test_imgur_album_resolves_first_animated_item_to_mp4():
+    session = FakeSession(
+        {
+            "data": [
+                {
+                    "type": "video/mp4",
+                    "animated": True,
+                    "link": "https://i.imgur.com/WjBLinK.mp4",
+                    "mp4": "https://i.imgur.com/WjBLinK.mp4",
+                }
+            ]
+        }
+    )
+
+    result = resolve_media_url(
+        "https://imgur.com/a/gF7hDYF",
+        client_id="client-id",
+        session=session,
+    )
+
+    assert result == ResolvedMedia("video", "https://i.imgur.com/WjBLinK.mp4")
+    assert session.requests[0][0].endswith("/3/album/gF7hDYF/images")
+
+
+def test_imgur_album_title_slug_uses_trailing_album_id():
+    session = FakeSession(
+        {
+            "data": [
+                {
+                    "type": "video/mp4",
+                    "animated": True,
+                    "link": "https://i.imgur.com/3kcaZ5a.mp4",
+                    "mp4": "https://i.imgur.com/3kcaZ5a.mp4",
+                }
+            ]
+        }
+    )
+
+    result = resolve_media_url(
+        "https://imgur.com/a/karina-x-aespa-capo-ZHB76tL",
+        client_id="client-id",
+        session=session,
+    )
+
+    assert result == ResolvedMedia("video", "https://i.imgur.com/3kcaZ5a.mp4")
+    assert session.requests[0][0].endswith("/3/album/ZHB76tL/images")
+
+
 def test_imgur_metadata_cannot_redirect_media_to_another_host():
     session = FakeSession({"data": {"mp4": "https://example.com/tracker.mp4"}})
 

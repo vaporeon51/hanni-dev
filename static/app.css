@@ -269,7 +269,7 @@ button:disabled { cursor: wait; opacity: .55; }
   .search input { grid-column: 1 / -1; }
   .search button { padding-inline: 17px; }
   .feed-status { margin-top: 14px; }
-  .feed-status.is-floating { margin: 0; padding-inline: 14px; }
+  .feed-status.is-floating { margin: 0 auto; padding-inline: 14px; }
   .feed-list { width: 100%; gap: 20px; margin-top: 22px; }
   .card { border-radius: 13px; scroll-margin-top: 10px; }
   .card-body { padding: 15px; }

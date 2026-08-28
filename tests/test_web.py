@@ -292,6 +292,7 @@ def test_homepage_renders():
     assert "max-height: min(62vh, 540px)" in css
     assert "max-height: var(--mobile-media-max-height)" in css
     assert ".card-actions .upvote, .card-actions .downvote { min-width: 42px; }" in css
+    assert ".feed-status.is-floating { margin: 0 auto; padding-inline: 14px; }" in css
     assert '<option value="15" selected>15 links</option>' in response.text
     assert '<option value="random" selected>random</option>' in response.text
     assert '<option value="latest">latest</option>' in response.text

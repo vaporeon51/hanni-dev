@@ -278,7 +278,9 @@ button:disabled { cursor: wait; opacity: .55; }
   .card-body { padding: 15px; }
   .card-media { padding: 7px; }
   .card-media img, .card-media video {
-    width: 100%;
+    /* Keep the media box fitted to its content so rounded clipping follows
+       tall videos instead of clipping a wider, letterboxed rectangle. */
+    width: auto;
     max-width: 100%;
     max-height: var(--mobile-media-max-height);
     border-radius: 11px;

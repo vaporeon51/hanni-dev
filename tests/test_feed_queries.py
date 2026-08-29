@@ -93,6 +93,10 @@ def test_random_feed_prioritizes_urls_outside_recent_history(monkeypatch):
     assert "PARTITION BY cl.role_id" in query
     assert "cl.url = ANY(%s) ASC" in query
     assert "initial_reaction_count, 0)::double precision / 3.0" in query
+    assert "EXTRACT(EPOCH FROM (NOW() - cl.uploaded_date))" in query
+    assert 0.05 in params
+    assert 14.0 in params
+    assert 90.0 in params
     assert ["https://i.imgur.com/old.mp4"] in params
 
 

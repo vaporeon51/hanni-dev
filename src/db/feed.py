@@ -12,6 +12,9 @@ from src.config.constants import (
     EPHEMERAL_MEDIA_HOSTS,
     INITIAL_REACT_CAP,
     MAX_FEED_ITEMS,
+    RANDOM_FRESHNESS_DECAY_DAYS,
+    RANDOM_FRESHNESS_FULL_DAYS,
+    RANDOM_FRESHNESS_MAX_BOOST,
     REPORT_THRESHOLD,
     SAMPLING_EXPONENT,
 )
@@ -179,7 +182,17 @@ def get_feed_items(
             - COALESCE(cl.num_downvotes, 0)
         )::double precision
         """
-        random_expression = f"RANDOM() * POWER(GREATEST({random_score_expression}, 1.0), %s)"
+        freshness_expression = """(
+            1.0 + %s * EXP(
+                -GREATEST(
+                    EXTRACT(EPOCH FROM (NOW() - cl.uploaded_date)) / 86400.0 - %s,
+                    0.0
+                ) / %s
+            )
+        )"""
+        random_expression = (
+            f"RANDOM() * POWER(GREATEST({random_score_expression}, 1.0), %s) * {freshness_expression}"
+        )
 
         with connection.cursor() as cursor:
             if sort == "random":
@@ -260,6 +273,9 @@ def get_feed_items(
                         list(recent_urls),
                         INITIAL_REACT_CAP,
                         SAMPLING_EXPONENT,
+                        RANDOM_FRESHNESS_MAX_BOOST,
+                        RANDOM_FRESHNESS_FULL_DAYS,
+                        RANDOM_FRESHNESS_DECAY_DAYS,
                         *params,
                         limit,
                     ),

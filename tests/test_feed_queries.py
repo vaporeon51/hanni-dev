@@ -20,6 +20,8 @@ class FakeCursor:
         self.calls.append((query, params))
 
     def fetchall(self):
+        if "eligible_count" in self.calls[-1][0]:
+            return [("role-1", 20), ("role-2", 20)]
         return [
             (
                 1,
@@ -66,11 +68,10 @@ def test_feed_sql_has_a_parameter_for_each_placeholder(monkeypatch):
     pool = FakePool()
     monkeypatch.setattr(feed_db, "POOL", pool)
 
-    for sort, expected_select_parameters in (("random", 3), ("latest", 1), ("oldest", 1), ("top", 1)):
+    for sort in ("random", "latest", "oldest", "top"):
         feed_db.get_feed_items(sort=sort, limit=1, min_age="18 year 1 month")
         query, params = pool.connection_instance.cursor_instance.calls[-1]
         assert query.count("%s") == len(params)
-        assert len(params) == expected_select_parameters + 3 + len(EPHEMERAL_MEDIA_HOSTS)
         for host in EPHEMERAL_MEDIA_HOSTS:
             assert f"%://{host}/%" in params
 
@@ -88,9 +89,19 @@ def test_random_feed_prioritizes_urls_outside_recent_history(monkeypatch):
 
     query, params = pool.connection_instance.cursor_instance.calls[-1]
     assert query.count("%s") == len(params)
-    assert "cl.url = ANY(%s) AS recently_seen" in query
-    assert "ORDER BY recently_seen ASC, random_weight DESC" in query
+    assert "WITH role_counts AS" in query
+    assert "PARTITION BY cl.role_id" in query
+    assert "cl.url = ANY(%s) ASC" in query
+    assert "initial_reaction_count, 0)::double precision / 3.0" in query
     assert ["https://i.imgur.com/old.mp4"] in params
+
+
+def test_role_draws_are_uniform_but_do_not_exceed_available_links(monkeypatch):
+    monkeypatch.setattr(feed_db.random, "choice", lambda roles: roles[0])
+
+    selected = feed_db._draw_role_slots([("role-1", 2), ("role-2", 3)], limit=10)
+
+    assert selected == ["role-1", "role-1", "role-2", "role-2", "role-2"]
 
 
 def test_feed_label_collapses_solo_artist_duplicate():

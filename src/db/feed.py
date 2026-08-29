@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import random
+from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
@@ -89,6 +91,37 @@ def _role_ids_for_query(connection, query: str, min_age: str) -> list[str]:
         return [str(row[0]) for row in cursor.fetchall()]
 
 
+def _eligible_role_capacities(connection, where: list[str], params: list[object]) -> list[tuple[str, int]]:
+    """Return eligible link counts so random role draws can always be fulfilled."""
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            f"""
+            SELECT cl.role_id, COUNT(*)::integer AS eligible_count
+            FROM content_links AS cl
+            JOIN role_info AS ri ON ri.role_id = cl.role_id
+            WHERE {' AND '.join(where)}
+            GROUP BY cl.role_id
+            """,
+            params,
+        )
+        return [(str(row[0]), int(row[1])) for row in cursor.fetchall() if int(row[1]) > 0]
+
+
+def _draw_role_slots(capacities: list[tuple[str, int]], limit: int) -> list[str]:
+    """Draw roles uniformly while never requesting more links than they have."""
+
+    remaining = {role_id: min(count, limit) for role_id, count in capacities if count > 0}
+    selected: list[str] = []
+    while remaining and len(selected) < limit:
+        role_id = random.choice(tuple(remaining))
+        selected.append(role_id)
+        remaining[role_id] -= 1
+        if remaining[role_id] == 0:
+            del remaining[role_id]
+    return selected
+
+
 def get_feed_items(
     *,
     query: str | None = None,
@@ -129,73 +162,145 @@ def get_feed_items(
             where.append("cl.role_id = ANY(%s)")
             params.append(role_ids)
 
-        prioritize_fresh = sort == "random" and bool(recent_urls)
         order_by = {
             "latest": "cl.uploaded_date DESC, cl.content_link_id DESC",
             "oldest": "cl.uploaded_date ASC, cl.content_link_id ASC",
             "top": "feed_score DESC, cl.uploaded_date DESC, cl.content_link_id DESC",
-            "random": (
-                "recently_seen ASC, random_weight DESC, cl.content_link_id DESC"
-                if prioritize_fresh
-                else "random_weight DESC, cl.content_link_id DESC"
-            ),
-        }[sort]
+        }.get(sort)
         score_expression = """(
             LEAST(COALESCE(cl.initial_reaction_count, 0), %s)
             + COALESCE(cl.num_upvotes, 0)
             - COALESCE(cl.num_downvotes, 0)
         )::double precision
         """
-        random_expression = f"RANDOM() * POWER(GREATEST({score_expression}, 1.0), %s)"
-
-        # SELECT expressions precede the WHERE clause in SQL placeholder
-        # order. The random sort embeds the score expression a second time.
-        random_select = f",\n                    {random_expression} AS random_weight" if sort == "random" else ""
-        recent_select = ",\n                    cl.url = ANY(%s) AS recently_seen" if prioritize_fresh else ""
-        select_params: list[object] = [INITIAL_REACT_CAP]
-        if sort == "random":
-            select_params = [INITIAL_REACT_CAP, INITIAL_REACT_CAP, SAMPLING_EXPONENT]
-        if prioritize_fresh:
-            select_params.append(list(recent_urls))
-        query_params = [*select_params, *params, limit]
+        random_score_expression = """(
+            LEAST(COALESCE(cl.initial_reaction_count, 0)::double precision / 3.0, %s)
+            + COALESCE(cl.num_upvotes, 0)
+            - COALESCE(cl.num_downvotes, 0)
+        )::double precision
+        """
+        random_expression = f"RANDOM() * POWER(GREATEST({random_score_expression}, 1.0), %s)"
 
         with connection.cursor() as cursor:
-            cursor.execute(
-                f"""
-                WITH recovery_dates AS (
+            if sort == "random":
+                capacities = _eligible_role_capacities(connection, where, params)
+                role_slots = _draw_role_slots(capacities, limit)
+                if not role_slots:
+                    return []
+                role_counts = Counter(role_slots)
+                cursor.execute(
+                    f"""
+                    WITH role_counts AS (
+                        SELECT *
+                        FROM unnest(%s::text[], %s::integer[]) AS selected(role_id, desired_count)
+                    ),
+                    recovery_dates AS (
+                        SELECT
+                            original_url,
+                            replacement_url,
+                            MAX(finished_at) AS recovered_at
+                        FROM content_link_recovery_items
+                        WHERE status = 'updated'
+                        GROUP BY original_url, replacement_url
+                    ),
+                    ranked_links AS (
+                        SELECT
+                            cl.content_link_id,
+                            cl.role_id,
+                            ri.member_name,
+                            ri.group_name,
+                            cl.url,
+                            cl.original_url,
+                            cl.uploaded_date,
+                            {score_expression} AS feed_score,
+                            cl.num_upvotes,
+                            cl.num_downvotes,
+                            cl.num_reports,
+                            cl.recovery_generation,
+                            recovery_dates.recovered_at,
+                            role_counts.desired_count,
+                            ROW_NUMBER() OVER (
+                                PARTITION BY cl.role_id
+                                ORDER BY
+                                    cl.url = ANY(%s) ASC,
+                                    {random_expression} DESC,
+                                    cl.content_link_id DESC
+                            ) AS role_rank
+                        FROM content_links AS cl
+                        JOIN role_info AS ri ON ri.role_id = cl.role_id
+                        JOIN role_counts ON role_counts.role_id = cl.role_id
+                        LEFT JOIN recovery_dates
+                            ON recovery_dates.original_url = cl.original_url
+                           AND recovery_dates.replacement_url = cl.url
+                        WHERE {' AND '.join(where)}
+                    )
                     SELECT
+                        content_link_id,
+                        role_id,
+                        member_name,
+                        group_name,
+                        url,
                         original_url,
-                        replacement_url,
-                        MAX(finished_at) AS recovered_at
-                    FROM content_link_recovery_items
-                    WHERE status = 'updated'
-                    GROUP BY original_url, replacement_url
+                        uploaded_date,
+                        feed_score,
+                        num_upvotes,
+                        num_downvotes,
+                        num_reports,
+                        recovery_generation,
+                        recovered_at
+                    FROM ranked_links
+                    WHERE role_rank <= desired_count
+                    ORDER BY RANDOM()
+                    LIMIT %s
+                    """,
+                    (
+                        list(role_counts),
+                        list(role_counts.values()),
+                        INITIAL_REACT_CAP,
+                        list(recent_urls),
+                        INITIAL_REACT_CAP,
+                        SAMPLING_EXPONENT,
+                        *params,
+                        limit,
+                    ),
                 )
-                SELECT
-                    cl.content_link_id,
-                    cl.role_id,
-                    ri.member_name,
-                    ri.group_name,
-                    cl.url,
-                    cl.original_url,
-                    cl.uploaded_date,
-                    {score_expression} AS feed_score,
-                    cl.num_upvotes,
-                    cl.num_downvotes,
-                    cl.num_reports,
-                    cl.recovery_generation,
-                    recovery_dates.recovered_at{random_select}{recent_select}
-                FROM content_links AS cl
-                JOIN role_info AS ri ON ri.role_id = cl.role_id
-                LEFT JOIN recovery_dates
-                    ON recovery_dates.original_url = cl.original_url
-                   AND recovery_dates.replacement_url = cl.url
-                WHERE {' AND '.join(where)}
-                ORDER BY {order_by}
-                LIMIT %s
-                """,
-                query_params,
-            )
+            else:
+                cursor.execute(
+                    f"""
+                    WITH recovery_dates AS (
+                        SELECT
+                            original_url,
+                            replacement_url,
+                            MAX(finished_at) AS recovered_at
+                        FROM content_link_recovery_items
+                        WHERE status = 'updated'
+                        GROUP BY original_url, replacement_url
+                    )
+                    SELECT
+                        cl.content_link_id,
+                        cl.role_id,
+                        ri.member_name,
+                        ri.group_name,
+                        cl.url,
+                        cl.original_url,
+                        cl.uploaded_date,
+                        {score_expression} AS feed_score,
+                        cl.num_upvotes,
+                        cl.num_downvotes,
+                        cl.num_reports,
+                        cl.recovery_generation,
+                        recovery_dates.recovered_at
+                    FROM content_links AS cl
+                    JOIN role_info AS ri ON ri.role_id = cl.role_id
+                    LEFT JOIN recovery_dates
+                        ON recovery_dates.original_url = cl.original_url
+                       AND recovery_dates.replacement_url = cl.url
+                    WHERE {' AND '.join(where)}
+                    ORDER BY {order_by}
+                    LIMIT %s
+                    """,
+                    (INITIAL_REACT_CAP, *params, limit),
+                )
             rows = cursor.fetchall()
 
     return [

@@ -190,7 +190,10 @@ button:disabled { cursor: wait; opacity: .55; }
   max-width: min(100%, 520px);
   max-height: min(62vh, 540px);
   margin-inline: auto;
+  overflow: hidden;
   border-radius: 11px;
+  -webkit-clip-path: inset(0 round 11px);
+  clip-path: inset(0 round 11px);
   object-fit: contain;
 }
 .card-media video { background: #f5e8ed; }
@@ -278,7 +281,7 @@ button:disabled { cursor: wait; opacity: .55; }
     width: 100%;
     max-width: 100%;
     max-height: var(--mobile-media-max-height);
-    border-radius: 8px;
+    border-radius: 11px;
   }
   .card-actions { gap: 4px; }
   .card-actions button { min-height: 34px; padding-inline: 8px; }

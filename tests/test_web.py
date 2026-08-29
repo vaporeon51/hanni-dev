@@ -286,6 +286,7 @@ def test_homepage_renders():
     assert "font-weight: 400;" in css
     assert ".card-media video" in css
     assert ".card-media img, .card-media video" in css
+    assert "clip-path: inset(0 round 11px)" in css
     assert "width: auto" in css
     assert "max-width: min(100%, 520px)" in css
     assert "width: min(560px, 100%)" in css

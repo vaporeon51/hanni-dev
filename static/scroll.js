@@ -1,6 +1,7 @@
 const BATCH_SIZE = 8;
 const MAX_MOUNTED_REELS = 24;
 const CLIENT_HISTORY_CAPACITY = 100;
+const MEDIA_RETRY_DELAYS_MS = [1500, 4000, 9000];
 const state = {
   cards: [],
   activeCard: null,
@@ -75,10 +76,16 @@ function createMedia(item) {
   const wrapper = document.createElement("div");
   wrapper.className = "reel-media is-loading";
   wrapper.textContent = "loading…";
-  let started = false;
+  let resolved = null;
+  let loading = false;
+  let wantsLoaded = false;
   let wantsPlayback = false;
   let media = null;
   let fitObserver = null;
+  let requestController = null;
+  let retryTimer = null;
+  let retryCount = 0;
+  let disposed = false;
 
   const fitInsideStage = () => {
     if (!media) return;
@@ -103,8 +110,31 @@ function createMedia(item) {
     }
   };
 
-  const showSourceLink = () => {
+  const cancelRetry = () => {
+    if (retryTimer === null) return;
+    window.clearTimeout(retryTimer);
+    retryTimer = null;
+  };
+
+  const releaseMedia = () => {
+    fitObserver?.disconnect();
+    fitObserver = null;
     if (media?.tagName === "VIDEO") media.pause();
+    if (media) {
+      media.onerror = null;
+      media.onload = null;
+      media.onloadeddata = null;
+      media.onloadedmetadata = null;
+      media.removeAttribute("src");
+      if (media.tagName === "VIDEO") media.load();
+    }
+    media = null;
+  };
+
+  const showSourceLink = () => {
+    if (disposed || !wantsLoaded) return;
+    cancelRetry();
+    releaseMedia();
     const link = document.createElement("a");
     link.href = item.url;
     link.target = "_blank";
@@ -112,10 +142,33 @@ function createMedia(item) {
     link.textContent = "open source link";
     wrapper.replaceChildren(link);
     wrapper.className = "reel-media is-link";
-    media = null;
   };
 
-  const showResolvedMedia = (resolved) => {
+  const scheduleRetry = (delay) => {
+    if (disposed || !wantsLoaded) return;
+    cancelRetry();
+    releaseMedia();
+    wrapper.replaceChildren();
+    wrapper.className = "reel-media is-loading";
+    wrapper.textContent = "media is catching up…";
+    retryTimer = window.setTimeout(() => {
+      retryTimer = null;
+      if (wantsLoaded && !disposed) load();
+    }, delay);
+  };
+
+  const handleMediaError = () => {
+    if (retryCount >= MEDIA_RETRY_DELAYS_MS.length) {
+      showSourceLink();
+      return;
+    }
+    scheduleRetry(MEDIA_RETRY_DELAYS_MS[retryCount]);
+    retryCount += 1;
+  };
+
+  const showResolvedMedia = (payload) => {
+    resolved = payload;
+    if (disposed || !wantsLoaded) return;
     if (!resolved || !["video", "image"].includes(resolved.kind) || !resolved.url) {
       showSourceLink();
       return;
@@ -127,41 +180,70 @@ function createMedia(item) {
       media.defaultMuted = true;
       media.loop = true;
       media.muted = true;
-      media.preload = "auto";
+      media.preload = wantsPlayback ? "auto" : "metadata";
       media.playsInline = true;
-      media.addEventListener("loadedmetadata", startFitting, { once: true });
+      media.onloadedmetadata = startFitting;
     } else {
       media.alt = item.label || "Reel item";
       media.decoding = "async";
     }
-    media.addEventListener("error", showSourceLink, { once: true });
-    media.addEventListener(resolved.kind === "video" ? "loadeddata" : "load", () => {
+    media.onerror = handleMediaError;
+    const onReady = () => {
       startFitting();
       wrapper.className = "reel-media is-ready";
       if (resolved.kind === "video" && wantsPlayback) media.play().catch(() => {});
-    }, { once: true });
+    };
+    if (resolved.kind === "video") media.onloadeddata = onReady;
+    else media.onload = onReady;
     wrapper.replaceChildren(media);
     media.src = resolved.url;
     if (resolved.kind === "video") media.load();
   };
 
   const load = async () => {
-    if (started) return;
-    started = true;
+    wantsLoaded = true;
+    if (disposed || loading || retryTimer !== null) return;
+    if (resolved) {
+      if (!media?.getAttribute("src")) showResolvedMedia(resolved);
+      return;
+    }
+    loading = true;
+    const currentController = new AbortController();
+    requestController = currentController;
     try {
-      const response = await fetch(`/api/feed/${item.content_link_id}/media`);
+      const response = await fetch(`/api/feed/${item.content_link_id}/media`, {
+        signal: currentController.signal,
+      });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.detail || "media unavailable");
+      if (!response.ok) {
+        const error = new Error(payload.detail || "media unavailable");
+        error.isTransient = [429, 502, 503, 504].includes(response.status);
+        error.retryAfter = Math.max(0, Number(response.headers.get("Retry-After")) || 0) * 1000;
+        throw error;
+      }
       showResolvedMedia(payload);
-    } catch (_) {
-      showSourceLink();
+    } catch (error) {
+      if (error.name === "AbortError") return;
+      if (error.isTransient && retryCount < MEDIA_RETRY_DELAYS_MS.length && wantsLoaded) {
+        const delay = Math.max(error.retryAfter, MEDIA_RETRY_DELAYS_MS[retryCount]);
+        retryCount += 1;
+        scheduleRetry(delay);
+      } else {
+        showSourceLink();
+      }
+    } finally {
+      if (requestController === currentController) requestController = null;
+      loading = false;
     }
   };
 
   const play = () => {
     wantsPlayback = true;
     load();
-    if (media?.tagName === "VIDEO") media.play().catch(() => {});
+    if (media?.tagName === "VIDEO") {
+      media.preload = "auto";
+      media.play().catch(() => {});
+    }
   };
 
   const pause = () => {
@@ -169,20 +251,27 @@ function createMedia(item) {
     if (media?.tagName === "VIDEO") media.pause();
   };
 
-  const dispose = () => {
-    pause();
-    fitObserver?.disconnect();
-    fitObserver = null;
-    if (media?.tagName === "VIDEO") {
-      media.removeAttribute("src");
-      media.load();
-    } else if (media) {
-      media.removeAttribute("src");
-    }
-    media = null;
+  const unload = () => {
+    wantsLoaded = false;
+    wantsPlayback = false;
+    cancelRetry();
+    releaseMedia();
+    wrapper.replaceChildren();
+    wrapper.className = "reel-media is-loading";
+    wrapper.textContent = "waiting…";
   };
 
-  return { element: wrapper, load, play, pause, dispose };
+  const dispose = () => {
+    disposed = true;
+    wantsLoaded = false;
+    wantsPlayback = false;
+    cancelRetry();
+    requestController?.abort();
+    requestController = null;
+    releaseMedia();
+  };
+
+  return { element: wrapper, load, play, pause, unload, dispose };
 }
 
 function actionButton(action, symbol, label, { showLabel = true } = {}) {
@@ -363,10 +452,17 @@ function setActiveCard(card) {
   if (!card || card === state.activeCard) return;
   state.activeCard?._media.pause();
   state.activeCard = card;
-  card._media.play();
   const index = state.cards.indexOf(card);
-  const next = state.cards[index + 1];
-  if (next) next._media.load();
+  state.cards.forEach((candidate, candidateIndex) => {
+    const distance = Math.abs(candidateIndex - index);
+    if (candidate === card) candidate._media.play();
+    else if (distance <= 1) {
+      candidate._media.pause();
+      candidate._media.load();
+    } else {
+      candidate._media.unload();
+    }
+  });
   if (index >= state.cards.length - 3) loadMore();
   scheduleMountedCardTrim();
 }

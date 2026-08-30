@@ -8,7 +8,7 @@ import httpx
 from src.db.feedback import ContentFeedback
 from src.db.feed import FeedItem
 from src.db.collections import ContentCollection, ContentSet, CollectionPreview
-from src.services.media import ResolvedMedia
+from src.services.media import MediaResolutionError, ResolvedMedia
 from src.web import app as web_app
 
 
@@ -275,6 +275,28 @@ def test_media_endpoint_returns_one_resolved_asset(monkeypatch):
     assert response.json() == {"kind": "video", "url": "/api/feed/42/asset", "collection_count": 5}
     assert queued == ["https://imgur.com/abc123"]
     assert remembered == [("media-history-test", "https://imgur.com/abc123")]
+
+
+def test_media_endpoint_exposes_transient_resolution_backoff(monkeypatch):
+    async def fake_preview(content_link_id):
+        return CollectionPreview(url="https://imgur.com/abc123", count=1)
+
+    def fail_temporarily(url):
+        raise MediaResolutionError("rate limited", retry_after_seconds=7)
+
+    monkeypatch.setattr(web_app, "load_collection_preview", fake_preview)
+    monkeypatch.setattr(web_app, "enqueue_priority_url", lambda url: None)
+    monkeypatch.setattr(web_app, "resolve_media_url_cached", fail_temporarily)
+
+    async def request():
+        transport = httpx.ASGITransport(app=web_app.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            return await client.get("/api/feed/42/media")
+
+    response = asyncio.run(request())
+
+    assert response.status_code == 503
+    assert response.headers["retry-after"] == "7"
 
 
 def test_collection_endpoint_reuses_serialized_feed_items(monkeypatch):
@@ -589,7 +611,7 @@ def test_homepage_renders():
     assert 'id="feed-sentinel"' in response.text
     assert 'id="timeline-tools"' in response.text
     assert '<svg class="timeline-icon timeline-icon-search"' in response.text
-    assert '<svg class="timeline-icon timeline-icon-refresh"' in response.text
+    assert 'id="timeline-refresh"' not in response.text
     assert '<svg class="timeline-icon timeline-icon-top"' in response.text
     assert "stroke-width: 2.35;" in css
     assert "appearance: none;" in css
@@ -628,6 +650,9 @@ def test_sets_page_renders_separately():
     assert "threshold: [0, 0.01]" in script
     assert "activeVideo" not in script
     assert "scheduleSetMediaStart" in script
+    assert "MEDIA_RETRY_DELAYS_MS" in script
+    assert "media is catching up…" in script
+    assert "new AbortController()" in script
     assert '$("timeline-refresh")' not in script
     assert "setEndObserver" in script
     assert "async function loadMoreSets()" in script
@@ -681,6 +706,9 @@ def test_scroll_client_is_bounded_and_supports_desktop_paging():
     assert "availableWidth / intrinsicWidth" in script
     assert "availableHeight / intrinsicHeight" in script
     assert "new ResizeObserver(fitInsideStage)" in script
+    assert "MEDIA_RETRY_DELAYS_MS" in script
+    assert 'media.preload = wantsPlayback ? "auto" : "metadata"' in script
+    assert "candidate._media.unload()" in script
     assert 'thumbIcon("up")' in script
     assert 'thumbIcon("down")' in script
     assert '"Upvote this link"' in script
@@ -703,6 +731,11 @@ def test_client_loads_timeline_batches_and_autoplays_video():
     assert "FIRST_MEDIA_HEAD_START_MS = 360" in script
     assert "MEDIA_STAGGER_MS = 110" in script
     assert "scheduleMediaStart" in script
+    assert "MEDIA_RETRY_DELAYS_MS" in script
+    assert "media is catching up…" in script
+    assert "new AbortController()" in script
+    assert "refreshTimeline" not in script
+    assert '$("timeline-refresh")' not in script
     assert "mediaWindowObserver" in script
     assert "feedEndObserver" in script
     assert "async function loadMoreFeed()" in script

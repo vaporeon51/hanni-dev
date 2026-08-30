@@ -462,6 +462,7 @@ button:disabled { cursor: wait; opacity: .55; }
 }
 
 @media (min-width: 621px) {
+  .surface-nav { font-size: .78rem; }
   .card-title { font-size: 1.08rem; }
   .card-meta { font-size: .74rem; }
   .collection-link { font-size: .73rem; }

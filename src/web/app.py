@@ -30,7 +30,13 @@ from src.services.feed import load_feed, load_role_suggestions  # noqa: E402
 from src.services.feed_history import feed_history, scroll_history  # noqa: E402
 from src.services.collections import load_collection, load_collection_feed, load_collection_preview  # noqa: E402
 from src.services.dead_link_queue import enqueue_priority_url  # noqa: E402
-from src.services.media import MediaUpstreamError, open_media_stream, resolve_media_url_cached  # noqa: E402
+from src.services.media import (  # noqa: E402
+    TRANSIENT_UPSTREAM_STATUSES,
+    MediaResolutionError,
+    MediaUpstreamError,
+    open_media_stream,
+    resolve_media_url_cached,
+)
 
 templates = Jinja2Templates(directory=str(REPO_ROOT / "templates"))
 
@@ -44,8 +50,6 @@ SEARCH_CACHE_CAPACITY = 256
 SCROLL_COOLDOWN_SECONDS = 1
 SCROLL_CACHE_CAPACITY = 512
 ANALYTICS_CACHE_CAPACITY = 4096
-
-
 class _RecentActionRateLimiter:
     """Small in-memory cooldown cache for anonymous browser actions.
 
@@ -425,7 +429,14 @@ async def media(content_link_id: int, request: Request, response: Response) -> d
     visitor_id = _ensure_visitor_cookie(request, response)
     feed_history.remember(visitor_id, url)
     enqueue_priority_url(url)
-    resolved = await asyncio.to_thread(resolve_media_url_cached, url)
+    try:
+        resolved = await asyncio.to_thread(resolve_media_url_cached, url)
+    except MediaResolutionError as error:
+        raise HTTPException(
+            status_code=503,
+            detail="Media host is catching up. Please retry shortly.",
+            headers={"Retry-After": str(error.retry_after_seconds)},
+        ) from error
     if resolved.kind in {"video", "image"}:
         return {
             "kind": resolved.kind,
@@ -455,14 +466,23 @@ def media_asset(content_link_id: int, request: Request) -> StreamingResponse:
     url = get_live_content_url(content_link_id)
     if url is None:
         raise HTTPException(status_code=404, detail="Content item not found")
-    resolved = resolve_media_url_cached(url)
+    try:
+        resolved = resolve_media_url_cached(url)
+    except MediaResolutionError as error:
+        raise HTTPException(
+            status_code=503,
+            detail="Media host is catching up. Please retry shortly.",
+            headers={"Retry-After": str(error.retry_after_seconds)},
+        ) from error
     if resolved.kind not in {"video", "image"}:
         raise HTTPException(status_code=404, detail="Media asset is unavailable")
 
     try:
         upstream = open_media_stream(resolved.url, range_header=request.headers.get("range"))
     except MediaUpstreamError as error:
-        raise HTTPException(status_code=502, detail=str(error)) from error
+        status_code = 503 if error.status_code in TRANSIENT_UPSTREAM_STATUSES else 502
+        headers = {"Retry-After": str(error.retry_after_seconds)} if status_code == 503 else None
+        raise HTTPException(status_code=status_code, detail=str(error), headers=headers) from error
 
     response_headers = {"Cache-Control": "public, max-age=3600"}
     for header in ("Content-Length", "Content-Range", "Accept-Ranges", "ETag", "Last-Modified"):

@@ -1,6 +1,14 @@
 from __future__ import annotations
 
-from src.services.media import MediaUpstreamError, ResolvedMedia, open_media_stream, resolve_media_url
+import requests
+
+from src.services.media import (
+    MediaResolutionError,
+    MediaUpstreamError,
+    ResolvedMedia,
+    open_media_stream,
+    resolve_media_url,
+)
 
 
 class FakeResponse:
@@ -22,6 +30,19 @@ class FakeSession:
     def get(self, url, **kwargs):
         self.requests.append((url, kwargs))
         return FakeResponse(self.payload)
+
+
+class RateLimitedMetadataResponse:
+    status_code = 429
+    headers = {"Retry-After": "7"}
+
+    def raise_for_status(self):
+        raise requests.HTTPError(response=self)
+
+
+class RateLimitedMetadataSession:
+    def get(self, url, **kwargs):
+        return RateLimitedMetadataResponse()
 
 
 def test_direct_mp4_does_not_need_an_imgur_lookup():
@@ -63,6 +84,19 @@ def test_imgur_page_resolves_to_animated_mp4():
 
     assert result == ResolvedMedia("video", "https://i.imgur.com/abc123.mp4")
     assert session.requests[0][0].endswith("/3/image/abc123")
+
+
+def test_imgur_rate_limit_is_transient_and_not_resolved_as_a_plain_link():
+    try:
+        resolve_media_url(
+            "https://imgur.com/abc123",
+            client_id="client-id",
+            session=RateLimitedMetadataSession(),
+        )
+    except MediaResolutionError as error:
+        assert error.retry_after_seconds == 7
+    else:  # pragma: no cover
+        raise AssertionError("Expected a transient media resolution error")
 
 
 def test_imgur_page_resolves_static_direct_image():

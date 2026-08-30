@@ -53,6 +53,10 @@
   color: var(--pink-dark);
 }
 
+@media (min-width: 621px) {
+  .scroll-nav { font-size: .78rem; }
+}
+
 .scroll-search {
   display: flex;
   justify-self: end;

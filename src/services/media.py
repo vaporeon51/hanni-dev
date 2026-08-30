@@ -30,6 +30,25 @@ TRANSIENT_UPSTREAM_STATUSES = {429, 502, 503, 504}
 class MediaUpstreamError(RuntimeError):
     """An allowlisted host did not return a browser-playable media response."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int | None = None,
+        retry_after_seconds: int = 2,
+    ) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.retry_after_seconds = retry_after_seconds
+
+
+class MediaResolutionError(RuntimeError):
+    """Imgur metadata could not be resolved because of a transient failure."""
+
+    def __init__(self, message: str, *, retry_after_seconds: int = 3) -> None:
+        super().__init__(message)
+        self.retry_after_seconds = retry_after_seconds
+
 
 @dataclass(frozen=True)
 class ResolvedMedia:
@@ -85,6 +104,13 @@ def _safe_proxied_asset(value: object) -> str | None:
     if parsed.scheme != "https" or parsed.hostname not in PROXIED_MEDIA_HOSTS:
         return None
     return value
+
+
+def _retry_after_seconds(response: requests.Response, default: int) -> int:
+    try:
+        return max(1, min(30, int(float(response.headers.get("Retry-After", default)))))
+    except (TypeError, ValueError):
+        return default
 
 
 def _resolved_imgur_item(data: object) -> ResolvedMedia | None:
@@ -150,9 +176,21 @@ def resolve_media_url(
             },
             timeout=(5, 12),
         )
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except requests.HTTPError as error:
+            if response.status_code in TRANSIENT_UPSTREAM_STATUSES:
+                raise MediaResolutionError(
+                    f"Imgur metadata temporarily returned HTTP {response.status_code}",
+                    retry_after_seconds=_retry_after_seconds(response, 3),
+                ) from error
+            return ResolvedMedia("link", url)
         payload = response.json()
-    except (requests.RequestException, ValueError):
+    except MediaResolutionError:
+        raise
+    except requests.RequestException as error:
+        raise MediaResolutionError("Imgur metadata request temporarily failed") from error
+    except ValueError:
         return ResolvedMedia("link", url)
     finally:
         if should_close:
@@ -205,12 +243,17 @@ def open_media_stream(
         if response.status_code in {200, 206}:
             break
         status_code = response.status_code
+        retry_after_seconds = _retry_after_seconds(response, 2)
         response.close()
         response = None
         if attempt == 0 and status_code in TRANSIENT_UPSTREAM_STATUSES:
             time.sleep(0.5)
             continue
-        raise MediaUpstreamError(f"Upstream host returned HTTP {status_code}")
+        raise MediaUpstreamError(
+            f"Upstream host returned HTTP {status_code}",
+            status_code=status_code,
+            retry_after_seconds=retry_after_seconds,
+        )
 
     if response is None:
         raise MediaUpstreamError("Upstream media request failed")

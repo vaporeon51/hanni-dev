@@ -24,3 +24,14 @@ def test_history_evicts_the_least_recently_used_visitor():
     assert history.recent_urls("visitor-a") == ("one",)
     assert history.recent_urls("visitor-b") == ()
     assert history.recent_urls("visitor-c") == ("three",)
+
+
+def test_history_can_start_a_new_cycle_for_one_visitor():
+    history = RecentFeedHistory(per_visitor_capacity=100)
+    history.remember("visitor-a", "one")
+    history.remember("visitor-b", "two")
+
+    history.clear("visitor-a")
+
+    assert history.recent_urls("visitor-a") == ()
+    assert history.recent_urls("visitor-b") == ("two",)

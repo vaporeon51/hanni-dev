@@ -323,6 +323,59 @@ def test_set_feed_endpoint_serializes_whole_sets(monkeypatch):
     assert len(response.json()["sets"][0]["items"]) == 2
 
 
+def test_scroll_endpoint_returns_and_reserves_a_random_batch(monkeypatch):
+    remembered = []
+
+    async def fake_load_feed(**kwargs):
+        assert kwargs == {
+            "query": "hanni",
+            "sort": "random",
+            "limit": 8,
+            "recent_urls": ("https://i.imgur.com/recent.mp4",),
+            "exclude_recent": True,
+        }
+        return [
+            FeedItem(
+                content_link_id=82,
+                role_id="role-1",
+                member_name="Hanni",
+                group_name="NewJeans",
+                url="https://i.imgur.com/scroll.mp4",
+                original_url=None,
+                uploaded_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
+                score=3.0,
+            )
+        ]
+
+    monkeypatch.setattr(web_app, "load_feed", fake_load_feed)
+    monkeypatch.setattr(
+        web_app.scroll_history,
+        "recent_urls",
+        lambda visitor_id: ("https://i.imgur.com/recent.mp4",),
+    )
+    monkeypatch.setattr(
+        web_app.scroll_history,
+        "remember",
+        lambda visitor_id, url: remembered.append((visitor_id, url)),
+    )
+
+    async def request():
+        transport = httpx.ASGITransport(app=web_app.app)
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="http://test",
+            cookies={web_app.VISITOR_COOKIE: "scroll-feed-endpoint-test"},
+        ) as client:
+            return await client.get("/api/scroll?query=hanni&limit=8")
+
+    response = asyncio.run(request())
+
+    assert response.status_code == 200
+    assert response.json()["items"][0]["content_link_id"] == 82
+    assert response.json()["cycle_reset"] is False
+    assert remembered == [("scroll-feed-endpoint-test", "https://i.imgur.com/scroll.mp4")]
+
+
 def test_media_asset_proxies_range_response(monkeypatch):
     class FakeUpstream:
         status_code = 206
@@ -380,6 +433,7 @@ def test_homepage_renders():
     assert "search a member or group" in response.text
     assert '<footer class="site-credit">made by glaceon</footer>' in response.text
     assert '<a href="/sets">sets</a>' in response.text
+    assert '<a href="/scroll">scroll</a>' in response.text
     assert 'id="collection-heading"' in response.text
     assert '/static/app.css?v=' in response.text
     assert '/static/app.js?v=' in response.text
@@ -419,6 +473,56 @@ def test_sets_page_renders_separately():
     assert "search sets by member or group" in response.text
     assert '/static/sets.js?v=' in response.text
     assert '<option value="15" selected>15 sets</option>' in response.text
+
+
+def test_scroll_page_renders_as_a_separate_reel_surface():
+    async def request():
+        transport = httpx.ASGITransport(app=web_app.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            return await client.get("/scroll")
+
+    response = asyncio.run(request())
+
+    assert response.status_code == 200
+    assert 'id="reel-feed"' in response.text
+    assert 'id="scroll-form"' in response.text
+    assert '/static/scroll.css?v=' in response.text
+    assert '/static/scroll.js?v=' in response.text
+
+
+def test_scroll_client_is_bounded_and_supports_desktop_paging():
+    script = (web_app.REPO_ROOT / "static" / "scroll.js").read_text()
+    css = (web_app.REPO_ROOT / "static" / "scroll.css").read_text()
+
+    assert "MAX_MOUNTED_REELS = 24" in script
+    assert "CLIENT_HISTORY_CAPACITY = 100" in script
+    assert "function trimMountedCards()" in script
+    assert "function scheduleMountedCardTrim()" in script
+    assert 'addEventListener("wheel"' in script
+    assert 'addEventListener("keydown"' in script
+    assert "gestureAlreadyHandled" in script
+    wheel_handler = script[script.index('$("reel-feed").addEventListener("wheel"'):]
+    assert wheel_handler.index("event.preventDefault();") < wheel_handler.index("Math.abs(event.deltaY) < 12")
+    assert "}, 720);" in script
+    assert "state.spacerHeight += removedHeight" in script
+    assert "top: target.offsetTop" in script
+    assert "target.scrollIntoView" not in script
+    assert '{ showLabel: false }' in script
+    assert "scroll-snap-type: y mandatory" in css
+    assert "@media (hover: hover) and (pointer: fine)" in css
+    assert "overscroll-behavior-y: none" in css
+    assert "scroll-snap-type: none" in css
+    assert "object-fit: contain" in css
+    assert "max-width: 100%" in css
+    assert "max-height: 100%" in css
+    assert "const fitInsideStage = () =>" in script
+    assert "availableWidth / intrinsicWidth" in script
+    assert "availableHeight / intrinsicHeight" in script
+    assert "new ResizeObserver(fitInsideStage)" in script
+    assert 'thumbIcon("up")' in script
+    assert 'thumbIcon("down")' in script
+    assert '"Upvote this link"' in script
+    assert '"Downvote this link"' in script
 
 
 def test_client_waits_for_search_and_autoplays_video():

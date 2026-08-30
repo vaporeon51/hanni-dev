@@ -38,5 +38,10 @@ class RecentFeedHistory:
             while len(self._queues) > self.visitor_capacity:
                 self._queues.popitem(last=False)
 
+    def clear(self, visitor_id: str) -> None:
+        with self._lock:
+            self._queues.pop(visitor_id, None)
+
 
 feed_history = RecentFeedHistory()
+scroll_history = RecentFeedHistory(per_visitor_capacity=100)

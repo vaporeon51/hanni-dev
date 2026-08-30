@@ -418,6 +418,16 @@ button:disabled { cursor: wait; opacity: .55; }
   .vote-score { min-width: 18px; }
 }
 
+@media (min-width: 621px) {
+  .card-title { font-size: 1.08rem; }
+  .card-meta { font-size: .74rem; }
+  .collection-link { font-size: .73rem; }
+  .card-actions button { font-size: .79rem; }
+  .vote-score { font-size: .77rem; }
+  .feedback-message { font-size: .73rem; }
+  .set-position { font-size: .73rem; }
+}
+
 @media (max-width: 360px) {
   .search { grid-template-columns: 1fr 1fr; }
   .search input, .search button { grid-column: 1 / -1; }

@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query, Request, Response
+from fastapi import Body, FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -22,6 +22,7 @@ load_dotenv(REPO_ROOT / ".env")
 load_dotenv(REPO_ROOT / ".env.local", override=True)
 
 from src.db import POOL  # noqa: E402
+from src.db.analytics import record_country_session  # noqa: E402
 from src.db.feedback import ContentFeedback, add_content_report, add_content_vote  # noqa: E402
 from src.db.media import get_live_content_url  # noqa: E402
 from src.services.feed import load_feed, load_role_suggestions  # noqa: E402
@@ -33,12 +34,15 @@ from src.services.media import MediaUpstreamError, open_media_stream, resolve_me
 templates = Jinja2Templates(directory=str(REPO_ROOT / "templates"))
 
 VISITOR_COOKIE = "hanni_visitor"
+ANALYTICS_SESSION_COOKIE = "hanni_analytics_session"
+ANALYTICS_SESSION_SECONDS = 30 * 60
 FEEDBACK_COOLDOWN_SECONDS = 5 * 60
 FEEDBACK_CACHE_CAPACITY = 20
 SEARCH_COOLDOWN_SECONDS = 10
 SEARCH_CACHE_CAPACITY = 256
 SCROLL_COOLDOWN_SECONDS = 1
 SCROLL_CACHE_CAPACITY = 512
+ANALYTICS_CACHE_CAPACITY = 4096
 
 
 class _RecentActionRateLimiter:
@@ -73,6 +77,10 @@ _vote_rate_limiter = _RecentActionRateLimiter(FEEDBACK_COOLDOWN_SECONDS, FEEDBAC
 _report_rate_limiter = _RecentActionRateLimiter(FEEDBACK_COOLDOWN_SECONDS, FEEDBACK_CACHE_CAPACITY)
 _search_rate_limiter = _RecentActionRateLimiter(SEARCH_COOLDOWN_SECONDS, SEARCH_CACHE_CAPACITY)
 _scroll_rate_limiter = _RecentActionRateLimiter(SCROLL_COOLDOWN_SECONDS, SCROLL_CACHE_CAPACITY)
+_analytics_rate_limiter = _RecentActionRateLimiter(
+    ANALYTICS_SESSION_SECONDS,
+    ANALYTICS_CACHE_CAPACITY,
+)
 
 
 def _ensure_visitor_cookie(request: Request, response: Response) -> str:
@@ -97,6 +105,22 @@ def _serialize_feedback(feedback: ContentFeedback) -> dict[str, int | bool]:
         "reports": feedback.reports,
         "vote_score": feedback.score,
     }
+
+
+def _country_code(value: str) -> str:
+    normalized = value.strip().upper()
+    return normalized if len(normalized) == 2 and normalized.isascii() and normalized.isalpha() else "XX"
+
+
+def _set_analytics_session_cookie(request: Request, response: Response) -> None:
+    response.set_cookie(
+        ANALYTICS_SESSION_COOKIE,
+        secrets.token_urlsafe(12),
+        max_age=ANALYTICS_SESSION_SECONDS,
+        httponly=True,
+        samesite="lax",
+        secure=request.url.scheme == "https",
+    )
 
 
 def _background_tasks_enabled() -> bool:
@@ -167,6 +191,23 @@ async def scroll_page(request: Request) -> HTMLResponse:
 @app.get("/healthz")
 async def healthz() -> dict[str, bool]:
     return {"ok": True}
+
+
+@app.post("/api/analytics/session")
+async def analytics_session(
+    request: Request,
+    response: Response,
+    country_code: str = Body(default="XX", embed=True, max_length=16),
+) -> dict[str, bool]:
+    """Count one approximate browser-locale session per rolling 30 minutes."""
+
+    visitor_id = _ensure_visitor_cookie(request, response)
+    existing_session = request.cookies.get(ANALYTICS_SESSION_COOKIE)
+    _set_analytics_session_cookie(request, response)
+    if existing_session or not _analytics_rate_limiter.allow(visitor_id, "session"):
+        return {"recorded": False}
+    await asyncio.to_thread(record_country_session, _country_code(country_code))
+    return {"recorded": True}
 
 
 def _serialize_item(item) -> dict[str, Any]:

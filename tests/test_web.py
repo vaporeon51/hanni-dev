@@ -376,6 +376,35 @@ def test_scroll_endpoint_returns_and_reserves_a_random_batch(monkeypatch):
     assert remembered == [("scroll-feed-endpoint-test", "https://i.imgur.com/scroll.mp4")]
 
 
+def test_analytics_endpoint_records_only_the_first_request_in_a_session(monkeypatch):
+    recorded = []
+    monkeypatch.setattr(web_app, "record_country_session", recorded.append)
+
+    async def request():
+        transport = httpx.ASGITransport(app=web_app.app)
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="http://test",
+            cookies={web_app.VISITOR_COOKIE: "analytics-session-test"},
+        ) as client:
+            first = await client.post("/api/analytics/session", json={"country_code": "us"})
+            second = await client.post("/api/analytics/session", json={"country_code": "CA"})
+            return first, second
+
+    first, second = asyncio.run(request())
+
+    assert first.status_code == 200
+    assert first.json() == {"recorded": True}
+    assert second.json() == {"recorded": False}
+    assert recorded == ["US"]
+    assert web_app.ANALYTICS_SESSION_COOKIE in first.cookies
+
+
+def test_analytics_country_code_falls_back_to_unknown():
+    assert web_app._country_code(" ca ") == "CA"
+    assert web_app._country_code("not-a-country") == "XX"
+
+
 def test_media_asset_proxies_range_response(monkeypatch):
     class FakeUpstream:
         status_code = 206
@@ -434,6 +463,7 @@ def test_homepage_renders():
     assert '<footer class="site-credit">made by glaceon</footer>' in response.text
     assert '<a href="/sets">sets</a>' in response.text
     assert '<a href="/scroll">scroll</a>' in response.text
+    assert '/static/analytics.js?v=' in response.text
     assert 'id="collection-heading"' in response.text
     assert '/static/app.css?v=' in response.text
     assert '/static/app.js?v=' in response.text

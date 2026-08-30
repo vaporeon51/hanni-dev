@@ -74,6 +74,8 @@
   color: var(--text);
 }
 .scroll-search button {
+  display: grid;
+  place-items: center;
   padding: 0 13px 0 10px;
   border: 1px solid var(--pink);
   border-radius: 0 999px 999px 0;
@@ -82,6 +84,7 @@
   font-size: .7rem;
   font-weight: 700;
 }
+.scroll-search-icon { display: none; }
 .scroll-search input:focus {
   border-color: var(--pink);
   box-shadow: 0 0 0 3px var(--pink-soft);
@@ -295,10 +298,10 @@
 @media (max-width: 700px) {
   .scroll-topbar {
     grid-template-columns: auto 1fr;
-    gap: 12px;
-    min-height: 52px;
-    padding: 7px 10px 7px 14px;
-    padding-top: max(7px, env(safe-area-inset-top));
+    gap: 10px;
+    min-height: 54px;
+    padding: 10px 14px 8px 20px;
+    padding-top: max(10px, env(safe-area-inset-top));
     border-bottom: 0;
     background: linear-gradient(rgba(32, 21, 27, .48), transparent);
     backdrop-filter: none;
@@ -306,10 +309,21 @@
   }
   .scroll-brand { color: #fff; font-size: 1.4rem; text-shadow: 0 1px 8px rgba(0, 0, 0, .28); }
   .scroll-nav { display: none; }
-  .scroll-search { width: 100%; max-width: 230px; justify-self: end; }
+  .scroll-search { width: 100%; max-width: 190px; justify-self: end; }
   .scroll-search input,
-  .scroll-search button { min-height: 36px; font-size: 16px; }
-  .scroll-search button { width: 46px; padding: 0; font-size: .68rem; }
+  .scroll-search button { min-height: 32px; font-size: 16px; }
+  .scroll-search input { padding-block: 5px; padding-left: 11px; }
+  .scroll-search button { width: 40px; padding: 0; font-size: .65rem; }
+  .scroll-search-label { display: none; }
+  .scroll-search-icon {
+    display: block;
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+  }
   .reel {
     min-height: 0;
     padding: 0;
@@ -356,6 +370,11 @@
   .reel-action-label,
   .reel-score { color: rgba(255, 255, 255, .78); }
   .scroll-status { bottom: max(16px, calc(env(safe-area-inset-bottom) + 8px)); }
+}
+
+@media (max-width: 360px) {
+  .scroll-topbar { padding-left: 17px; }
+  .scroll-search { max-width: 172px; }
 }
 
 @media (max-height: 650px) and (min-width: 701px) {

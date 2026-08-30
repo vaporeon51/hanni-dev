@@ -9,10 +9,14 @@ from src.config.constants import (
     INITIAL_REACT_CAP,
     MAX_FEED_ITEMS,
     MIN_CONTENT_AGE,
+    RANDOM_FRESHNESS_DECAY_DAYS,
+    RANDOM_FRESHNESS_FULL_DAYS,
+    RANDOM_FRESHNESS_MAX_BOOST,
     REPORT_THRESHOLD,
+    SAMPLING_EXPONENT,
 )
 from src.db import POOL
-from src.db.feed import FeedItem
+from src.db.feed import FeedItem, FeedSort, _role_ids_for_query
 
 LEGACY_CONTINUATION_MINUTES = 2
 
@@ -25,6 +29,13 @@ class CollectionPreview:
 
 @dataclass(frozen=True)
 class ContentCollection:
+    label: str
+    items: tuple[FeedItem, ...]
+
+
+@dataclass(frozen=True)
+class ContentSet:
+    collection_of: int
     label: str
     items: tuple[FeedItem, ...]
 
@@ -285,3 +296,238 @@ def get_collection(content_link_id: int) -> ContentCollection | None:
             return None
         items = _items_for_ids(connection, _member_ids(connection, anchor))
         return ContentCollection(label=anchor.label, items=items)
+
+
+def get_collection_feed(
+    *,
+    query: str | None = None,
+    sort: FeedSort = "random",
+    limit: int = 15,
+    min_age: str,
+) -> list[ContentSet]:
+    """Return multi-link parent posts for the set-oriented feed.
+
+    Search results use exact Discord root-message boundaries. That keeps a set
+    semantically precise and lets the query hydrate all selected sets in one
+    batch. The existing per-item collection view retains its legacy burst
+    fallback for rows that predate root-message ingestion.
+    """
+
+    if sort not in {"random", "latest", "oldest", "top"}:
+        raise ValueError(f"Unsupported collection sort: {sort}")
+    limit = max(1, min(int(limit), MAX_FEED_ITEMS))
+    candidate_limit = min(max(limit * 4, 30), MAX_FEED_ITEMS * 4)
+
+    with POOL.connection() as connection:
+        role_ids = None
+        if query and query.strip() and query.strip().lower() not in {"r", "random", "a", "all"}:
+            role_ids = _role_ids_for_query(connection, query, min_age)
+            if not role_ids:
+                return []
+
+        filters, filter_params = _live_filters()
+        where = list(filters)
+        if role_ids is not None:
+            where.append("cl.role_id = ANY(%s)")
+            filter_params.append(role_ids)
+
+        order_by = {
+            "latest": "set_date DESC, anchor_id DESC",
+            "oldest": "set_date ASC, anchor_id ASC",
+            "top": "set_score DESC, set_date DESC, anchor_id DESC",
+        }.get(sort)
+        random_order = """RANDOM()
+            * POWER(GREATEST(set_random_score, 1.0), %s)
+            * (
+                1.0 + %s * EXP(
+                    -GREATEST(
+                        EXTRACT(EPOCH FROM (NOW() - set_date)) / 86400.0 - %s,
+                        0.0
+                    ) / %s
+                )
+            ) DESC
+        """
+        extra_params: tuple[object, ...] = ()
+        if sort == "random":
+            order_by = random_order
+            extra_params = (
+                SAMPLING_EXPONENT,
+                RANDOM_FRESHNESS_MAX_BOOST,
+                RANDOM_FRESHNESS_FULL_DAYS,
+                RANDOM_FRESHNESS_DECAY_DAYS,
+            )
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"""
+                WITH eligible AS (
+                    SELECT
+                        cl.content_link_id,
+                        cl.role_id,
+                        cl.author_id,
+                        cl.root_message_id,
+                        cl.url,
+                        cl.uploaded_date,
+                        ri.member_name,
+                        ri.group_name,
+                        (
+                            LEAST(COALESCE(cl.initial_reaction_count, 0), %s)
+                            + COALESCE(cl.num_upvotes, 0)
+                            - COALESCE(cl.num_downvotes, 0)
+                        )::double precision AS item_score,
+                        (
+                            LEAST(COALESCE(cl.initial_reaction_count, 0)::double precision / 3.0, %s)
+                            + COALESCE(cl.num_upvotes, 0)
+                            - COALESCE(cl.num_downvotes, 0)
+                        )::double precision AS item_random_score
+                    FROM content_links AS cl
+                    JOIN role_info AS ri ON ri.role_id = cl.role_id
+                    WHERE cl.root_message_id IS NOT NULL
+                      AND {' AND '.join(where)}
+                ),
+                grouped AS (
+                    SELECT
+                        role_id,
+                        root_message_id,
+                        MIN(uploaded_date) AS set_date,
+                        MAX(item_score) AS set_score,
+                        MAX(item_random_score) AS set_random_score
+                    FROM eligible
+                    GROUP BY role_id, root_message_id
+                    HAVING COUNT(DISTINCT url) >= 2
+                ),
+                ranked AS (
+                    SELECT
+                        eligible.*,
+                        grouped.set_date,
+                        grouped.set_score,
+                        grouped.set_random_score,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY eligible.role_id, eligible.root_message_id
+                            ORDER BY eligible.uploaded_date, eligible.content_link_id
+                        ) AS anchor_rank
+                    FROM eligible
+                    JOIN grouped USING (role_id, root_message_id)
+                )
+                SELECT
+                    content_link_id AS anchor_id,
+                    role_id,
+                    author_id,
+                    root_message_id,
+                    url,
+                    member_name,
+                    group_name,
+                    set_date,
+                    set_score,
+                    set_random_score
+                FROM ranked
+                WHERE anchor_rank = 1
+                ORDER BY {order_by}
+                LIMIT %s
+                """,
+                (
+                    INITIAL_REACT_CAP,
+                    INITIAL_REACT_CAP,
+                    *filter_params,
+                    *extra_params,
+                    candidate_limit,
+                ),
+            )
+            rows = cursor.fetchall()
+
+        anchors = [
+            _Anchor(
+                content_link_id=int(row[0]),
+                role_id=str(row[1]),
+                author_id=str(row[2]) if row[2] is not None else None,
+                root_message_id=str(row[3]),
+                url=str(row[4]),
+                member_name=row[5],
+                group_name=row[6],
+            )
+            for row in rows
+        ]
+        if not anchors:
+            return []
+
+        member_filters, member_filter_params = _live_filters()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"""
+                WITH wanted AS (
+                    SELECT *
+                    FROM unnest(%s::text[], %s::text[])
+                        AS selected(role_id, root_message_id)
+                ),
+                distinct_links AS (
+                    SELECT DISTINCT ON (cl.role_id, cl.root_message_id, cl.url)
+                        cl.role_id,
+                        cl.root_message_id,
+                        cl.content_link_id,
+                        cl.uploaded_date
+                    FROM content_links AS cl
+                    JOIN wanted
+                      ON wanted.role_id = cl.role_id
+                     AND wanted.root_message_id = cl.root_message_id
+                    JOIN role_info AS ri ON ri.role_id = cl.role_id
+                    WHERE {' AND '.join(member_filters)}
+                    ORDER BY
+                        cl.role_id,
+                        cl.root_message_id,
+                        cl.url,
+                        cl.uploaded_date,
+                        cl.content_link_id
+                ),
+                numbered AS (
+                    SELECT
+                        *,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY role_id, root_message_id
+                            ORDER BY uploaded_date, content_link_id
+                        ) AS member_rank
+                    FROM distinct_links
+                )
+                SELECT role_id, root_message_id, content_link_id
+                FROM numbered
+                WHERE member_rank <= %s
+                ORDER BY role_id, root_message_id, member_rank
+                """,
+                (
+                    [anchor.role_id for anchor in anchors],
+                    [anchor.root_message_id for anchor in anchors],
+                    *member_filter_params,
+                    MAX_FEED_ITEMS,
+                ),
+            )
+            member_rows = cursor.fetchall()
+
+        ids_by_set: dict[tuple[str, str], list[int]] = {}
+        for role_id, root_message_id, content_link_id in member_rows:
+            ids_by_set.setdefault((str(role_id), str(root_message_id)), []).append(int(content_link_id))
+        all_member_ids = [content_link_id for ids in ids_by_set.values() for content_link_id in ids]
+        item_by_id = {
+            item.content_link_id: item
+            for item in _items_for_ids(connection, all_member_ids)
+        }
+
+        results: list[ContentSet] = []
+        seen_memberships: set[tuple[str, ...]] = set()
+        for anchor in anchors:
+            content_link_ids = ids_by_set.get((anchor.role_id, anchor.root_message_id or ""), [])
+            items = tuple(item_by_id[item_id] for item_id in content_link_ids if item_id in item_by_id)
+            if len(items) < 2:
+                continue
+            membership = tuple(sorted(item.url for item in items))
+            if membership in seen_memberships:
+                continue
+            seen_memberships.add(membership)
+            results.append(
+                ContentSet(
+                    collection_of=anchor.content_link_id,
+                    label=anchor.label,
+                    items=items,
+                )
+            )
+            if len(results) >= limit:
+                break
+        return results

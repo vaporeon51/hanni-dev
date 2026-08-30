@@ -7,7 +7,7 @@ import httpx
 
 from src.db.feedback import ContentFeedback
 from src.db.feed import FeedItem
-from src.db.collections import ContentCollection, CollectionPreview
+from src.db.collections import ContentCollection, ContentSet, CollectionPreview
 from src.services.media import ResolvedMedia
 from src.web import app as web_app
 
@@ -272,6 +272,57 @@ def test_collection_endpoint_reuses_serialized_feed_items(monkeypatch):
     assert [item["content_link_id"] for item in response.json()["items"]] == [42, 43]
 
 
+def test_set_feed_endpoint_serializes_whole_sets(monkeypatch):
+    async def fake_set_feed(**kwargs):
+        assert kwargs == {"query": "hanni", "sort": "latest", "limit": 1}
+        return [
+            ContentSet(
+                collection_of=42,
+                label="Hanni - NewJeans",
+                items=(
+                    FeedItem(
+                        content_link_id=42,
+                        role_id="role-1",
+                        member_name="Hanni",
+                        group_name="NewJeans",
+                        url="https://i.imgur.com/one.mp4",
+                        original_url=None,
+                        uploaded_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
+                        score=3.0,
+                    ),
+                    FeedItem(
+                        content_link_id=43,
+                        role_id="role-1",
+                        member_name="Hanni",
+                        group_name="NewJeans",
+                        url="https://i.imgur.com/two.mp4",
+                        original_url=None,
+                        uploaded_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
+                        score=2.0,
+                    ),
+                ),
+            )
+        ]
+
+    monkeypatch.setattr(web_app, "load_collection_feed", fake_set_feed)
+
+    async def request():
+        transport = httpx.ASGITransport(app=web_app.app)
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="http://test",
+            cookies={web_app.VISITOR_COOKIE: "set-feed-endpoint-test"},
+        ) as client:
+            return await client.get("/api/sets?query=hanni&sort=latest&limit=1")
+
+    response = asyncio.run(request())
+
+    assert response.status_code == 200
+    assert response.json()["count"] == 1
+    assert response.json()["sets"][0]["collection_of"] == 42
+    assert len(response.json()["sets"][0]["items"]) == 2
+
+
 def test_media_asset_proxies_range_response(monkeypatch):
     class FakeUpstream:
         status_code = 206
@@ -328,6 +379,7 @@ def test_homepage_renders():
     assert '<a class="brand-link" href="/" aria-label="hanni home">' in response.text
     assert "search a member or group" in response.text
     assert '<footer class="site-credit">made by glaceon</footer>' in response.text
+    assert '<a href="/sets">sets</a>' in response.text
     assert 'id="collection-heading"' in response.text
     assert '/static/app.css?v=' in response.text
     assert '/static/app.js?v=' in response.text
@@ -353,6 +405,20 @@ def test_homepage_renders():
     assert "a tiny corner for good links" not in response.text
     assert "autofeed" not in response.text.lower()
     assert response.text.index('id="feed"') < response.text.index('class="feed-status"')
+
+
+def test_sets_page_renders_separately():
+    async def request():
+        transport = httpx.ASGITransport(app=web_app.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            return await client.get("/sets")
+
+    response = asyncio.run(request())
+
+    assert response.status_code == 200
+    assert "search sets by member or group" in response.text
+    assert '/static/sets.js?v=' in response.text
+    assert '<option value="15" selected>15 sets</option>' in response.text
 
 
 def test_client_waits_for_search_and_autoplays_video():

@@ -26,7 +26,7 @@ from src.db.feedback import ContentFeedback, add_content_report, add_content_vot
 from src.db.media import get_live_content_url  # noqa: E402
 from src.services.feed import load_feed, load_role_suggestions  # noqa: E402
 from src.services.feed_history import feed_history  # noqa: E402
-from src.services.collections import load_collection, load_collection_preview  # noqa: E402
+from src.services.collections import load_collection, load_collection_feed, load_collection_preview  # noqa: E402
 from src.services.dead_link_queue import enqueue_priority_url  # noqa: E402
 from src.services.media import MediaUpstreamError, open_media_stream, resolve_media_url_cached  # noqa: E402
 
@@ -124,7 +124,7 @@ app.mount("/static", StaticFiles(directory=str(REPO_ROOT / "static")), name="sta
 def _static_version() -> str:
     """Change asset URLs whenever local CSS or JavaScript changes."""
 
-    assets = (REPO_ROOT / "static" / "app.css", REPO_ROOT / "static" / "app.js")
+    assets = tuple((REPO_ROOT / "static").glob("*.css")) + tuple((REPO_ROOT / "static").glob("*.js"))
     return str(max(asset.stat().st_mtime_ns for asset in assets))
 
 
@@ -133,6 +133,17 @@ async def index(request: Request) -> HTMLResponse:
     response = templates.TemplateResponse(
         request=request,
         name="index.html",
+        context={"static_version": _static_version()},
+    )
+    _ensure_visitor_cookie(request, response)
+    return response
+
+
+@app.get("/sets", response_class=HTMLResponse)
+async def sets_page(request: Request) -> HTMLResponse:
+    response = templates.TemplateResponse(
+        request=request,
+        name="sets.html",
         context={"static_version": _static_version()},
     )
     _ensure_visitor_cookie(request, response)
@@ -183,6 +194,40 @@ async def feed(
     recent_urls = feed_history.recent_urls(visitor_id) if sort == "random" else ()
     items = await load_feed(query=query, sort=sort, limit=limit, recent_urls=recent_urls)
     return {"items": [_serialize_item(item) for item in items], "count": len(items), "sort": sort, "query": query}
+
+
+@app.get("/api/sets")
+async def sets(
+    request: Request,
+    response: Response,
+    query: str | None = Query(default=None, max_length=100),
+    sort: str = Query(default="random"),
+    limit: int = Query(default=15, ge=1, le=30),
+) -> dict[str, Any]:
+    if sort not in {"random", "latest", "oldest", "top"}:
+        raise HTTPException(status_code=400, detail="sort must be random, latest, oldest, or top")
+    visitor_id = _ensure_visitor_cookie(request, response)
+    if not _search_rate_limiter.allow(visitor_id, "sets"):
+        raise HTTPException(
+            status_code=429,
+            detail="Please wait 10 seconds before searching again.",
+            headers={"Retry-After": str(SEARCH_COOLDOWN_SECONDS)},
+        )
+    results = await load_collection_feed(query=query, sort=sort, limit=limit)
+    return {
+        "sets": [
+            {
+                "collection_of": result.collection_of,
+                "label": result.label,
+                "count": len(result.items),
+                "items": [_serialize_item(item) for item in result.items],
+            }
+            for result in results
+        ],
+        "count": len(results),
+        "sort": sort,
+        "query": query,
+    }
 
 
 @app.get("/api/feed/{content_link_id}/media")

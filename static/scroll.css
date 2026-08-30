@@ -161,7 +161,11 @@
   height: 0;
   max-width: 100%;
   max-height: 100%;
+  overflow: hidden;
+  border-radius: 11px;
   background: transparent;
+  -webkit-clip-path: inset(0 round 11px);
+  clip-path: inset(0 round 11px);
   object-fit: contain;
 }
 .reel-media.is-link {
@@ -309,16 +313,34 @@
   }
   .scroll-brand { color: #fff; font-size: 1.4rem; text-shadow: 0 1px 8px rgba(0, 0, 0, .28); }
   .scroll-nav { display: none; }
-  .scroll-search { width: 100%; max-width: 190px; justify-self: end; }
+  .scroll-search {
+    width: 100%;
+    max-width: 176px;
+    justify-self: end;
+    transform: translateY(3px);
+  }
   .scroll-search input,
-  .scroll-search button { min-height: 32px; font-size: 16px; }
-  .scroll-search input { padding-block: 5px; padding-left: 11px; }
-  .scroll-search button { width: 40px; padding: 0; font-size: .65rem; }
+  .scroll-search button { min-height: 30px; font-size: 16px; }
+  .scroll-search input {
+    padding-block: 4px;
+    padding-left: 10px;
+    border-color: rgba(236, 222, 228, .72);
+    background: rgba(255, 255, 255, .68);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  .scroll-search button {
+    width: 36px;
+    padding: 0;
+    border-color: rgba(233, 154, 186, .82);
+    background: rgba(233, 154, 186, .82);
+    font-size: .65rem;
+  }
   .scroll-search-label { display: none; }
   .scroll-search-icon {
     display: block;
-    width: 16px;
-    height: 16px;
+    width: 15px;
+    height: 15px;
     fill: none;
     stroke: currentColor;
     stroke-width: 2;
@@ -374,7 +396,7 @@
 
 @media (max-width: 360px) {
   .scroll-topbar { padding-left: 17px; }
-  .scroll-search { max-width: 172px; }
+  .scroll-search { max-width: 160px; }
 }
 
 @media (max-height: 650px) and (min-width: 701px) {

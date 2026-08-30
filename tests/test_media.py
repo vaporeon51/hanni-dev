@@ -36,6 +36,12 @@ def test_direct_goyangi_webp_is_browser_ready():
     assert resolve_media_url(url, client_id="") == ResolvedMedia("image", url)
 
 
+def test_direct_kpopping_jpg_is_browser_ready():
+    url = "https://cdn.kpopping.com/kpics/2026/06/1782845536570-2ej1px-2.jpg"
+
+    assert resolve_media_url(url, client_id="") == ResolvedMedia("image", url)
+
+
 def test_discord_attachment_is_left_as_an_external_link():
     url = "https://cdn.discordapp.com/attachments/1/2/video.mp4?ex=expired"
 
@@ -161,6 +167,18 @@ def test_media_stream_allows_goyangi_webp():
     url = "https://cdn.goyangi.pics/v1/babymonster/260824-babymonster-ahyeon-asa-5084.webp"
     session = FakeStreamSession(
         [FakeStreamResponse(status_code=200, content_type="image/webp", url=url)]
+    )
+
+    response = open_media_stream(url, session=session)
+
+    assert response.status_code == 200
+    assert session.requests[0][0] == url
+
+
+def test_media_stream_allows_kpopping_jpg():
+    url = "https://cdn.kpopping.com/kpics/2026/06/1782845536570-2ej1px-2.jpg"
+    session = FakeStreamSession(
+        [FakeStreamResponse(status_code=200, content_type="image/jpeg", url=url)]
     )
 
     response = open_media_stream(url, session=session)

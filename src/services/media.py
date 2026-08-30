@@ -21,7 +21,7 @@ IMGUR_HOSTS = {"imgur.com", "www.imgur.com", "i.imgur.com"}
 # These durable CDN hosts may be streamed through the public feed asset endpoint.
 # Keep this narrower than the worker's URL-check allowlist: every host here is an
 # SSRF boundary for a user-accessible proxy.
-PROXIED_MEDIA_HOSTS = IMGUR_HOSTS | {"cdn.goyangi.pics"}
+PROXIED_MEDIA_HOSTS = IMGUR_HOSTS | {"cdn.goyangi.pics", "cdn.kpopping.com"}
 VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".m4v"}
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif"}
 TRANSIENT_UPSTREAM_STATUSES = {429, 502, 503, 504}

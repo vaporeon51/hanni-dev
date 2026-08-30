@@ -587,6 +587,9 @@ def test_homepage_renders():
     assert 'id="feed-sentinel"' in response.text
     assert 'id="timeline-tools"' in response.text
     assert '<svg class="timeline-icon timeline-icon-search"' in response.text
+    assert '<svg class="timeline-icon timeline-icon-refresh"' in response.text
+    assert '<svg class="timeline-icon timeline-icon-top"' in response.text
+    assert "stroke-width: 2.35;" in css
     assert "appearance: none;" in css
     assert "background-position: right 13px center;" in css
     assert "Loading little links" not in response.text

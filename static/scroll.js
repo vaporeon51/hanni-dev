@@ -20,12 +20,14 @@ const state = {
 };
 
 const $ = (id) => document.getElementById(id);
+const dateFormatter = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
+const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 function formatDate(value) {
   if (!value) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(date);
+  return dateFormatter.format(date);
 }
 
 function announce(text, { sticky = false } = {}) {
@@ -479,16 +481,18 @@ const reelObserver = new IntersectionObserver((entries) => {
 
 function appendItems(items) {
   const feed = $("reel-feed");
-  let added = 0;
+  const fragment = document.createDocumentFragment();
+  const addedCards = [];
   items.forEach((item) => {
     if (!item?.url || !rememberUrl(item.url)) return;
     const card = createReel(item);
     state.cards.push(card);
-    feed.appendChild(card);
-    reelObserver.observe(card);
-    added += 1;
+    addedCards.push(card);
+    fragment.appendChild(card);
   });
-  return added;
+  feed.appendChild(fragment);
+  addedCards.forEach((card) => reelObserver.observe(card));
+  return addedCards.length;
 }
 
 async function loadMore({ initial = false } = {}) {
@@ -576,7 +580,7 @@ function navigateBy(direction) {
     if (direction > 0) loadMore();
     return;
   }
-  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const reducedMotion = reducedMotionQuery.matches;
   $("reel-feed").scrollTo({
     top: target.offsetTop,
     behavior: reducedMotion ? "auto" : "smooth",

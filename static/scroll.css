@@ -47,6 +47,7 @@
   padding: 2px 1px;
   text-decoration: none;
 }
+.scroll-nav a { transition: color 130ms ease; }
 .scroll-nav a:hover { color: var(--pink-dark); }
 .scroll-nav [aria-current="page"] {
   border-bottom-color: currentColor;
@@ -88,6 +89,7 @@
   color: #fff;
   font-size: .7rem;
   font-weight: 700;
+  transition: background-color 130ms ease, border-color 130ms ease;
 }
 .scroll-search-icon { display: none; }
 .scroll-search input:focus {
@@ -240,10 +242,19 @@
   color: var(--text);
   font-size: 1rem;
   place-items: center;
+  transition: border-color 130ms ease, color 130ms ease, background-color 130ms ease;
 }
 .reel-action:hover { border-color: var(--pink); color: var(--pink-dark); }
 .reel-action[data-action="upvote"]:hover { border-color: var(--green); color: var(--green); }
 .reel-action[data-action="downvote"]:hover { border-color: var(--red); color: var(--red); }
+.scroll-nav a:focus-visible,
+.scroll-brand:focus-visible,
+.reel-action:focus-visible,
+.scroll-search button:focus-visible,
+.scroll-top:focus-visible {
+  outline: 2px solid var(--pink);
+  outline-offset: 2px;
+}
 .reel-action svg {
   width: 21px;
   height: 21px;
@@ -410,4 +421,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .reel-feed { scroll-behavior: auto; }
+  .scroll-nav a,
+  .scroll-search button,
+  .reel-action { transition: none; }
 }

@@ -23,6 +23,8 @@ const viewCache = new Map();
 const pendingMediaStarts = new Set();
 
 const $ = (id) => document.getElementById(id);
+const dateFormatter = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
+const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 function newHistoryKey() {
   if (window.crypto?.randomUUID) return window.crypto.randomUUID();
@@ -64,15 +66,12 @@ window.addEventListener("orientationchange", () => {
   window.setTimeout(lockMobileMediaHeight, 250);
 });
 
-const visibleVideos = new Set();
 const videoPlaybackObserver = "IntersectionObserver" in window
   ? new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting && entry.intersectionRatio > 0) {
-          visibleVideos.add(entry.target);
           entry.target.play().catch(() => {});
         } else {
-          visibleVideos.delete(entry.target);
           entry.target.pause();
         }
       });
@@ -141,19 +140,28 @@ function setTimelineToolsVisible(visible) {
   $("timeline-tools").hidden = !visible;
 }
 
+let timelineToolsFrame = null;
 function updateTimelineTools() {
   setTimelineToolsVisible(state.mode === "feed" && window.scrollY > 500);
 }
 
+function scheduleTimelineToolsUpdate() {
+  if (timelineToolsFrame !== null) return;
+  timelineToolsFrame = window.requestAnimationFrame(() => {
+    timelineToolsFrame = null;
+    updateTimelineTools();
+  });
+}
+
 function focusSearch() {
   const search = $("feed-form");
-  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const reducedMotion = reducedMotionQuery.matches;
   search.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
   window.setTimeout(() => $("query").focus({ preventScroll: true }), reducedMotion ? 0 : 350);
 }
 
 function jumpToTop() {
-  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const reducedMotion = reducedMotionQuery.matches;
   $("feed-form").scrollIntoView({
     behavior: reducedMotion ? "auto" : "smooth",
     block: "start",
@@ -227,7 +235,7 @@ function formatDate(value) {
   if (!value) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(date);
+  return dateFormatter.format(date);
 }
 
 function externalLink(item, text = "open source") {
@@ -265,7 +273,6 @@ function createMedia(item) {
       if (height > 0) wrapper.style.minHeight = `${Math.ceil(height)}px`;
     }
     if (media?.tagName === "VIDEO") {
-      visibleVideos.delete(media);
       videoPlaybackObserver?.unobserve(media);
       media.pause();
     }
@@ -401,7 +408,6 @@ function createMedia(item) {
       media.style.width = `${Math.ceil(rect.width)}px`;
       media.style.height = `${Math.ceil(rect.height)}px`;
     }
-    visibleVideos.delete(media);
     videoPlaybackObserver?.unobserve(media);
     media.pause();
     media.removeAttribute("src");
@@ -880,7 +886,7 @@ $("feed-sentinel").addEventListener("click", () => {
   if ($("feed-sentinel").classList.contains("is-error") && !state.retryContinuation) loadFeed();
   else loadMoreFeed();
 });
-window.addEventListener("scroll", updateTimelineTools, { passive: true });
+window.addEventListener("scroll", scheduleTimelineToolsUpdate, { passive: true });
 refreshFeedSentinelObserver();
 $("feed").addEventListener("click", (event) => {
   const collectionLink = event.target.closest("a.collection-link");

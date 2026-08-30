@@ -26,7 +26,7 @@ body {
 }
 
 button, input, select { font: inherit; }
-button { cursor: pointer; }
+button { cursor: pointer; touch-action: manipulation; }
 button:disabled { cursor: wait; opacity: .55; }
 
 .shell {
@@ -100,6 +100,7 @@ button:disabled { cursor: wait; opacity: .55; }
   color: #fff;
   font-weight: 700;
   padding: 0 20px;
+  transition: background-color 130ms ease;
 }
 .search button:hover { background: var(--pink-dark); }
 
@@ -118,6 +119,7 @@ button:disabled { cursor: wait; opacity: .55; }
   padding: 2px 1px;
   text-decoration: none;
 }
+.surface-nav a { transition: color 130ms ease; }
 .surface-nav a:hover { color: var(--pink-dark); }
 .surface-nav [aria-current="page"] {
   border-bottom-color: currentColor;
@@ -318,6 +320,7 @@ button:disabled { cursor: wait; opacity: .55; }
   font-size: .68rem;
   line-height: 1.25;
   text-decoration: none;
+  transition: color 130ms ease;
   white-space: nowrap;
 }
 .collection-link:hover { color: var(--pink); }
@@ -332,6 +335,7 @@ button:disabled { cursor: wait; opacity: .55; }
   font-size: .74rem;
   line-height: 1;
   padding: 7px 10px;
+  transition: border-color 130ms ease, color 130ms ease, background-color 130ms ease;
 }
 .card-actions button:hover { border-color: var(--pink); color: var(--pink-dark); }
 .card-actions .upvote, .card-actions .downvote { min-width: 42px; }
@@ -377,9 +381,16 @@ button:disabled { cursor: wait; opacity: .55; }
   font-size: 1.3rem;
   line-height: 1;
   place-items: center;
+  transition: background-color 130ms ease, color 130ms ease;
 }
 .timeline-tools button:hover,
 .timeline-tools button:focus-visible { background: var(--pink-soft); }
+button:focus-visible,
+.surface-nav a:focus-visible,
+.collection-link:focus-visible {
+  outline: 2px solid var(--pink);
+  outline-offset: 2px;
+}
 .timeline-icon {
   display: block;
   width: 1em;
@@ -478,5 +489,11 @@ button:disabled { cursor: wait; opacity: .55; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .card-media img, .card-media video { transition: none; }
+  .card-media img,
+  .card-media video,
+  .search button,
+  .surface-nav a,
+  .collection-link,
+  .card-actions button,
+  .timeline-tools button { transition: none; }
 }

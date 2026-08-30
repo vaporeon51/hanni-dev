@@ -26,6 +26,7 @@ from src.db.feedback import ContentFeedback, add_content_report, add_content_vot
 from src.db.media import get_live_content_url  # noqa: E402
 from src.services.feed import load_feed, load_role_suggestions  # noqa: E402
 from src.services.feed_history import feed_history  # noqa: E402
+from src.services.collections import load_collection, load_collection_preview  # noqa: E402
 from src.services.dead_link_queue import enqueue_priority_url  # noqa: E402
 from src.services.media import MediaUpstreamError, open_media_stream, resolve_media_url_cached  # noqa: E402
 
@@ -185,18 +186,36 @@ async def feed(
 
 
 @app.get("/api/feed/{content_link_id}/media")
-async def media(content_link_id: int, request: Request, response: Response) -> dict[str, str]:
-    url = await asyncio.to_thread(get_live_content_url, content_link_id)
-    if url is None:
+async def media(content_link_id: int, request: Request, response: Response) -> dict[str, str | int]:
+    preview = await load_collection_preview(content_link_id)
+    if preview is None:
         raise HTTPException(status_code=404, detail="Content item not found")
+    url = preview.url
     # This endpoint is requested as each delayed feed card is actually shown.
     visitor_id = _ensure_visitor_cookie(request, response)
     feed_history.remember(visitor_id, url)
     enqueue_priority_url(url)
     resolved = await asyncio.to_thread(resolve_media_url_cached, url)
     if resolved.kind in {"video", "image"}:
-        return {"kind": resolved.kind, "url": f"/api/feed/{content_link_id}/asset"}
-    return resolved.as_dict()
+        return {
+            "kind": resolved.kind,
+            "url": f"/api/feed/{content_link_id}/asset",
+            "collection_count": preview.count,
+        }
+    return {**resolved.as_dict(), "collection_count": preview.count}
+
+
+@app.get("/api/collections/{content_link_id}")
+async def collection(content_link_id: int) -> dict[str, Any]:
+    result = await load_collection(content_link_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Content set not found")
+    return {
+        "items": [_serialize_item(item) for item in result.items],
+        "count": len(result.items),
+        "label": result.label,
+        "collection_of": content_link_id,
+    }
 
 
 @app.get("/api/feed/{content_link_id}/asset")

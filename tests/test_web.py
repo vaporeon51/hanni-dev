@@ -7,6 +7,7 @@ import httpx
 
 from src.db.feedback import ContentFeedback
 from src.db.feed import FeedItem
+from src.db.collections import ContentCollection, CollectionPreview
 from src.services.media import ResolvedMedia
 from src.web import app as web_app
 
@@ -196,7 +197,12 @@ def test_report_endpoint_requires_known_reason():
 def test_media_endpoint_returns_one_resolved_asset(monkeypatch):
     queued = []
     remembered = []
-    monkeypatch.setattr(web_app, "get_live_content_url", lambda content_link_id: "https://imgur.com/abc123")
+
+    async def fake_preview(content_link_id):
+        assert content_link_id == 42
+        return CollectionPreview(url="https://imgur.com/abc123", count=5)
+
+    monkeypatch.setattr(web_app, "load_collection_preview", fake_preview)
     monkeypatch.setattr(web_app, "enqueue_priority_url", queued.append)
     monkeypatch.setattr(web_app.feed_history, "remember", lambda visitor_id, url: remembered.append((visitor_id, url)))
     monkeypatch.setattr(
@@ -217,9 +223,53 @@ def test_media_endpoint_returns_one_resolved_asset(monkeypatch):
     response = asyncio.run(request())
 
     assert response.status_code == 200
-    assert response.json() == {"kind": "video", "url": "/api/feed/42/asset"}
+    assert response.json() == {"kind": "video", "url": "/api/feed/42/asset", "collection_count": 5}
     assert queued == ["https://imgur.com/abc123"]
     assert remembered == [("media-history-test", "https://imgur.com/abc123")]
+
+
+def test_collection_endpoint_reuses_serialized_feed_items(monkeypatch):
+    async def fake_collection(content_link_id):
+        assert content_link_id == 42
+        return ContentCollection(
+            label="Hanni - NewJeans",
+            items=(
+                FeedItem(
+                    content_link_id=42,
+                    role_id="role-1",
+                    member_name="Hanni",
+                    group_name="NewJeans",
+                    url="https://i.imgur.com/one.mp4",
+                    original_url=None,
+                    uploaded_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
+                    score=3.0,
+                ),
+                FeedItem(
+                    content_link_id=43,
+                    role_id="role-1",
+                    member_name="Hanni",
+                    group_name="NewJeans",
+                    url="https://i.imgur.com/two.mp4",
+                    original_url=None,
+                    uploaded_date=datetime(2026, 1, 1, 0, 1, tzinfo=timezone.utc),
+                    score=2.0,
+                ),
+            ),
+        )
+
+    monkeypatch.setattr(web_app, "load_collection", fake_collection)
+
+    async def request():
+        transport = httpx.ASGITransport(app=web_app.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            return await client.get("/api/collections/42")
+
+    response = asyncio.run(request())
+
+    assert response.status_code == 200
+    assert response.json()["label"] == "Hanni - NewJeans"
+    assert response.json()["count"] == 2
+    assert [item["content_link_id"] for item in response.json()["items"]] == [42, 43]
 
 
 def test_media_asset_proxies_range_response(monkeypatch):
@@ -278,6 +328,7 @@ def test_homepage_renders():
     assert '<a class="brand-link" href="/" aria-label="hanni home">' in response.text
     assert "search a member or group" in response.text
     assert '<footer class="site-credit">made by glaceon</footer>' in response.text
+    assert 'id="collection-heading"' in response.text
     assert '/static/app.css?v=' in response.text
     assert '/static/app.js?v=' in response.text
     assert "fonts.googleapis.com" not in response.text
@@ -294,6 +345,7 @@ def test_homepage_renders():
     assert "max-height: var(--mobile-media-max-height)" in css
     assert ".card-actions .upvote, .card-actions .downvote { min-width: 42px; }" in css
     assert ".feed-status.is-floating { margin: 0 auto; padding-inline: 14px; }" in css
+    assert ".collection-link" in css
     assert '<option value="15" selected>15 links</option>' in response.text
     assert '<option value="random" selected>random</option>' in response.text
     assert '<option value="latest">latest</option>' in response.text
@@ -333,8 +385,15 @@ def test_client_waits_for_search_and_autoplays_video():
     assert '["dead_link", "dead link"]' not in script
     assert "dead link report ${payload.dead_link_reports} of 3" not in script
     assert "state.visibleCount > 1" not in script
-    assert 'removeAttribute("src")' not in script
+    assert "function disposeView(snapshot)" in script
+    assert 'video.removeAttribute("src")' in script
     assert "dataset.mediaSrc" not in script
     assert "mediaCandidates" not in script
     assert "if (copied) await recordImplicitUpvote(card, id);" in script
     assert "async function recordImplicitUpvote(card, id)" in script
+    assert "async function loadCollection(contentLinkId)" in script
+    assert "function navigateToCollection(contentLinkId, href)" in script
+    assert 'window.addEventListener("popstate"' in script
+    assert "VIEW_CACHE_CAPACITY = 1" in script
+    assert "view set (${count}) →" in script
+    assert "?collection=${item.content_link_id}" in script

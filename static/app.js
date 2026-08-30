@@ -1,9 +1,43 @@
 const ALLOWED_LIMITS = new Set([1, 15, 30]);
 const ALLOWED_SORTS = new Set(["random", "latest", "oldest", "top"]);
 const REVEAL_DELAY_MS = 2000;
-const state = { items: [], revealTimer: null, revealToken: 0, visibleCount: 0 };
+const VIEW_CACHE_CAPACITY = 1;
+const state = {
+  items: [],
+  revealTimer: null,
+  revealToken: 0,
+  visibleCount: 0,
+  mode: "feed",
+  collectionLabel: "",
+  historyKey: "",
+  navigationToken: 0,
+};
+const viewCache = new Map();
 
 const $ = (id) => document.getElementById(id);
+
+function newHistoryKey() {
+  if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function collectionIdFromLocation() {
+  const value = new URL(window.location.href).searchParams.get("collection");
+  return /^\d+$/.test(value || "") && Number(value) > 0 ? Number(value) : null;
+}
+
+function initializeHistory() {
+  const collectionId = collectionIdFromLocation();
+  state.mode = collectionId ? "collection" : "feed";
+  state.historyKey = window.history.state?.viewKey || newHistoryKey();
+  window.history.replaceState(
+    { viewKey: state.historyKey, mode: state.mode, collectionId },
+    "",
+    window.location.href,
+  );
+  if ("scrollRestoration" in window.history) window.history.scrollRestoration = "manual";
+  return collectionId;
+}
 
 function lockMobileMediaHeight() {
   if (!window.matchMedia("(max-width: 620px)").matches) {
@@ -115,6 +149,65 @@ function clearFeed() {
   setFeedOverlayFloating(false);
 }
 
+function setCollectionHeading(label = "", count = 0) {
+  const heading = $("collection-heading");
+  heading.replaceChildren();
+  heading.hidden = !label;
+  if (!label) return;
+  const title = document.createElement("strong");
+  title.textContent = label;
+  heading.append(title, ` · set of ${count}`);
+}
+
+function disposeView(snapshot) {
+  snapshot.nodes.forEach((node) => {
+    node.querySelectorAll?.("video").forEach((video) => {
+      if (videoPlaybackObserver) videoPlaybackObserver.unobserve(video);
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
+    });
+  });
+}
+
+function cacheView(key, snapshot) {
+  const previous = viewCache.get(key);
+  if (previous) disposeView(previous);
+  viewCache.set(key, snapshot);
+  while (viewCache.size > VIEW_CACHE_CAPACITY) {
+    const oldestKey = viewCache.keys().next().value;
+    const oldest = viewCache.get(oldestKey);
+    viewCache.delete(oldestKey);
+    if (oldest) disposeView(oldest);
+  }
+}
+
+function captureCurrentView() {
+  const wasRevealing = state.revealTimer !== null;
+  if (state.revealTimer !== null) window.clearTimeout(state.revealTimer);
+  state.revealTimer = null;
+  state.revealToken += 1;
+  const nodes = Array.from($("feed").childNodes);
+  nodes.forEach((node) => node.remove());
+  return {
+    nodes,
+    items: state.items,
+    visibleCount: state.visibleCount,
+    mode: state.mode,
+    collectionLabel: state.collectionLabel,
+    wasRevealing,
+    statusText: $("status").textContent,
+    query: $("query").value,
+    sort: $("sort").value,
+    limit: $("limit").value,
+    scrollY: window.scrollY,
+  };
+}
+
+function storeCurrentView() {
+  cacheView(state.historyKey, captureCurrentView());
+}
+
 function formatDate(value) {
   if (!value) return null;
   const date = new Date(value);
@@ -182,6 +275,7 @@ function createMedia(item) {
       const response = await fetch(`/api/feed/${item.content_link_id}/media`);
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.detail || "media unavailable");
+      showCollectionLink(item, Number(payload.collection_count) || 0);
       showResolvedMedia(payload);
     } catch (_) {
       showSourceLink();
@@ -196,6 +290,19 @@ function appendMeta(meta, text, className = "") {
   if (className) element.className = className;
   element.textContent = text;
   meta.appendChild(element);
+}
+
+function showCollectionLink(item, count) {
+  if (state.mode !== "feed" || count < 2) return;
+  const card = $("feed").querySelector(`[data-content-link-id="${item.content_link_id}"]`);
+  const header = card?.querySelector(".card-header");
+  if (!header || header.querySelector(".collection-link")) return;
+  const link = document.createElement("a");
+  link.className = "collection-link";
+  link.href = `/?collection=${item.content_link_id}`;
+  link.dataset.collectionId = String(item.content_link_id);
+  link.textContent = `view set (${count}) →`;
+  header.appendChild(link);
 }
 
 function feedbackButton(className, action, text, label) {
@@ -220,10 +327,14 @@ function renderCard(item) {
   const body = document.createElement("div");
   body.className = "card-body";
 
+  const header = document.createElement("div");
+  header.className = "card-header";
+
   const title = document.createElement("div");
   title.className = "card-title";
   title.textContent = item.label || "untitled link";
-  body.appendChild(title);
+  header.appendChild(title);
+  body.appendChild(header);
 
   const meta = document.createElement("div");
   meta.className = "card-meta";
@@ -261,43 +372,83 @@ function renderCard(item) {
   return card;
 }
 
+function revealNext(token) {
+  if (token !== state.revealToken || state.visibleCount >= state.items.length) return;
+  const card = renderCard(state.items[state.visibleCount]);
+  $("feed").appendChild(card);
+  card._pendingMediaLoad();
+  state.visibleCount += 1;
+  setFeedOverlayFloating(true);
+  setJumpBottomVisible(true);
+  setJumpTopVisible(true);
+
+  if (state.visibleCount < state.items.length) {
+    setStatus(`showing ${state.visibleCount} of ${state.items.length} · next link in 2 seconds`);
+    setRevealProgress(true);
+    setStopVisible(true);
+    state.revealTimer = window.setTimeout(() => revealNext(token), REVEAL_DELAY_MS);
+  } else {
+    state.revealTimer = null;
+    setRevealProgress(false);
+    setStopVisible(false);
+    setStatus(`${state.visibleCount} link${state.visibleCount === 1 ? "" : "s"} shown`);
+  }
+}
+
+function resumeReveal() {
+  if (state.visibleCount >= state.items.length) return;
+  const token = state.revealToken;
+  setStatus(`showing ${state.visibleCount} of ${state.items.length} · next link in 2 seconds`);
+  setRevealProgress(true);
+  setStopVisible(true);
+  state.revealTimer = window.setTimeout(() => revealNext(token), REVEAL_DELAY_MS);
+}
+
 function renderFeed() {
   cancelReveal();
   clearFeed();
   if (!state.items.length) {
     const empty = document.createElement("p");
     empty.className = "empty";
-    empty.textContent = "no little links found — try another search ♡";
+    empty.textContent = state.mode === "collection"
+      ? "this set has no available links ♡"
+      : "no little links found — try another search ♡";
     $("feed").appendChild(empty);
     setStatus("0 links");
     return;
   }
 
-  const token = state.revealToken;
   state.visibleCount = 0;
-  const revealNext = () => {
-    if (token !== state.revealToken) return;
-    const card = renderCard(state.items[state.visibleCount]);
-    $("feed").appendChild(card);
-    card._pendingMediaLoad();
-    state.visibleCount += 1;
-    setFeedOverlayFloating(true);
-    setJumpBottomVisible(true);
-    setJumpTopVisible(true);
+  revealNext(state.revealToken);
+}
 
-    if (state.visibleCount < state.items.length) {
-      setStatus(`showing ${state.visibleCount} of ${state.items.length} · next link in 2 seconds`);
-      setRevealProgress(true);
-      setStopVisible(true);
-      state.revealTimer = window.setTimeout(revealNext, REVEAL_DELAY_MS);
-    } else {
-      state.revealTimer = null;
-      setRevealProgress(false);
-      setStopVisible(false);
-      setStatus(`${state.visibleCount} link${state.visibleCount === 1 ? "" : "s"} shown`);
-    }
-  };
-  revealNext();
+function restoreView(snapshot) {
+  cancelReveal();
+  clearFeed();
+  state.items = snapshot.items;
+  state.visibleCount = snapshot.visibleCount;
+  state.mode = snapshot.mode;
+  state.collectionLabel = snapshot.collectionLabel;
+  $("query").value = snapshot.query;
+  $("sort").value = snapshot.sort;
+  $("limit").value = snapshot.limit;
+  $("feed").append(...snapshot.nodes);
+  setCollectionHeading(
+    state.mode === "collection" ? state.collectionLabel : "",
+    state.mode === "collection" ? state.items.length : 0,
+  );
+  const hasCards = state.visibleCount > 0;
+  setFeedOverlayFloating(hasCards);
+  setJumpBottomVisible(hasCards);
+  setJumpTopVisible(hasCards);
+  if (snapshot.wasRevealing && state.visibleCount < state.items.length) {
+    resumeReveal();
+  } else {
+    setRevealProgress(false);
+    setStopVisible(false);
+    setStatus(snapshot.statusText);
+  }
+  window.requestAnimationFrame(() => window.scrollTo({ top: snapshot.scrollY, behavior: "auto" }));
 }
 
 function setFeedbackMessage(card, text) {
@@ -382,8 +533,70 @@ async function recordImplicitUpvote(card, id) {
   }
 }
 
+async function loadCollection(contentLinkId) {
+  const navigationToken = ++state.navigationToken;
+  cancelReveal();
+  clearFeed();
+  state.mode = "collection";
+  state.collectionLabel = "";
+  state.items = [];
+  state.visibleCount = 0;
+  setCollectionHeading();
+  setStatus("finding this set…");
+  try {
+    const response = await fetch(`/api/collections/${contentLinkId}`);
+    const payload = await response.json().catch(() => ({}));
+    if (navigationToken !== state.navigationToken) return;
+    if (!response.ok) throw new Error(payload.detail || "set unavailable");
+    state.items = payload.items || [];
+    state.collectionLabel = payload.label || "content set";
+    setCollectionHeading(state.collectionLabel, state.items.length);
+    window.scrollTo({ top: 0, behavior: "auto" });
+    renderFeed();
+  } catch (error) {
+    if (navigationToken !== state.navigationToken) return;
+    const message = document.createElement("p");
+    message.className = "empty";
+    message.textContent = error.message || "set unavailable — try again shortly";
+    $("feed").appendChild(message);
+    setStatus(error.message || "set unavailable");
+  }
+}
+
+function navigateToCollection(contentLinkId, href) {
+  storeCurrentView();
+  state.historyKey = newHistoryKey();
+  window.history.pushState(
+    { viewKey: state.historyKey, mode: "collection", collectionId: contentLinkId },
+    "",
+    href,
+  );
+  loadCollection(contentLinkId);
+}
+
+function beginFeedNavigation() {
+  if (state.mode !== "collection") return;
+  storeCurrentView();
+  state.historyKey = newHistoryKey();
+  window.history.pushState(
+    { viewKey: state.historyKey, mode: "feed", collectionId: null },
+    "",
+    "/",
+  );
+  state.mode = "feed";
+  state.collectionLabel = "";
+  state.items = [];
+  state.visibleCount = 0;
+  setCollectionHeading();
+}
+
 async function loadFeed(event) {
   if (event) event.preventDefault();
+  beginFeedNavigation();
+  const navigationToken = ++state.navigationToken;
+  state.mode = "feed";
+  state.collectionLabel = "";
+  setCollectionHeading();
   $("query").blur();
   cancelReveal();
   setStatus("finding little links…");
@@ -399,10 +612,12 @@ async function loadFeed(event) {
   try {
     const response = await fetch(`/api/feed?${params.toString()}`);
     const payload = await response.json().catch(() => ({}));
+    if (navigationToken !== state.navigationToken) return;
     if (!response.ok) throw new Error(payload.detail || "feed unavailable");
     state.items = payload.items || [];
     renderFeed();
   } catch (error) {
+    if (navigationToken !== state.navigationToken) return;
     if (!state.items.length) {
       clearFeed();
       const message = document.createElement("p");
@@ -416,13 +631,50 @@ async function loadFeed(event) {
   }
 }
 
+window.addEventListener("popstate", (event) => {
+  state.navigationToken += 1;
+  const nextHistoryKey = event.state?.viewKey || newHistoryKey();
+  const snapshot = viewCache.get(nextHistoryKey);
+  if (snapshot) viewCache.delete(nextHistoryKey);
+  storeCurrentView();
+  state.historyKey = nextHistoryKey;
+  if (snapshot) {
+    restoreView(snapshot);
+    return;
+  }
+  const collectionId = collectionIdFromLocation();
+  if (collectionId) {
+    loadCollection(collectionId);
+    return;
+  }
+  cancelReveal();
+  clearFeed();
+  state.mode = "feed";
+  state.collectionLabel = "";
+  state.items = [];
+  state.visibleCount = 0;
+  setCollectionHeading();
+  setStatus("");
+  window.scrollTo({ top: 0, behavior: "auto" });
+});
+
 $("feed-form").addEventListener("submit", loadFeed);
 $("stop-feed").addEventListener("click", stopFeed);
 $("jump-bottom").addEventListener("click", jumpToBottom);
 $("jump-top").addEventListener("click", jumpToTop);
 $("feed").addEventListener("click", (event) => {
+  const collectionLink = event.target.closest("a.collection-link");
+  if (collectionLink) {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    navigateToCollection(Number(collectionLink.dataset.collectionId), collectionLink.href);
+    return;
+  }
   const button = event.target.closest("button[data-action]");
   if (!button) return;
   const card = button.closest(".card");
   if (card) handleFeedback(card, button);
 });
+
+const initialCollectionId = initializeHistory();
+if (initialCollectionId) loadCollection(initialCollectionId);

@@ -67,6 +67,8 @@ button:disabled { cursor: wait; opacity: .55; }
   max-width: 760px;
   margin: 0 auto;
 }
+.search.feed-search { grid-template-columns: minmax(0, 1fr) auto auto; }
+.search.sets-search { grid-template-columns: minmax(0, 1fr) auto auto; }
 .search input, .search select, .search button {
   min-height: 46px;
   border-radius: 999px;
@@ -79,6 +81,15 @@ button:disabled { cursor: wait; opacity: .55; }
 }
 .search input { min-width: 0; padding: 11px 18px; }
 .search select { cursor: pointer; padding: 10px 14px; }
+.sets-search select, .feed-search select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 38px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%2394838b' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-position: right 13px center;
+  background-repeat: no-repeat;
+  background-size: 12px 8px;
+}
 .search input:focus, .search select:focus {
   border-color: var(--pink);
   box-shadow: 0 0 0 3px var(--pink-soft);
@@ -120,59 +131,6 @@ button:disabled { cursor: wait; opacity: .55; }
   font-size: .75rem;
   text-align: center;
 }
-.feed-status.is-floating {
-  position: fixed;
-  z-index: 20;
-  right: 10px;
-  bottom: max(14px, env(safe-area-inset-bottom));
-  left: 10px;
-  width: fit-content;
-  max-width: calc(100% - 20px);
-  margin: 0 auto;
-  padding: 10px 16px 9px;
-  border: 1px solid rgba(236, 222, 228, .92);
-  border-radius: 999px;
-  background: var(--page);
-  box-shadow: 0 8px 28px rgba(82, 45, 60, .13);
-}
-.feed-status-line {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 9px;
-}
-#status { flex: 1 1 100%; overflow-wrap: anywhere; }
-.stop-feed, .jump-top, .jump-bottom {
-  border: 0;
-  border-bottom: 1px solid currentColor;
-  background: transparent;
-  color: var(--pink-dark);
-  font-size: .7rem;
-  line-height: 1.2;
-  padding: 0;
-}
-.stop-feed[hidden], .jump-top[hidden], .jump-bottom[hidden] { display: none; }
-.reveal-progress {
-  display: block;
-  width: 132px;
-  height: 2px;
-  margin: 8px auto 0;
-  overflow: hidden;
-  border-radius: 999px;
-  background: var(--line);
-}
-.reveal-progress[hidden] { display: none; }
-.reveal-progress span {
-  display: block;
-  width: 100%;
-  height: 100%;
-  background: var(--pink);
-  transform: scaleX(0);
-  transform-origin: left;
-}
-.reveal-progress.is-counting span { animation: reveal-countdown 2s linear forwards; }
-@keyframes reveal-countdown { to { transform: scaleX(1); } }
 .feed-list {
   display: flex;
   flex-direction: column;
@@ -181,6 +139,27 @@ button:disabled { cursor: wait; opacity: .55; }
   margin: 28px auto 0;
 }
 .feed-list:empty { margin-top: 0; }
+.feed-sentinel {
+  display: grid;
+  min-height: 44px;
+  margin: 20px auto 0;
+  place-items: center;
+  color: var(--muted);
+  font-size: .72rem;
+  text-align: center;
+}
+.feed-sentinel:empty { min-height: 18px; }
+.feed-sentinel.is-loading::after {
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--line);
+  border-top-color: var(--pink);
+  border-radius: 50%;
+  content: "";
+  animation: timeline-spin 700ms linear infinite;
+}
+.feed-sentinel.is-error { cursor: pointer; color: var(--pink-dark); }
+@keyframes timeline-spin { to { transform: rotate(360deg); } }
 .collection-heading {
   width: min(560px, 100%);
   margin: 22px auto -10px;
@@ -367,6 +346,48 @@ button:disabled { cursor: wait; opacity: .55; }
   padding: 48px 20px;
   text-align: center;
 }
+.timeline-tools {
+  position: fixed;
+  z-index: 20;
+  right: max(14px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  display: flex;
+  gap: 5px;
+  padding: 5px;
+  border: 1px solid rgba(236, 222, 228, .92);
+  border-radius: 999px;
+  background: rgba(255, 250, 251, .9);
+  box-shadow: 0 8px 28px rgba(82, 45, 60, .13);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.timeline-tools[hidden] { display: none; }
+.timeline-tools button {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--pink-dark);
+  cursor: pointer;
+  font-size: 1.3rem;
+  line-height: 1;
+  place-items: center;
+}
+.timeline-tools button:hover,
+.timeline-tools button:focus-visible { background: var(--pink-soft); }
+.timeline-icon { display: inline-grid; place-items: center; }
+.timeline-icon-search {
+  display: block;
+  width: .92em;
+  height: .92em;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: butt;
+  stroke-linejoin: round;
+  stroke-width: 1.9;
+}
 .sr-only {
   position: absolute;
   width: 1px;
@@ -384,12 +405,13 @@ button:disabled { cursor: wait; opacity: .55; }
   .brand { margin-bottom: 22px; }
   .brand h1 { font-size: clamp(2.7rem, 15vw, 3.7rem); }
   .search { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .search.feed-search { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .search.sets-search { grid-template-columns: minmax(0, 1fr) auto auto; }
   .search input, .search select, .search button { font-size: 16px; }
   .search input { grid-column: 1 / -1; }
   .search button { padding-inline: 17px; }
   .surface-nav { margin-top: -11px; }
   .feed-status { margin-top: 14px; }
-  .feed-status.is-floating { margin: 0 auto; padding-inline: 14px; }
   .feed-list { width: 100%; gap: 20px; margin-top: 22px; }
   .collection-heading { width: 100%; margin-top: 18px; }
   .card { border-radius: 13px; scroll-margin-top: 10px; }
@@ -430,6 +452,11 @@ button:disabled { cursor: wait; opacity: .55; }
   .card-actions button { min-height: 34px; padding-inline: 8px; }
   .card-actions .copy { margin-left: auto; }
   .vote-score { min-width: 18px; }
+  .timeline-tools {
+    right: 50%;
+    transform: translateX(50%);
+  }
+  .timeline-tools button { width: 31px; height: 31px; font-size: 1rem; }
 }
 
 @media (min-width: 621px) {
@@ -445,8 +472,4 @@ button:disabled { cursor: wait; opacity: .55; }
 @media (max-width: 360px) {
   .search { grid-template-columns: 1fr 1fr; }
   .search input, .search button { grid-column: 1 / -1; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .reveal-progress.is-counting span { animation: none; transform: scaleX(1); }
 }

@@ -1,16 +1,20 @@
-const ALLOWED_LIMITS = new Set([1, 15, 30]);
-const ALLOWED_SORTS = new Set(["random", "latest", "oldest", "top"]);
-const REVEAL_DELAY_MS = 2000;
+const BATCH_SIZE = 5;
+const MEDIA_PRELOAD_MARGIN = "900px 0px";
+const CONTINUATION_GAP_MS = 1100;
 const VIEW_CACHE_CAPACITY = 1;
 const state = {
   items: [],
-  revealTimer: null,
-  revealToken: 0,
-  visibleCount: 0,
   mode: "feed",
   collectionLabel: "",
   historyKey: "",
   navigationToken: 0,
+  hasMore: false,
+  loadingMore: false,
+  retryContinuation: false,
+  nextContinuationAt: 0,
+  continuationTimer: null,
+  query: "",
+  sort: "random",
 };
 const viewCache = new Map();
 
@@ -56,97 +60,121 @@ window.addEventListener("orientationchange", () => {
   window.setTimeout(lockMobileMediaHeight, 250);
 });
 
+const visibleVideos = new Map();
 const videoPlaybackObserver = "IntersectionObserver" in window
   ? new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          entry.target.play().catch(() => {});
-        } else {
-          entry.target.pause();
-        }
+        if (entry.isIntersecting) visibleVideos.set(entry.target, entry.intersectionRatio);
+        else visibleVideos.delete(entry.target);
       });
-    }, { threshold: 0.25 })
+      const activeVideo = [...visibleVideos.entries()]
+        .filter(([, ratio]) => ratio >= 0.25)
+        .sort(([, left], [, right]) => right - left)[0]?.[0];
+      visibleVideos.forEach((_, video) => {
+        if (video === activeVideo) video.play().catch(() => {});
+        else video.pause();
+      });
+    }, { threshold: [0, 0.25, 0.5, 0.75, 1] })
   : null;
+
+const mediaWindowObserver = "IntersectionObserver" in window
+  ? new IntersectionObserver((entries) => {
+      entries.forEach((entry) => entry.target._mediaController?.setNearViewport(entry.isIntersecting));
+    }, { rootMargin: MEDIA_PRELOAD_MARGIN, threshold: 0 })
+  : null;
+
+const feedEndObserver = "IntersectionObserver" in window
+  ? new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting) && state.mode === "feed" && !state.loadingMore) {
+        loadMoreFeed();
+      }
+    }, { rootMargin: "900px 0px", threshold: 0 })
+  : null;
+
+function refreshFeedSentinelObserver() {
+  if (!feedEndObserver) return;
+  const sentinel = $("feed-sentinel");
+  feedEndObserver.unobserve(sentinel);
+  feedEndObserver.observe(sentinel);
+}
 
 function setStatus(text) {
   const status = $("status");
   status.textContent = text;
   status.hidden = !text;
-  status.closest(".feed-status").hidden = !text && $("reveal-progress").hidden;
 }
 
-function setRevealProgress(active) {
-  const progress = $("reveal-progress");
-  const statusContainer = progress.closest(".feed-status");
-  progress.hidden = !active;
-  progress.classList.remove("is-counting");
-  if (active) {
-    // Restart the two-second fill animation for each incoming card.
-    void progress.offsetWidth;
-    progress.classList.add("is-counting");
-  }
-  statusContainer.hidden = !active && $("status").hidden;
+function setSentinel(text = "", stateClass = "") {
+  const sentinel = $("feed-sentinel");
+  sentinel.className = `feed-sentinel${stateClass ? ` ${stateClass}` : ""}`;
+  sentinel.textContent = text;
 }
 
-function setStopVisible(visible) {
-  $("stop-feed").hidden = !visible;
+function cancelContinuationTimer() {
+  if (state.continuationTimer === null) return;
+  window.clearTimeout(state.continuationTimer);
+  state.continuationTimer = null;
 }
 
-function setJumpBottomVisible(visible) {
-  $("jump-bottom").hidden = !visible;
+function sentinelIsNearViewport() {
+  const sentinel = $("feed-sentinel");
+  return sentinel.getBoundingClientRect().top <= window.innerHeight + 900;
 }
 
-function setJumpTopVisible(visible) {
-  $("jump-top").hidden = !visible;
+function scheduleFeedContinuation() {
+  if (
+    state.continuationTimer !== null
+    || state.mode !== "feed"
+    || !state.hasMore
+    || state.loadingMore
+  ) return;
+  const delay = Math.max(0, state.nextContinuationAt - Date.now());
+  state.continuationTimer = window.setTimeout(() => {
+    state.continuationTimer = null;
+    if (state.mode === "feed" && state.hasMore && sentinelIsNearViewport()) loadMoreFeed();
+  }, delay);
 }
 
-function setFeedOverlayFloating(floating) {
-  $("status").closest(".feed-status").classList.toggle("is-floating", floating);
+function setTimelineToolsVisible(visible) {
+  $("timeline-tools").hidden = !visible;
 }
 
-function cancelReveal() {
-  if (state.revealTimer !== null) window.clearTimeout(state.revealTimer);
-  state.revealTimer = null;
-  state.revealToken += 1;
-  setRevealProgress(false);
-  setStopVisible(false);
+function updateTimelineTools() {
+  setTimelineToolsVisible(state.mode === "feed" && window.scrollY > 500);
 }
 
-function stopFeed() {
-  if (state.revealTimer === null) return;
-  const visibleCount = state.visibleCount;
-  cancelReveal();
-  setStatus(`stopped at ${visibleCount} of ${state.items.length}`);
-}
-
-function jumpToBottom() {
-  const cards = $("feed").querySelectorAll(".card");
-  const latestCard = cards[cards.length - 1];
-  if (!latestCard) return;
-  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  latestCard.scrollIntoView({
-    behavior: reducedMotion ? "auto" : "smooth",
-    block: "end",
-  });
-}
-
-function jumpToTop() {
+function focusSearch() {
   const search = $("feed-form");
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  search.scrollIntoView({
-    behavior: reducedMotion ? "auto" : "smooth",
-    block: "start",
-  });
+  search.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
   window.setTimeout(() => $("query").focus({ preventScroll: true }), reducedMotion ? 0 : 350);
 }
 
+function jumpToTop() {
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  $("feed-form").scrollIntoView({
+    behavior: reducedMotion ? "auto" : "smooth",
+    block: "start",
+  });
+}
+
+function refreshTimeline() {
+  if (state.mode === "collection") {
+    const collectionId = collectionIdFromLocation();
+    if (collectionId) loadCollection(collectionId);
+    return;
+  }
+  loadFeed();
+}
+
 function clearFeed() {
+  cancelContinuationTimer();
   const feed = $("feed");
-  if (videoPlaybackObserver) feed.querySelectorAll("video").forEach((video) => videoPlaybackObserver.unobserve(video));
+  feed.querySelectorAll(".card").forEach((card) => card._mediaController?.dispose());
   while (feed.firstChild) feed.removeChild(feed.firstChild);
-  setJumpBottomVisible(false);
-  setJumpTopVisible(false);
-  setFeedOverlayFloating(false);
+  setSentinel();
+  setStatus("");
+  setTimelineToolsVisible(false);
 }
 
 function setCollectionHeading(label = "", count = 0) {
@@ -161,12 +189,7 @@ function setCollectionHeading(label = "", count = 0) {
 
 function disposeView(snapshot) {
   snapshot.nodes.forEach((node) => {
-    node.querySelectorAll?.("video").forEach((video) => {
-      if (videoPlaybackObserver) videoPlaybackObserver.unobserve(video);
-      video.pause();
-      video.removeAttribute("src");
-      video.load();
-    });
+    node._mediaController?.dispose();
   });
 }
 
@@ -183,10 +206,6 @@ function cacheView(key, snapshot) {
 }
 
 function captureCurrentView() {
-  const wasRevealing = state.revealTimer !== null;
-  if (state.revealTimer !== null) window.clearTimeout(state.revealTimer);
-  state.revealTimer = null;
-  state.revealToken += 1;
   // Read this before detaching the cards. Removing the feed collapses the
   // document and can clamp window.scrollY back to zero on mobile browsers.
   const scrollY = window.scrollY;
@@ -195,14 +214,12 @@ function captureCurrentView() {
   return {
     nodes,
     items: state.items,
-    visibleCount: state.visibleCount,
     mode: state.mode,
     collectionLabel: state.collectionLabel,
-    wasRevealing,
     statusText: $("status").textContent,
     query: $("query").value,
     sort: $("sort").value,
-    limit: $("limit").value,
+    hasMore: state.hasMore,
     scrollY,
   };
 }
@@ -231,60 +248,145 @@ function createMedia(item) {
   const wrapper = document.createElement("div");
   wrapper.className = "card-media is-loading";
   wrapper.textContent = "loading media…";
-  let started = false;
+  let media = null;
+  let resolved = null;
+  let loading = false;
+  let failed = false;
+  let nearViewport = false;
+  let disposed = false;
 
   const showSourceLink = () => {
+    if (disposed) return;
+    failed = true;
+    if (media?.tagName === "VIDEO") {
+      visibleVideos.delete(media);
+      videoPlaybackObserver?.unobserve(media);
+      media.pause();
+    }
+    if (media) {
+      media.onerror = null;
+      media.onload = null;
+      media.onloadeddata = null;
+    }
     wrapper.replaceChildren(externalLink(item, "open source link"));
     wrapper.className = "card-media is-ready card-link";
+    wrapper.style.minHeight = "";
+    media = null;
   };
 
-  const showResolvedMedia = (resolved) => {
-    if (!resolved || !["video", "image"].includes(resolved.kind) || !resolved.url) {
+  const showResolvedMedia = (payload) => {
+    if (!payload || !["video", "image"].includes(payload.kind) || !payload.url) {
       showSourceLink();
       return;
     }
-    const media = document.createElement(resolved.kind === "video" ? "video" : "img");
-    media.referrerPolicy = "no-referrer";
-    if (resolved.kind === "video") {
-      media.autoplay = true;
-      media.controls = false;
-      media.defaultMuted = true;
-      media.loop = true;
-      media.muted = true;
-      media.preload = "auto";
-      media.playsInline = true;
-    } else {
-      media.alt = item.label || "Feed item";
-      media.loading = "eager";
-      media.decoding = "async";
+    resolved = payload;
+    if (disposed || !nearViewport) return;
+    showCollectionLink(item, Number(payload.collection_count) || 0);
+    if (!media || (media.tagName === "VIDEO") !== (resolved.kind === "video")) {
+      media = document.createElement(resolved.kind === "video" ? "video" : "img");
+      media.referrerPolicy = "no-referrer";
+      if (resolved.kind === "video") {
+        media.autoplay = true;
+        media.controls = false;
+        media.defaultMuted = true;
+        media.loop = true;
+        media.muted = true;
+        media.preload = "auto";
+        media.playsInline = true;
+      } else {
+        media.alt = item.label || "Feed item";
+        media.loading = "eager";
+        media.decoding = "async";
+      }
     }
-    media.addEventListener("error", showSourceLink, { once: true });
-    media.addEventListener(resolved.kind === "video" ? "loadeddata" : "load", () => {
+    wrapper.replaceChildren(media);
+    wrapper.className = "card-media is-loading";
+    media.onerror = showSourceLink;
+    const onReady = () => {
+      if (disposed || !media) return;
       wrapper.className = "card-media is-ready";
+      wrapper.style.minHeight = "";
+      media.style.width = "";
+      media.style.height = "";
       if (resolved.kind === "video") {
         if (videoPlaybackObserver) videoPlaybackObserver.observe(media);
         else media.play().catch(() => {});
       }
-    }, { once: true });
-    wrapper.replaceChildren(media);
+    };
+    if (resolved.kind === "video") media.onloadeddata = onReady;
+    else media.onload = onReady;
     media.src = resolved.url;
     if (resolved.kind === "video") media.load();
   };
 
   const load = async () => {
-    if (started) return;
-    started = true;
+    if (failed || loading) return;
+    if (resolved) {
+      if (!media?.getAttribute("src")) showResolvedMedia(resolved);
+      return;
+    }
+    loading = true;
     try {
       const response = await fetch(`/api/feed/${item.content_link_id}/media`);
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.detail || "media unavailable");
-      showCollectionLink(item, Number(payload.collection_count) || 0);
       showResolvedMedia(payload);
     } catch (_) {
       showSourceLink();
+    } finally {
+      loading = false;
     }
   };
-  return { element: wrapper, load };
+
+  const unload = () => {
+    if (!media || media.tagName !== "VIDEO" || !resolved || !media.getAttribute("src")) return;
+    const rect = media.getBoundingClientRect();
+    if (rect.height > 0) {
+      wrapper.style.minHeight = `${Math.ceil(wrapper.getBoundingClientRect().height)}px`;
+      media.style.width = `${Math.ceil(rect.width)}px`;
+      media.style.height = `${Math.ceil(rect.height)}px`;
+    }
+    visibleVideos.delete(media);
+    videoPlaybackObserver?.unobserve(media);
+    media.pause();
+    media.removeAttribute("src");
+    media.load();
+    wrapper.className = "card-media is-loading";
+    wrapper.replaceChildren(media);
+  };
+
+  const controller = {
+    element: wrapper,
+    observe() {
+      wrapper._mediaController = controller;
+      if (mediaWindowObserver) mediaWindowObserver.observe(wrapper);
+      else {
+        nearViewport = true;
+        load();
+      }
+    },
+    setNearViewport(isNear) {
+      nearViewport = isNear;
+      if (isNear) load();
+      else unload();
+    },
+    dispose() {
+      disposed = true;
+      nearViewport = false;
+      mediaWindowObserver?.unobserve(wrapper);
+      if (media?.tagName === "VIDEO") {
+        visibleVideos.delete(media);
+        videoPlaybackObserver?.unobserve(media);
+        media.pause();
+      }
+      if (media) {
+        media.removeAttribute("src");
+        media.load();
+      }
+    },
+  };
+  wrapper._mediaController = controller;
+  return controller;
 }
 
 function appendMeta(meta, text, className = "") {
@@ -371,44 +473,17 @@ function renderCard(item) {
   body.appendChild(message);
 
   card.appendChild(body);
-  card._pendingMediaLoad = media.load;
+  card._mediaController = media;
   return card;
 }
 
-function revealNext(token) {
-  if (token !== state.revealToken || state.visibleCount >= state.items.length) return;
-  const card = renderCard(state.items[state.visibleCount]);
-  $("feed").appendChild(card);
-  card._pendingMediaLoad();
-  state.visibleCount += 1;
-  setFeedOverlayFloating(true);
-  setJumpBottomVisible(true);
-  setJumpTopVisible(true);
-
-  if (state.visibleCount < state.items.length) {
-    setStatus(`showing ${state.visibleCount} of ${state.items.length} · next link in 2 seconds`);
-    setRevealProgress(true);
-    setStopVisible(true);
-    state.revealTimer = window.setTimeout(() => revealNext(token), REVEAL_DELAY_MS);
-  } else {
-    state.revealTimer = null;
-    setRevealProgress(false);
-    setStopVisible(false);
-    setStatus(`${state.visibleCount} link${state.visibleCount === 1 ? "" : "s"} shown`);
-  }
-}
-
-function resumeReveal() {
-  if (state.visibleCount >= state.items.length) return;
-  const token = state.revealToken;
-  setStatus(`showing ${state.visibleCount} of ${state.items.length} · next link in 2 seconds`);
-  setRevealProgress(true);
-  setStopVisible(true);
-  state.revealTimer = window.setTimeout(() => revealNext(token), REVEAL_DELAY_MS);
+function appendCards(items) {
+  const cards = items.map((item) => renderCard(item));
+  $("feed").append(...cards);
+  cards.forEach((card) => card._mediaController.observe());
 }
 
 function renderFeed() {
-  cancelReveal();
   clearFeed();
   if (!state.items.length) {
     const empty = document.createElement("p");
@@ -418,39 +493,37 @@ function renderFeed() {
       : "no little links found — try another search ♡";
     $("feed").appendChild(empty);
     setStatus("0 links");
+    setSentinel(state.mode === "feed" ? (state.hasMore ? "" : "end of results") : "");
     return;
   }
-
-  state.visibleCount = 0;
-  revealNext(state.revealToken);
+  appendCards(state.items);
+  setStatus(`${state.items.length} link${state.items.length === 1 ? "" : "s"} loaded`);
+  setSentinel(state.mode === "feed" ? (state.hasMore ? "" : "end of results") : "");
+  updateTimelineTools();
 }
 
 function restoreView(snapshot) {
-  cancelReveal();
   clearFeed();
   state.items = snapshot.items;
-  state.visibleCount = snapshot.visibleCount;
   state.mode = snapshot.mode;
   state.collectionLabel = snapshot.collectionLabel;
+  state.query = snapshot.query;
+  state.sort = snapshot.sort === "top" ? "top" : "random";
+  state.hasMore = snapshot.hasMore;
+  state.loadingMore = false;
+  state.retryContinuation = false;
   $("query").value = snapshot.query;
-  $("sort").value = snapshot.sort;
-  $("limit").value = snapshot.limit;
+  $("sort").value = state.sort;
   $("feed").append(...snapshot.nodes);
+  $("feed").querySelectorAll(".card").forEach((card) => card._mediaController?.observe());
   setCollectionHeading(
     state.mode === "collection" ? state.collectionLabel : "",
     state.mode === "collection" ? state.items.length : 0,
   );
-  const hasCards = state.visibleCount > 0;
-  setFeedOverlayFloating(hasCards);
-  setJumpBottomVisible(hasCards);
-  setJumpTopVisible(hasCards);
-  if (snapshot.wasRevealing && state.visibleCount < state.items.length) {
-    resumeReveal();
-  } else {
-    setRevealProgress(false);
-    setStopVisible(false);
-    setStatus(snapshot.statusText);
-  }
+  setSentinel(state.mode === "feed" ? (state.hasMore ? "" : "end of results") : "");
+  setStatus(snapshot.statusText);
+  updateTimelineTools();
+  refreshFeedSentinelObserver();
   window.requestAnimationFrame(() => window.scrollTo({ top: snapshot.scrollY, behavior: "auto" }));
 }
 
@@ -538,12 +611,13 @@ async function recordImplicitUpvote(card, id) {
 
 async function loadCollection(contentLinkId) {
   const navigationToken = ++state.navigationToken;
-  cancelReveal();
   clearFeed();
   state.mode = "collection";
   state.collectionLabel = "";
   state.items = [];
-  state.visibleCount = 0;
+  state.hasMore = false;
+  state.loadingMore = false;
+  state.retryContinuation = false;
   setCollectionHeading();
   setStatus("finding this set…");
   try {
@@ -589,7 +663,9 @@ function beginFeedNavigation() {
   state.mode = "feed";
   state.collectionLabel = "";
   state.items = [];
-  state.visibleCount = 0;
+  state.hasMore = true;
+  state.loadingMore = false;
+  state.retryContinuation = false;
   setCollectionHeading();
 }
 
@@ -599,38 +675,100 @@ async function loadFeed(event) {
   const navigationToken = ++state.navigationToken;
   state.mode = "feed";
   state.collectionLabel = "";
+  state.query = $("query").value.trim();
+  state.sort = $("sort").value === "top" ? "top" : "random";
+  state.items = [];
+  state.hasMore = true;
+  state.loadingMore = true;
+  state.retryContinuation = false;
+  state.nextContinuationAt = 0;
   setCollectionHeading();
   $("query").blur();
-  cancelReveal();
+  clearFeed();
   setStatus("finding little links…");
-  const query = $("query").value.trim();
-  const requestedLimit = Number($("limit").value);
-  const limit = ALLOWED_LIMITS.has(requestedLimit) ? requestedLimit : 15;
-  const requestedSort = $("sort").value;
-  const sort = ALLOWED_SORTS.has(requestedSort) ? requestedSort : "random";
-  const params = new URLSearchParams({ limit: String(limit), sort });
+  setSentinel("finding little links…", "is-loading");
+  const params = new URLSearchParams({ limit: String(BATCH_SIZE), sort: state.sort });
   const submitButton = $("feed-form").querySelector('button[type="submit"]');
   submitButton.disabled = true;
-  if (query) params.set("query", query);
+  if (state.query) params.set("query", state.query);
   try {
     const response = await fetch(`/api/feed?${params.toString()}`);
     const payload = await response.json().catch(() => ({}));
     if (navigationToken !== state.navigationToken) return;
     if (!response.ok) throw new Error(payload.detail || "feed unavailable");
-    state.items = payload.items || [];
-    renderFeed();
+    const items = payload.items || [];
+    state.items = items;
+    state.hasMore = payload.has_more !== false && items.length > 0;
+    state.retryContinuation = false;
+    if (items.length) {
+      appendCards(items);
+      setStatus(`${items.length} link${items.length === 1 ? "" : "s"} loaded`);
+    } else {
+      const empty = document.createElement("p");
+      empty.className = "empty";
+      empty.textContent = "no little links found — try another search ♡";
+      $("feed").appendChild(empty);
+      setStatus("0 links");
+    }
+    setSentinel(state.hasMore ? "" : "end of results");
+    refreshFeedSentinelObserver();
   } catch (error) {
     if (navigationToken !== state.navigationToken) return;
-    if (!state.items.length) {
-      clearFeed();
-      const message = document.createElement("p");
-      message.className = "empty";
-      message.textContent = error.message || "feed unavailable — try again shortly";
-      $("feed").appendChild(message);
-    }
+    state.hasMore = false;
+    state.retryContinuation = false;
+    setSentinel("couldn't load feed · tap to retry", "is-error");
     setStatus(error.message || "something went wrong");
   } finally {
-    submitButton.disabled = false;
+    if (navigationToken === state.navigationToken) {
+      state.loadingMore = false;
+      submitButton.disabled = false;
+    }
+  }
+}
+
+async function loadMoreFeed() {
+  if (state.mode !== "feed" || !state.hasMore || state.loadingMore) return;
+  if (Date.now() < state.nextContinuationAt) {
+    scheduleFeedContinuation();
+    return;
+  }
+  const navigationToken = state.navigationToken;
+  state.loadingMore = true;
+  state.retryContinuation = false;
+  setSentinel("finding more little links…", "is-loading");
+  try {
+    const params = new URLSearchParams({
+      limit: String(BATCH_SIZE),
+      sort: state.sort,
+      continuation: "true",
+    });
+    if (state.query) params.set("query", state.query);
+    if (state.sort !== "random") params.set("offset", String(state.items.length));
+    const response = await fetch(`/api/feed?${params.toString()}`);
+    const payload = await response.json().catch(() => ({}));
+    if (navigationToken !== state.navigationToken) return;
+    if (!response.ok) throw new Error(payload.detail || "more links unavailable");
+    const knownIds = new Set(state.items.map((item) => item.content_link_id));
+    const incoming = (payload.items || []).filter((item) => !knownIds.has(item.content_link_id));
+    state.hasMore = payload.has_more !== false && incoming.length > 0;
+    state.retryContinuation = false;
+    if (incoming.length) {
+      state.items.push(...incoming);
+      appendCards(incoming);
+      setStatus(`${state.items.length} links loaded`);
+    }
+    state.nextContinuationAt = state.hasMore ? Date.now() + CONTINUATION_GAP_MS : 0;
+    setSentinel(state.hasMore ? "" : "end of results");
+    refreshFeedSentinelObserver();
+  } catch (error) {
+    if (navigationToken !== state.navigationToken) return;
+    state.hasMore = true;
+    state.retryContinuation = true;
+    state.nextContinuationAt = 0;
+    setSentinel("couldn't load more · tap to retry", "is-error");
+    setStatus(error.message || "more links unavailable");
+  } finally {
+    if (navigationToken === state.navigationToken) state.loadingMore = false;
   }
 }
 
@@ -650,21 +788,29 @@ window.addEventListener("popstate", (event) => {
     loadCollection(collectionId);
     return;
   }
-  cancelReveal();
   clearFeed();
   state.mode = "feed";
   state.collectionLabel = "";
   state.items = [];
-  state.visibleCount = 0;
+  state.query = $("query").value.trim();
+  state.hasMore = true;
+  state.loadingMore = false;
+  state.retryContinuation = false;
   setCollectionHeading();
-  setStatus("");
   window.scrollTo({ top: 0, behavior: "auto" });
+  loadFeed();
 });
 
 $("feed-form").addEventListener("submit", loadFeed);
-$("stop-feed").addEventListener("click", stopFeed);
-$("jump-bottom").addEventListener("click", jumpToBottom);
-$("jump-top").addEventListener("click", jumpToTop);
+$("timeline-search").addEventListener("click", focusSearch);
+$("timeline-refresh").addEventListener("click", refreshTimeline);
+$("timeline-top").addEventListener("click", jumpToTop);
+$("feed-sentinel").addEventListener("click", () => {
+  if ($("feed-sentinel").classList.contains("is-error") && !state.retryContinuation) loadFeed();
+  else loadMoreFeed();
+});
+window.addEventListener("scroll", updateTimelineTools, { passive: true });
+refreshFeedSentinelObserver();
 $("feed").addEventListener("click", (event) => {
   const collectionLink = event.target.closest("a.collection-link");
   if (collectionLink) {
@@ -681,3 +827,4 @@ $("feed").addEventListener("click", (event) => {
 
 const initialCollectionId = initializeHistory();
 if (initialCollectionId) loadCollection(initialCollectionId);
+else clearFeed();

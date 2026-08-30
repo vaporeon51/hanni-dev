@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 
 from src.config.constants import (
     EPHEMERAL_MEDIA_HOSTS,
@@ -38,6 +39,7 @@ class ContentSet:
     collection_of: int
     label: str
     items: tuple[FeedItem, ...]
+    set_date: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -301,9 +303,11 @@ def get_collection(content_link_id: int) -> ContentCollection | None:
 def get_collection_feed(
     *,
     query: str | None = None,
-    sort: FeedSort = "random",
+    sort: FeedSort = "latest",
     limit: int = 15,
     min_age: str,
+    cursor_date: datetime | None = None,
+    cursor_id: int | None = None,
 ) -> list[ContentSet]:
     """Return multi-link parent posts for the set-oriented feed.
 
@@ -315,7 +319,12 @@ def get_collection_feed(
 
     if sort not in {"random", "latest", "oldest", "top"}:
         raise ValueError(f"Unsupported collection sort: {sort}")
-    limit = max(1, min(int(limit), MAX_FEED_ITEMS))
+    if (cursor_date is None) != (cursor_id is None):
+        raise ValueError("Collection cursor date and id must be provided together")
+    if cursor_date is not None and sort not in {"latest", "oldest"}:
+        raise ValueError("Collection cursors require chronological sorting")
+    # The API may request one extra set to determine whether another page exists.
+    limit = max(1, min(int(limit), MAX_FEED_ITEMS + 1))
     candidate_limit = min(max(limit * 4, 30), MAX_FEED_ITEMS * 4)
 
     with POOL.connection() as connection:
@@ -356,6 +365,12 @@ def get_collection_feed(
                 RANDOM_FRESHNESS_FULL_DAYS,
                 RANDOM_FRESHNESS_DECAY_DAYS,
             )
+        cursor_clause = ""
+        cursor_params: tuple[object, ...] = ()
+        if cursor_date is not None and cursor_id is not None:
+            comparison = "<" if sort == "latest" else ">"
+            cursor_clause = f"AND (set_date, content_link_id) {comparison} (%s, %s)"
+            cursor_params = (cursor_date, cursor_id)
 
         with connection.cursor() as cursor:
             cursor.execute(
@@ -422,6 +437,7 @@ def get_collection_feed(
                     set_random_score
                 FROM ranked
                 WHERE anchor_rank = 1
+                  {cursor_clause}
                 ORDER BY {order_by}
                 LIMIT %s
                 """,
@@ -429,6 +445,7 @@ def get_collection_feed(
                     INITIAL_REACT_CAP,
                     INITIAL_REACT_CAP,
                     *filter_params,
+                    *cursor_params,
                     *extra_params,
                     candidate_limit,
                 ),
@@ -447,6 +464,7 @@ def get_collection_feed(
             )
             for row in rows
         ]
+        set_dates = {int(row[0]): row[7] for row in rows}
         if not anchors:
             return []
 
@@ -526,6 +544,7 @@ def get_collection_feed(
                     collection_of=anchor.content_link_id,
                     label=anchor.label,
                     items=items,
+                    set_date=set_dates[anchor.content_link_id],
                 )
             )
             if len(results) >= limit:

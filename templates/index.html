@@ -15,40 +15,30 @@
       </header>
 
       <nav class="surface-nav" aria-label="Browse style">
-        <span aria-current="page">links</span>
+        <span aria-current="page">feed</span>
         <a href="/sets">sets</a>
         <a href="/scroll">scroll</a>
       </nav>
 
-      <form id="feed-form" class="search" role="search">
+      <form id="feed-form" class="search feed-search" role="search">
         <label class="sr-only" for="query">Search by member or group</label>
         <input id="query" name="query" type="search" placeholder="search a member or group" autocomplete="off" />
         <label class="sr-only" for="sort">Sort feed</label>
         <select id="sort" name="sort" aria-label="Sort feed">
           <option value="random" selected>random</option>
-          <option value="latest">latest</option>
-          <option value="oldest">oldest</option>
           <option value="top">top</option>
-        </select>
-        <label class="sr-only" for="limit">Number of links</label>
-        <select id="limit" name="limit" aria-label="Number of links">
-          <option value="1">1 link</option>
-          <option value="15" selected>15 links</option>
-          <option value="30">30 links</option>
         </select>
         <button type="submit">Search</button>
       </form>
 
       <div id="collection-heading" class="collection-heading" hidden></div>
       <section id="feed" class="feed-list" aria-live="polite" aria-label="Content feed"></section>
-      <div class="feed-status" aria-live="polite" hidden>
-        <span class="feed-status-line">
-          <span id="status" hidden></span>
-          <button id="jump-top" class="jump-top" type="button" aria-label="Jump to top" hidden>↑ top</button>
-          <button id="jump-bottom" class="jump-bottom" type="button" aria-label="Jump to bottom" hidden>↓ bottom</button>
-          <button id="stop-feed" class="stop-feed" type="button" hidden>stop</button>
-        </span>
-        <span id="reveal-progress" class="reveal-progress" hidden aria-hidden="true"><span></span></span>
+      <div id="feed-sentinel" class="feed-sentinel" role="status" aria-live="polite" aria-label="More content loading"></div>
+      <p id="status" class="feed-status" role="status" aria-live="polite" hidden></p>
+      <div id="timeline-tools" class="timeline-tools" aria-label="Timeline controls" hidden>
+        <button id="timeline-search" type="button" aria-label="Open search"><svg class="timeline-icon timeline-icon-search" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="6.25"></circle><path d="M15.05 15.05 20.4 20.4"></path></svg></button>
+        <button id="timeline-refresh" type="button" aria-label="Refresh timeline"><span class="timeline-icon" aria-hidden="true">↻</span></button>
+        <button id="timeline-top" type="button" aria-label="Jump to top"><span class="timeline-icon" aria-hidden="true">↑</span></button>
       </div>
     </main>
     <footer class="site-credit">made by glaceon</footer>

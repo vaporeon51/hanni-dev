@@ -15,6 +15,7 @@ async def load_feed(
     limit: int,
     recent_urls: tuple[str, ...] = (),
     exclude_recent: bool = False,
+    offset: int = 0,
 ) -> list[FeedItem]:
     return await asyncio.to_thread(
         get_feed_items,
@@ -24,6 +25,7 @@ async def load_feed(
         min_age=MIN_CONTENT_AGE,
         recent_urls=recent_urls,
         exclude_recent=exclude_recent,
+        offset=offset,
     )
 
 

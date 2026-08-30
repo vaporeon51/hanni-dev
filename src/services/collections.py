@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime
 
 from src.config.constants import MIN_CONTENT_AGE
 from src.db.collections import (
@@ -25,7 +26,12 @@ async def load_collection(content_link_id: int) -> ContentCollection | None:
 
 
 async def load_collection_feed(
-    *, query: str | None, sort: FeedSort, limit: int
+    *,
+    query: str | None,
+    sort: FeedSort,
+    limit: int,
+    cursor_date: datetime | None = None,
+    cursor_id: int | None = None,
 ) -> list[ContentSet]:
     return await asyncio.to_thread(
         get_collection_feed,
@@ -33,4 +39,6 @@ async def load_collection_feed(
         sort=sort,
         limit=limit,
         min_age=MIN_CONTENT_AGE,
+        cursor_date=cursor_date,
+        cursor_id=cursor_id,
     )

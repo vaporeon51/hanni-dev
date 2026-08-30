@@ -1,12 +1,13 @@
-const ALLOWED_LIMITS = new Set([1, 15, 30]);
-const ALLOWED_SORTS = new Set(["random", "latest", "oldest", "top"]);
-const REVEAL_DELAY_MS = 2000;
+const BATCH_SIZE = 5;
+const ALLOWED_SORTS = new Set(["latest", "oldest"]);
+const MEDIA_PRELOAD_MARGIN = "900px 0px";
 const state = {
   sets: [],
-  revealTimer: null,
-  revealToken: 0,
-  visibleCount: 0,
   navigationToken: 0,
+  nextCursor: null,
+  requestParams: null,
+  loadingMore: false,
+  retryContinuation: false,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -26,56 +27,85 @@ function lockMobileMediaHeight() {
 lockMobileMediaHeight();
 window.addEventListener("orientationchange", () => window.setTimeout(lockMobileMediaHeight, 250));
 
+const visibleVideos = new Map();
 const videoPlaybackObserver = "IntersectionObserver" in window
   ? new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
-        if (entry.isIntersecting) entry.target.play().catch(() => {});
-        else entry.target.pause();
+        if (entry.isIntersecting) visibleVideos.set(entry.target, entry.intersectionRatio);
+        else visibleVideos.delete(entry.target);
       });
-    }, { threshold: 0.25 })
+      const activeVideo = [...visibleVideos.entries()]
+        .filter(([, ratio]) => ratio >= 0.25)
+        .sort(([, left], [, right]) => right - left)[0]?.[0];
+      visibleVideos.forEach((_, video) => {
+        if (video === activeVideo) video.play().catch(() => {});
+        else video.pause();
+      });
+    }, { threshold: [0, 0.25, 0.5, 0.75, 1] })
   : null;
+
+const mediaWindowObserver = "IntersectionObserver" in window
+  ? new IntersectionObserver((entries) => {
+      entries.forEach((entry) => entry.target._mediaController?.setNearViewport(entry.isIntersecting));
+    }, { rootMargin: MEDIA_PRELOAD_MARGIN, threshold: 0 })
+  : null;
+
+const setEndObserver = "IntersectionObserver" in window
+  ? new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting) && !state.loadingMore) loadMoreSets();
+    }, { rootMargin: "900px 0px", threshold: 0 })
+  : null;
+
+function refreshSetSentinelObserver() {
+  if (!setEndObserver) return;
+  const sentinel = $("feed-sentinel");
+  setEndObserver.unobserve(sentinel);
+  setEndObserver.observe(sentinel);
+}
 
 function setStatus(text) {
   const status = $("status");
   status.textContent = text;
   status.hidden = !text;
-  status.closest(".feed-status").hidden = !text && $("reveal-progress").hidden;
 }
 
-function setRevealProgress(active) {
-  const progress = $("reveal-progress");
-  progress.hidden = !active;
-  progress.classList.remove("is-counting");
-  if (active) {
-    void progress.offsetWidth;
-    progress.classList.add("is-counting");
-  }
-  progress.closest(".feed-status").hidden = !active && $("status").hidden;
+function setSentinel(text = "", stateClass = "") {
+  const sentinel = $("feed-sentinel");
+  sentinel.className = `feed-sentinel${stateClass ? ` ${stateClass}` : ""}`;
+  sentinel.textContent = text;
 }
 
-function setControlsVisible({ stop = false, jumps = false, floating = false } = {}) {
-  $("stop-feed").hidden = !stop;
-  $("jump-top").hidden = !jumps;
-  $("jump-bottom").hidden = !jumps;
-  $("status").closest(".feed-status").classList.toggle("is-floating", floating);
+function setTimelineToolsVisible(visible) {
+  $("timeline-tools").hidden = !visible;
 }
 
-function cancelReveal() {
-  if (state.revealTimer !== null) window.clearTimeout(state.revealTimer);
-  state.revealTimer = null;
-  state.revealToken += 1;
-  setRevealProgress(false);
-  $("stop-feed").hidden = true;
+function updateTimelineTools() {
+  setTimelineToolsVisible(window.scrollY > 500);
+}
+
+function focusSearch() {
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  $("sets-form").scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
+  window.setTimeout(() => $("query").focus({ preventScroll: true }), reducedMotion ? 0 : 350);
+}
+
+function jumpToTop() {
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  $("sets-form").scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
+}
+
+function refreshTimeline() {
+  loadSets();
 }
 
 function clearFeed() {
-  const feed = $("feed");
-  feed.querySelectorAll("video").forEach((video) => {
-    if (videoPlaybackObserver) videoPlaybackObserver.unobserve(video);
-    video.pause();
+  $("feed").querySelectorAll(".set-card").forEach((card) => {
+    card._setMedia?.forEach((media) => media.dispose());
   });
-  feed.replaceChildren();
-  setControlsVisible();
+  $("feed").replaceChildren();
+  setSentinel();
+  setStatus("");
+  setTimelineToolsVisible(false);
 }
 
 function formatDate(value) {
@@ -98,49 +128,83 @@ function createMedia(item) {
   const wrapper = document.createElement("div");
   wrapper.className = "card-media is-loading";
   wrapper.textContent = "loading media…";
-  let started = false;
+  let media = null;
+  let resolved = null;
+  let loading = false;
+  let failed = false;
+  let nearViewport = false;
+  let disposed = false;
 
   const showSourceLink = () => {
+    if (disposed) return;
+    failed = true;
+    if (media?.tagName === "VIDEO") {
+      visibleVideos.delete(media);
+      videoPlaybackObserver?.unobserve(media);
+      media.pause();
+    }
+    if (media) {
+      media.onerror = null;
+      media.onload = null;
+      media.onloadeddata = null;
+    }
     wrapper.replaceChildren(externalLink(item));
     wrapper.className = "card-media is-ready card-link";
+    wrapper.style.minHeight = "";
+    media = null;
   };
 
-  const showResolvedMedia = (resolved) => {
-    if (!resolved || !["video", "image"].includes(resolved.kind) || !resolved.url) {
+  const showResolvedMedia = (payload) => {
+    if (!payload || !["video", "image"].includes(payload.kind) || !payload.url) {
       showSourceLink();
       return;
     }
-    const media = document.createElement(resolved.kind === "video" ? "video" : "img");
-    media.referrerPolicy = "no-referrer";
-    if (resolved.kind === "video") {
-      media.autoplay = true;
-      media.controls = false;
-      media.defaultMuted = true;
-      media.loop = true;
-      media.muted = true;
-      media.preload = "auto";
-      media.playsInline = true;
-    } else {
-      media.alt = item.label || "Set item";
-      media.loading = "eager";
-      media.decoding = "async";
+    resolved = payload;
+    if (disposed || !nearViewport) return;
+    if (!media || (media.tagName === "VIDEO") !== (resolved.kind === "video")) {
+      media = document.createElement(resolved.kind === "video" ? "video" : "img");
+      media.referrerPolicy = "no-referrer";
+      if (resolved.kind === "video") {
+        media.autoplay = true;
+        media.controls = false;
+        media.defaultMuted = true;
+        media.loop = true;
+        media.muted = true;
+        media.preload = "auto";
+        media.playsInline = true;
+      } else {
+        media.alt = item.label || "Set item";
+        media.loading = "eager";
+        media.decoding = "async";
+      }
     }
-    media.addEventListener("error", showSourceLink, { once: true });
-    media.addEventListener(resolved.kind === "video" ? "loadeddata" : "load", () => {
+    wrapper.replaceChildren(media);
+    wrapper.className = "card-media is-loading";
+    media.onerror = showSourceLink;
+    const onReady = () => {
+      if (disposed || !media) return;
       wrapper.className = "card-media is-ready";
+      wrapper.style.minHeight = "";
+      media.style.width = "";
+      media.style.height = "";
       if (resolved.kind === "video") {
         if (videoPlaybackObserver) videoPlaybackObserver.observe(media);
         else media.play().catch(() => {});
       }
-    }, { once: true });
-    wrapper.replaceChildren(media);
+    };
+    if (resolved.kind === "video") media.onloadeddata = onReady;
+    else media.onload = onReady;
     media.src = resolved.url;
     if (resolved.kind === "video") media.load();
   };
 
   const load = async () => {
-    if (started) return;
-    started = true;
+    if (failed || loading) return;
+    if (resolved) {
+      if (!media?.getAttribute("src")) showResolvedMedia(resolved);
+      return;
+    }
+    loading = true;
     try {
       const response = await fetch(`/api/feed/${item.content_link_id}/media`);
       const payload = await response.json().catch(() => ({}));
@@ -148,10 +212,60 @@ function createMedia(item) {
       showResolvedMedia(payload);
     } catch (_) {
       showSourceLink();
+    } finally {
+      loading = false;
     }
   };
 
-  return { element: wrapper, load };
+  const unload = () => {
+    if (!media || media.tagName !== "VIDEO" || !resolved || !media.getAttribute("src")) return;
+    const rect = media.getBoundingClientRect();
+    if (rect.height > 0) {
+      wrapper.style.minHeight = `${Math.ceil(wrapper.getBoundingClientRect().height)}px`;
+      media.style.width = `${Math.ceil(rect.width)}px`;
+      media.style.height = `${Math.ceil(rect.height)}px`;
+    }
+    visibleVideos.delete(media);
+    videoPlaybackObserver?.unobserve(media);
+    media.pause();
+    media.removeAttribute("src");
+    media.load();
+    wrapper.className = "card-media is-loading";
+    wrapper.replaceChildren(media);
+  };
+
+  const controller = {
+    element: wrapper,
+    observe() {
+      wrapper._mediaController = controller;
+      if (mediaWindowObserver) mediaWindowObserver.observe(wrapper);
+      else {
+        nearViewport = true;
+        load();
+      }
+    },
+    setNearViewport(isNear) {
+      nearViewport = isNear;
+      if (isNear) load();
+      else unload();
+    },
+    dispose() {
+      disposed = true;
+      nearViewport = false;
+      mediaWindowObserver?.unobserve(wrapper);
+      if (media?.tagName === "VIDEO") {
+        visibleVideos.delete(media);
+        videoPlaybackObserver?.unobserve(media);
+        media.pause();
+      }
+      if (media) {
+        media.removeAttribute("src");
+        media.load();
+      }
+    },
+  };
+  wrapper._mediaController = controller;
+  return controller;
 }
 
 function appendMeta(meta, text, className = "") {
@@ -245,7 +359,6 @@ function activateSlide(card, index) {
   if (changed) setFeedbackMessage(card, "");
   card.querySelector('[data-set-nav="previous"]').disabled = nextIndex === 0;
   card.querySelector('[data-set-nav="next"]').disabled = nextIndex === items.length - 1;
-  card._setMedia[nextIndex].load();
 }
 
 function renderSetCard(contentSet) {
@@ -284,7 +397,6 @@ function renderSetCard(contentSet) {
 
   card.append(carousel, createSetBody(contentSet, items[0]));
   card._setTrack = track;
-  card._pendingMediaLoad = () => activateSlide(card, 0);
 
   let scrollFrame = null;
   track.addEventListener("scroll", () => {
@@ -301,47 +413,17 @@ function navigateSet(card, direction) {
   const nextIndex = card._setIndex + (direction === "next" ? 1 : -1);
   const slide = card.querySelectorAll(".set-slide")[nextIndex];
   if (!slide) return;
-  card._setMedia[nextIndex].load();
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   card._setTrack.scrollTo({ left: slide.offsetLeft, behavior: reducedMotion ? "auto" : "smooth" });
 }
 
-function revealNext(token) {
-  if (token !== state.revealToken || state.visibleCount >= state.sets.length) return;
-  const card = renderSetCard(state.sets[state.visibleCount]);
-  $("feed").appendChild(card);
-  card._pendingMediaLoad();
-  state.visibleCount += 1;
-  setControlsVisible({
-    stop: state.visibleCount < state.sets.length,
-    jumps: true,
-    floating: true,
+function appendSetCards(contentSets) {
+  const cards = contentSets.map((contentSet) => renderSetCard(contentSet));
+  $("feed").append(...cards);
+  cards.forEach((card) => {
+    card._setMedia.forEach((media) => media.observe());
+    activateSlide(card, 0);
   });
-
-  if (state.visibleCount < state.sets.length) {
-    setStatus(`showing ${state.visibleCount} of ${state.sets.length} · next set in 2 seconds`);
-    setRevealProgress(true);
-    state.revealTimer = window.setTimeout(() => revealNext(token), REVEAL_DELAY_MS);
-  } else {
-    state.revealTimer = null;
-    setRevealProgress(false);
-    setStatus(`${state.visibleCount} set${state.visibleCount === 1 ? "" : "s"} shown`);
-  }
-}
-
-function renderSets() {
-  cancelReveal();
-  clearFeed();
-  if (!state.sets.length) {
-    const empty = document.createElement("p");
-    empty.className = "empty";
-    empty.textContent = "no little sets found · try another search ♡";
-    $("feed").appendChild(empty);
-    setStatus("0 sets");
-    return;
-  }
-  state.visibleCount = 0;
-  revealNext(state.revealToken);
 }
 
 function updateFeedback(card, payload) {
@@ -405,61 +487,113 @@ async function loadSets(event) {
   if (event) event.preventDefault();
   const navigationToken = ++state.navigationToken;
   $("query").blur();
-  cancelReveal();
   clearFeed();
   state.sets = [];
-  state.visibleCount = 0;
+  state.nextCursor = null;
+  state.requestParams = null;
+  state.loadingMore = true;
+  state.retryContinuation = false;
   setStatus("finding little sets…");
 
-  const requestedLimit = Number($("limit").value);
   const requestedSort = $("sort").value;
-  const params = new URLSearchParams({
-    limit: String(ALLOWED_LIMITS.has(requestedLimit) ? requestedLimit : 15),
-    sort: ALLOWED_SORTS.has(requestedSort) ? requestedSort : "random",
-  });
+  const sort = ALLOWED_SORTS.has(requestedSort) ? requestedSort : "latest";
   const query = $("query").value.trim();
+  state.requestParams = { limit: String(BATCH_SIZE), sort, query };
+  const params = new URLSearchParams({ limit: String(BATCH_SIZE), sort });
   if (query) params.set("query", query);
   const submit = $("sets-form").querySelector('button[type="submit"]');
   submit.disabled = true;
+  setSentinel("finding little sets…", "is-loading");
   try {
     const response = await fetch(`/api/sets?${params.toString()}`);
     const payload = await response.json().catch(() => ({}));
     if (navigationToken !== state.navigationToken) return;
     if (!response.ok) throw new Error(payload.detail || "sets unavailable");
     state.sets = payload.sets || [];
-    renderSets();
+    state.nextCursor = payload.next_cursor || null;
+    state.retryContinuation = false;
+    if (state.sets.length) {
+      appendSetCards(state.sets);
+      setStatus(`${state.sets.length} set${state.sets.length === 1 ? "" : "s"} loaded`);
+    } else {
+      const empty = document.createElement("p");
+      empty.className = "empty";
+      empty.textContent = "no little sets found · try another search ♡";
+      $("feed").appendChild(empty);
+      setStatus("0 sets");
+    }
+    setSentinel(state.nextCursor ? "" : "end of results");
+    refreshSetSentinelObserver();
   } catch (error) {
     if (navigationToken !== state.navigationToken) return;
     const message = document.createElement("p");
     message.className = "empty";
     message.textContent = error.message || "sets unavailable · try again shortly";
     $("feed").appendChild(message);
+    setSentinel("couldn't load sets · tap to retry", "is-error");
     setStatus(error.message || "something went wrong");
   } finally {
-    submit.disabled = false;
+    if (navigationToken === state.navigationToken) {
+      state.loadingMore = false;
+      submit.disabled = false;
+    }
   }
 }
 
-function stopFeed() {
-  if (state.revealTimer === null) return;
-  cancelReveal();
-  setControlsVisible({ jumps: state.visibleCount > 0, floating: state.visibleCount > 0 });
-  setStatus(`stopped at ${state.visibleCount} of ${state.sets.length}`);
-}
-
-function jumpTo(direction) {
-  const target = direction === "top"
-    ? $("sets-form")
-    : $("feed").querySelector(".card:last-child");
-  if (!target) return;
-  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  target.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: direction === "top" ? "start" : "end" });
+async function loadMoreSets() {
+  if (!state.nextCursor || !state.requestParams || state.loadingMore) return;
+  const navigationToken = state.navigationToken;
+  const previousCursor = state.nextCursor;
+  const params = new URLSearchParams({
+    limit: state.requestParams.limit,
+    sort: state.requestParams.sort,
+    cursor: state.nextCursor,
+  });
+  if (state.requestParams.query) params.set("query", state.requestParams.query);
+  state.loadingMore = true;
+  setSentinel("finding more little sets…", "is-loading");
+  setStatus("finding more sets…");
+  try {
+    const response = await fetch(`/api/sets?${params.toString()}`);
+    const payload = await response.json().catch(() => ({}));
+    if (navigationToken !== state.navigationToken) return;
+    if (!response.ok) throw new Error(payload.detail || "more sets unavailable");
+    state.nextCursor = payload.next_cursor || null;
+    state.retryContinuation = false;
+    const knownIds = new Set(state.sets.map((contentSet) => contentSet.collection_of));
+    const incoming = (payload.sets || []).filter((contentSet) => !knownIds.has(contentSet.collection_of));
+    if (!incoming.length) {
+      if (state.nextCursor === previousCursor) state.nextCursor = null;
+      setSentinel(state.nextCursor ? "" : "end of results");
+      setStatus(`${state.sets.length} sets loaded${state.nextCursor ? "" : " · end of results"}`);
+      refreshSetSentinelObserver();
+      return;
+    }
+    state.sets.push(...incoming);
+    appendSetCards(incoming);
+    setStatus(`${state.sets.length} sets loaded`);
+    setSentinel(state.nextCursor ? "" : "end of results");
+    refreshSetSentinelObserver();
+  } catch (error) {
+    if (navigationToken !== state.navigationToken) return;
+    state.retryContinuation = true;
+    setSentinel("couldn't load more · tap to retry", "is-error");
+    setStatus(error.message || "more sets unavailable");
+  } finally {
+    if (navigationToken === state.navigationToken) state.loadingMore = false;
+  }
 }
 
 $("sets-form").addEventListener("submit", loadSets);
-$("stop-feed").addEventListener("click", stopFeed);
-$("jump-top").addEventListener("click", () => jumpTo("top"));
-$("jump-bottom").addEventListener("click", () => jumpTo("bottom"));
+$("timeline-search").addEventListener("click", focusSearch);
+$("timeline-refresh").addEventListener("click", refreshTimeline);
+$("timeline-top").addEventListener("click", jumpToTop);
+$("feed-sentinel").addEventListener("click", () => {
+  if ($("feed-sentinel").classList.contains("is-error") && !state.retryContinuation) loadSets();
+  else loadMoreSets();
+});
+window.addEventListener("scroll", updateTimelineTools, { passive: true });
+refreshSetSentinelObserver();
 $("feed").addEventListener("click", (event) => {
   const navigation = event.target.closest("button[data-set-nav]");
   if (navigation) {

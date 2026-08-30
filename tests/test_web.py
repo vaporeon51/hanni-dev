@@ -66,7 +66,7 @@ def test_feed_endpoint_caps_items_at_thirty():
 
 def test_feed_endpoint_rate_limits_repeated_searches(monkeypatch):
     async def fake_load_feed(**kwargs):
-        assert kwargs["limit"] == 15
+        assert kwargs["limit"] == 5
         return []
 
     monkeypatch.setattr(web_app, "load_feed", fake_load_feed)
@@ -82,13 +82,28 @@ def test_feed_endpoint_rate_limits_repeated_searches(monkeypatch):
 
     assert first.status_code == 200
     assert second.status_code == 429
-    assert second.headers["retry-after"] == "10"
+    assert second.headers["retry-after"] == "3"
 
 
 def test_random_feed_uses_the_visitors_recent_media_history(monkeypatch):
+    calls = []
+
     async def fake_load_feed(**kwargs):
+        calls.append(kwargs)
         assert kwargs["recent_urls"] == ("https://i.imgur.com/recent.mp4",)
-        return []
+        assert kwargs["exclude_recent"] is True
+        return [
+            FeedItem(
+                content_link_id=44,
+                role_id="role-1",
+                member_name="Hanni",
+                group_name="NewJeans",
+                url="https://i.imgur.com/new.mp4",
+                original_url=None,
+                uploaded_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
+                score=1.0,
+            )
+        ]
 
     monkeypatch.setattr(web_app, "load_feed", fake_load_feed)
     monkeypatch.setattr(
@@ -108,6 +123,40 @@ def test_random_feed_uses_the_visitors_recent_media_history(monkeypatch):
 
     response = asyncio.run(request())
     assert response.status_code == 200
+    assert len(calls) == 1
+
+
+def test_top_feed_continuation_uses_a_stable_offset(monkeypatch):
+    calls = []
+
+    async def fake_load_feed(**kwargs):
+        calls.append(kwargs)
+        return []
+
+    monkeypatch.setattr(web_app, "load_feed", fake_load_feed)
+
+    async def request():
+        transport = httpx.ASGITransport(app=web_app.app)
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="http://test",
+            cookies={web_app.VISITOR_COOKIE: "top-feed-pagination-test"},
+        ) as client:
+            return await client.get("/api/feed?sort=top&limit=5&continuation=true&offset=10")
+
+    response = asyncio.run(request())
+
+    assert response.status_code == 200
+    assert calls == [
+        {
+            "query": None,
+            "sort": "top",
+            "limit": 5,
+            "recent_urls": (),
+            "exclude_recent": False,
+            "offset": 10,
+        }
+    ]
 
 
 def test_vote_endpoint_returns_updated_feedback(monkeypatch):
@@ -274,7 +323,13 @@ def test_collection_endpoint_reuses_serialized_feed_items(monkeypatch):
 
 def test_set_feed_endpoint_serializes_whole_sets(monkeypatch):
     async def fake_set_feed(**kwargs):
-        assert kwargs == {"query": "hanni", "sort": "latest", "limit": 1}
+        assert kwargs == {
+            "query": "hanni",
+            "sort": "latest",
+            "limit": 2,
+            "cursor_date": None,
+            "cursor_id": None,
+        }
         return [
             ContentSet(
                 collection_of=42,
@@ -301,6 +356,7 @@ def test_set_feed_endpoint_serializes_whole_sets(monkeypatch):
                         score=2.0,
                     ),
                 ),
+                set_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
             )
         ]
 
@@ -321,6 +377,49 @@ def test_set_feed_endpoint_serializes_whole_sets(monkeypatch):
     assert response.json()["count"] == 1
     assert response.json()["sets"][0]["collection_of"] == 42
     assert len(response.json()["sets"][0]["items"]) == 2
+    assert response.json()["next_cursor"] is None
+
+
+def test_set_feed_endpoint_returns_a_stable_next_cursor(monkeypatch):
+    first_date = datetime(2026, 1, 2, tzinfo=timezone.utc)
+
+    async def fake_set_feed(**kwargs):
+        assert kwargs["limit"] == 2
+        return [
+            ContentSet(collection_of=42, label="First", items=(), set_date=first_date),
+            ContentSet(
+                collection_of=41,
+                label="Second",
+                items=(),
+                set_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            ),
+        ]
+
+    monkeypatch.setattr(web_app, "load_collection_feed", fake_set_feed)
+
+    async def request():
+        transport = httpx.ASGITransport(app=web_app.app)
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="http://test",
+            cookies={web_app.VISITOR_COOKIE: "set-pagination-test"},
+        ) as client:
+            return await client.get("/api/sets?sort=latest&limit=1")
+
+    response = asyncio.run(request())
+
+    assert response.status_code == 200
+    assert response.json()["count"] == 1
+    assert response.json()["next_cursor"] == f"{first_date.isoformat()}|42"
+
+
+def test_set_cursor_round_trips_timezone_less_database_dates():
+    database_date = datetime(2026, 1, 2, 3, 4, 5)
+
+    cursor = web_app._encode_set_cursor(database_date, 42)
+
+    assert cursor == "2026-01-02T03:04:05+00:00|42"
+    assert web_app._decode_set_cursor(cursor) == (database_date, 42)
 
 
 def test_scroll_endpoint_returns_and_reserves_a_random_batch(monkeypatch):
@@ -463,6 +562,7 @@ def test_homepage_renders():
     assert '<footer class="site-credit">made by glaceon</footer>' in response.text
     assert '<a href="/sets">sets</a>' in response.text
     assert '<a href="/scroll">scroll</a>' in response.text
+    assert '<span aria-current="page">feed</span>' in response.text
     assert '/static/analytics.js?v=' in response.text
     assert 'id="collection-heading"' in response.text
     assert '/static/app.css?v=' in response.text
@@ -480,11 +580,15 @@ def test_homepage_renders():
     assert "max-height: min(62vh, 540px)" in css
     assert "max-height: var(--mobile-media-max-height)" in css
     assert ".card-actions .upvote, .card-actions .downvote { min-width: 42px; }" in css
-    assert ".feed-status.is-floating { margin: 0 auto; padding-inline: 14px; }" in css
     assert ".collection-link" in css
-    assert '<option value="15" selected>15 links</option>' in response.text
     assert '<option value="random" selected>random</option>' in response.text
-    assert '<option value="latest">latest</option>' in response.text
+    assert '<option value="top">top</option>' in response.text
+    assert 'id="limit"' not in response.text
+    assert 'id="feed-sentinel"' in response.text
+    assert 'id="timeline-tools"' in response.text
+    assert '<svg class="timeline-icon timeline-icon-search"' in response.text
+    assert "appearance: none;" in css
+    assert "background-position: right 13px center;" in css
     assert "Loading little links" not in response.text
     assert "a tiny corner for good links" not in response.text
     assert "autofeed" not in response.text.lower()
@@ -502,7 +606,20 @@ def test_sets_page_renders_separately():
     assert response.status_code == 200
     assert "search sets by member or group" in response.text
     assert '/static/sets.js?v=' in response.text
-    assert '<option value="15" selected>15 sets</option>' in response.text
+    assert '<option value="latest" selected>newest</option>' in response.text
+    assert '<option value="oldest">oldest</option>' in response.text
+    assert '<option value="random"' not in response.text
+    assert '<option value="top"' not in response.text
+    assert 'id="limit"' not in response.text
+    assert 'id="feed-sentinel"' in response.text
+    assert 'id="timeline-tools"' in response.text
+    assert '<svg class="timeline-icon timeline-icon-search"' in response.text
+    script = (web_app.REPO_ROOT / "static" / "sets.js").read_text()
+    assert "const BATCH_SIZE = 5;" in script
+    assert "setEndObserver" in script
+    assert "async function loadMoreSets()" in script
+    assert "cursor: state.nextCursor" in script
+    assert not script.rstrip().endswith("loadSets();")
 
 
 def test_scroll_page_renders_as_a_separate_reel_surface():
@@ -555,24 +672,29 @@ def test_scroll_client_is_bounded_and_supports_desktop_paging():
     assert '"Downvote this link"' in script
 
 
-def test_client_waits_for_search_and_autoplays_video():
+def test_client_loads_timeline_batches_and_autoplays_video():
     script = (web_app.REPO_ROOT / "static" / "app.js").read_text()
 
-    assert not script.rstrip().endswith("loadFeed();")
-    assert "new Set([1, 15, 30])" in script
-    assert 'new Set(["random", "latest", "oldest", "top"])' in script
-    assert "new URLSearchParams({ limit: String(limit), sort })" in script
+    assert script.rstrip().endswith("else clearFeed();")
+    assert "const BATCH_SIZE = 5;" in script
+    assert 'sort: state.sort' in script
+    assert '$("sort").value' in script
+    assert 'state.sort !== "random"' in script
+    assert '$("limit")' not in script
     assert "media.autoplay = true" in script
     assert "videoPlaybackObserver" in script
-    assert "REVEAL_DELAY_MS = 2000" in script
+    assert "mediaWindowObserver" in script
+    assert "feedEndObserver" in script
+    assert "async function loadMoreFeed()" in script
+    assert "CONTINUATION_GAP_MS = 1100" in script
+    assert "state.continuationTimer" in script
+    assert "state.retryContinuation" in script
+    assert "const initialCollectionId = initializeHistory();" in script
+    assert "else loadFeed();" not in script
     assert "function lockMobileMediaHeight()" in script
     assert 'window.addEventListener("orientationchange"' in script
     assert "scrollIntoView" in script
-    assert 'block: "end"' in script
     assert '$("query").blur()' in script
-    assert '$("stop-feed").addEventListener("click", stopFeed)' in script
-    assert '$("jump-bottom").addEventListener("click", jumpToBottom)' in script
-    assert '$("jump-top").addEventListener("click", jumpToTop)' in script
     assert 'search.scrollIntoView' in script
     assert 'query").focus({ preventScroll: true })' in script
     assert 'feedbackButton("upvote", "upvote", "↑", "Upvote this link")' in script
@@ -584,9 +706,10 @@ def test_client_waits_for_search_and_autoplays_video():
     assert 'select[data-action="report"]' not in script
     assert '["dead_link", "dead link"]' not in script
     assert "dead link report ${payload.dead_link_reports} of 3" not in script
-    assert "state.visibleCount > 1" not in script
+    assert "state.visibleCount" not in script
+    assert "REVEAL_DELAY_MS" not in script
     assert "function disposeView(snapshot)" in script
-    assert 'video.removeAttribute("src")' in script
+    assert 'media.removeAttribute("src")' in script
     assert "dataset.mediaSrc" not in script
     assert "mediaCandidates" not in script
     assert "if (copied) await recordImplicitUpvote(card, id);" in script

@@ -133,6 +133,7 @@ def get_feed_items(
     min_age: str,
     recent_urls: tuple[str, ...] = (),
     exclude_recent: bool = False,
+    offset: int = 0,
 ) -> list[FeedItem]:
     """Return live, low-report content for the web feed.
 
@@ -143,6 +144,7 @@ def get_feed_items(
     if sort not in {"random", "latest", "oldest", "top"}:
         raise ValueError(f"Unsupported feed sort: {sort}")
     limit = max(1, min(int(limit), MAX_FEED_ITEMS))
+    offset = max(0, int(offset))
 
     with POOL.connection() as connection:
         role_ids = None
@@ -318,8 +320,9 @@ def get_feed_items(
                     WHERE {' AND '.join(where)}
                     ORDER BY {order_by}
                     LIMIT %s
+                    OFFSET %s
                     """,
-                    (INITIAL_REACT_CAP, *params, limit),
+                    (INITIAL_REACT_CAP, *params, limit, offset),
                 )
             rows = cursor.fetchall()
 

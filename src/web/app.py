@@ -8,6 +8,7 @@ import secrets
 import time
 from collections import OrderedDict
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
@@ -38,7 +39,7 @@ ANALYTICS_SESSION_COOKIE = "hanni_analytics_session"
 ANALYTICS_SESSION_SECONDS = 30 * 60
 FEEDBACK_COOLDOWN_SECONDS = 5 * 60
 FEEDBACK_CACHE_CAPACITY = 20
-SEARCH_COOLDOWN_SECONDS = 10
+SEARCH_COOLDOWN_SECONDS = 3
 SEARCH_CACHE_CAPACITY = 256
 SCROLL_COOLDOWN_SECONDS = 1
 SCROLL_CACHE_CAPACITY = 512
@@ -229,26 +230,87 @@ def _serialize_item(item) -> dict[str, Any]:
     }
 
 
+def _encode_set_cursor(set_date: datetime | None, anchor_id: int) -> str | None:
+    if set_date is None:
+        return None
+    if set_date.tzinfo is None:
+        set_date = set_date.replace(tzinfo=timezone.utc)
+    else:
+        set_date = set_date.astimezone(timezone.utc)
+    return f"{set_date.isoformat()}|{anchor_id}"
+
+
+def _decode_set_cursor(value: str) -> tuple[datetime, int]:
+    try:
+        date_text, id_text = value.rsplit("|", 1)
+        set_date = datetime.fromisoformat(date_text.replace("Z", "+00:00"))
+        anchor_id = int(id_text)
+        if anchor_id <= 0:
+            raise ValueError
+        if set_date.tzinfo is not None:
+            set_date = set_date.astimezone(timezone.utc).replace(tzinfo=None)
+        return set_date, anchor_id
+    except (TypeError, ValueError) as error:
+        raise HTTPException(status_code=400, detail="invalid set cursor") from error
+
+
 @app.get("/api/feed")
 async def feed(
     request: Request,
     response: Response,
     query: str | None = Query(default=None, max_length=100),
     sort: str = Query(default="random"),
-    limit: int = Query(default=15, ge=1, le=30),
+    limit: int = Query(default=5, ge=1, le=30),
+    continuation: bool = Query(default=False),
+    offset: int = Query(default=0, ge=0, le=100_000),
 ) -> dict[str, Any]:
     if sort not in {"random", "latest", "oldest", "top"}:
         raise HTTPException(status_code=400, detail="sort must be random, latest, oldest, or top")
     visitor_id = _ensure_visitor_cookie(request, response)
-    if not _search_rate_limiter.allow(visitor_id, "feed"):
+    rate_limiter = _scroll_rate_limiter if continuation else _search_rate_limiter
+    rate_key = "feed-page" if continuation else "feed"
+    if not rate_limiter.allow(visitor_id, rate_key):
+        cooldown = SCROLL_COOLDOWN_SECONDS if continuation else SEARCH_COOLDOWN_SECONDS
         raise HTTPException(
             status_code=429,
-            detail="Please wait 10 seconds before searching again.",
-            headers={"Retry-After": str(SEARCH_COOLDOWN_SECONDS)},
+            detail=(
+                "Please wait a moment before loading more."
+                if continuation
+                else f"Please wait {SEARCH_COOLDOWN_SECONDS} seconds before searching again."
+            ),
+            headers={"Retry-After": str(cooldown)},
         )
     recent_urls = feed_history.recent_urls(visitor_id) if sort == "random" else ()
-    items = await load_feed(query=query, sort=sort, limit=limit, recent_urls=recent_urls)
-    return {"items": [_serialize_item(item) for item in items], "count": len(items), "sort": sort, "query": query}
+    if sort == "random":
+        items = await load_feed(
+            query=query,
+            sort=sort,
+            limit=limit,
+            recent_urls=recent_urls,
+            exclude_recent=bool(recent_urls),
+        )
+    else:
+        items = await load_feed(
+            query=query,
+            sort=sort,
+            limit=limit,
+            recent_urls=(),
+            exclude_recent=False,
+            offset=offset,
+        )
+    if not items and recent_urls:
+        feed_history.clear(visitor_id)
+        items = await load_feed(query=query, sort=sort, limit=limit, recent_urls=(), exclude_recent=True)
+    if sort == "random":
+        for item in items:
+            feed_history.remember(visitor_id, item.url)
+    return {
+        "items": [_serialize_item(item) for item in items],
+        "count": len(items),
+        "has_more": bool(items),
+        "sort": sort,
+        "query": query,
+    }
 
 
 @app.get("/api/sets")
@@ -256,19 +318,35 @@ async def sets(
     request: Request,
     response: Response,
     query: str | None = Query(default=None, max_length=100),
-    sort: str = Query(default="random"),
-    limit: int = Query(default=15, ge=1, le=30),
+    sort: str = Query(default="latest"),
+    limit: int = Query(default=5, ge=1, le=30),
+    cursor: str | None = Query(default=None, max_length=100),
 ) -> dict[str, Any]:
     if sort not in {"random", "latest", "oldest", "top"}:
         raise HTTPException(status_code=400, detail="sort must be random, latest, oldest, or top")
+    if cursor is not None and sort not in {"latest", "oldest"}:
+        raise HTTPException(status_code=400, detail="set pagination requires newest or oldest sorting")
+    cursor_date, cursor_id = _decode_set_cursor(cursor) if cursor else (None, None)
     visitor_id = _ensure_visitor_cookie(request, response)
-    if not _search_rate_limiter.allow(visitor_id, "sets"):
+    if cursor is None and not _search_rate_limiter.allow(visitor_id, "sets"):
         raise HTTPException(
             status_code=429,
-            detail="Please wait 10 seconds before searching again.",
+            detail=f"Please wait {SEARCH_COOLDOWN_SECONDS} seconds before searching again.",
             headers={"Retry-After": str(SEARCH_COOLDOWN_SECONDS)},
         )
-    results = await load_collection_feed(query=query, sort=sort, limit=limit)
+    results = await load_collection_feed(
+        query=query,
+        sort=sort,
+        limit=limit + 1,
+        cursor_date=cursor_date,
+        cursor_id=cursor_id,
+    )
+    page = results[:limit]
+    next_cursor = (
+        _encode_set_cursor(page[-1].set_date, page[-1].collection_of)
+        if len(results) > limit and page
+        else None
+    )
     return {
         "sets": [
             {
@@ -277,11 +355,12 @@ async def sets(
                 "count": len(result.items),
                 "items": [_serialize_item(item) for item in result.items],
             }
-            for result in results
+            for result in page
         ],
-        "count": len(results),
+        "count": len(page),
         "sort": sort,
         "query": query,
+        "next_cursor": next_cursor,
     }
 
 

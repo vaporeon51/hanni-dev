@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from src.db import collections as collection_db
 
 
@@ -142,3 +144,23 @@ def test_collection_feed_batches_exact_parent_sets(monkeypatch):
     assert [item.content_link_id for item in sets[0].items] == [42, 43]
     assert "cl.root_message_id IS NOT NULL" in connection.cursors[0].query
     assert "unnest(%s::text[], %s::text[])" in connection.cursors[1].query
+
+
+def test_collection_feed_applies_chronological_cursor(monkeypatch):
+    connection = FakeConnection([])
+    monkeypatch.setattr(collection_db, "POOL", FakePool(connection))
+    cursor_date = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+    sets = collection_db.get_collection_feed(
+        sort="latest",
+        limit=15,
+        min_age="18 year 1 month",
+        cursor_date=cursor_date,
+        cursor_id=42,
+    )
+
+    assert sets == []
+    query = connection.cursors[0].query
+    assert "(set_date, content_link_id) < (%s, %s)" in query
+    assert cursor_date in connection.cursors[0].params
+    assert 42 in connection.cursors[0].params

@@ -395,5 +395,8 @@ def test_client_waits_for_search_and_autoplays_video():
     assert "function navigateToCollection(contentLinkId, href)" in script
     assert 'window.addEventListener("popstate"' in script
     assert "VIEW_CACHE_CAPACITY = 1" in script
+    assert script.index("const scrollY = window.scrollY;") < script.index(
+        "nodes.forEach((node) => node.remove());"
+    )
     assert "view set (${count}) →" in script
     assert "?collection=${item.content_link_id}" in script

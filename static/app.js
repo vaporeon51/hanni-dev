@@ -187,6 +187,9 @@ function captureCurrentView() {
   if (state.revealTimer !== null) window.clearTimeout(state.revealTimer);
   state.revealTimer = null;
   state.revealToken += 1;
+  // Read this before detaching the cards. Removing the feed collapses the
+  // document and can clamp window.scrollY back to zero on mobile browsers.
+  const scrollY = window.scrollY;
   const nodes = Array.from($("feed").childNodes);
   nodes.forEach((node) => node.remove());
   return {
@@ -200,7 +203,7 @@ function captureCurrentView() {
     query: $("query").value,
     sort: $("sort").value,
     limit: $("limit").value,
-    scrollY: window.scrollY,
+    scrollY,
   };
 }
 

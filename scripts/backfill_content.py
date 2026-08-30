@@ -1,0 +1,12 @@
+#!/usr/bin/env python3
+"""Local CLI wrapper for the resumable historical content backfill."""
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from src.content_backfill import main
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -39,6 +39,23 @@ python -m src.worker dead-links
 python -m src.worker recovery
 ```
 
+Historical content can be inspected with the resumable backfill command. It is
+a read-only dry run unless `--apply` is supplied:
+
+```bash
+python scripts/backfill_content.py --max-pages 5
+python scripts/backfill_content.py --apply --max-pages 5
+python scripts/backfill_content.py --apply
+```
+
+The backfill replays the channel chronologically through the live classifier,
+fills Discord provenance on unambiguous legacy rows, and inserts missing
+continuations beginning January 1, 2025. Apply-mode progress is written atomically after every page to
+the ignored local file `.content-backfill-state.json`; it never moves the live
+cursor in `update_log` and requires no additional database table. Rerun the
+same command after interruption to resume. Dry-run mode never writes content
+or a checkpoint.
+
 The dead-link worker applies `MIN_CONTENT_AGE`, posts each eligible candidate URL to its private channel, waits up to 15 seconds for Discord's embed, and records the old `article`-embed behavior as dead. Messages remain in the channel as an audit trail. A missing embed is unknown rather than dead; an explicit `article` embed marks every row for that URL dead immediately and posts a notice in the same channel. URLs whose cards are actually revealed in the web feed enter a process-local, de-duplicated FIFO priority queue capped at 100 items. The checker is serial: it takes one queued URL when available, otherwise one regular database-sweep URL, processes it fully, waits two seconds, and repeats. Individual database URLs retain a five-minute minimum recheck interval. The queue is shared with the scheduler in the one-dyno `RUN_BACKGROUND_TASKS=true` deployment. Without `DISCORD_DEAD_LINK_WEBHOOK_URL`, the job skips safely instead of applying a different definition of dead.
 
 Recovery requires `IMGUR_CLIENT_ID`, `DISCORD_REVIVAL_WEBHOOK_URL`, and `ffmpeg`. Candidates use the same `MIN_CONTENT_AGE` eligibility rule as the public feed. After direct media validation, each new URL is posted to the separate revival channel. An explicit Discord `article` embed advances the failed derivative generation and leaves the source dead; a delayed embed is accepted like the old Tsuki pipeline because no embed is not proof of failure. Those messages remain in the channel.

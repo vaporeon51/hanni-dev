@@ -11,3 +11,5 @@ htmlcov/
 .venv/
 *.egg-info/
 *.swp
+.content-backfill-state*.json
+.content-backfill-state*.json.tmp

@@ -203,7 +203,10 @@ button:disabled { cursor: wait; opacity: .55; }
   -webkit-clip-path: inset(0 round 11px);
   clip-path: inset(0 round 11px);
   object-fit: contain;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
 }
+.card-media.is-ready img, .card-media.is-ready video { opacity: 1; }
 .card-media video { background: #f5e8ed; }
 .card-media.card-link {
   min-height: 0;
@@ -471,4 +474,8 @@ button:disabled { cursor: wait; opacity: .55; }
 @media (max-width: 360px) {
   .search { grid-template-columns: 1fr 1fr; }
   .search input, .search button { grid-column: 1 / -1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-media img, .card-media video { transition: none; }
 }

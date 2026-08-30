@@ -325,7 +325,10 @@ def get_collection_feed(
         raise ValueError("Collection cursors require chronological sorting")
     # The API may request one extra set to determine whether another page exists.
     limit = max(1, min(int(limit), MAX_FEED_ITEMS + 1))
-    candidate_limit = min(max(limit * 4, 30), MAX_FEED_ITEMS * 4)
+    # Exact root-message sets are already strongly distinct, so a modest
+    # over-fetch is enough for membership deduplication. Keeping this window
+    # bounded avoids hydrating 30 complete sets just to show the first five.
+    candidate_limit = min(max(limit * 3, 12), MAX_FEED_ITEMS * 3)
 
     with POOL.connection() as connection:
         role_ids = None

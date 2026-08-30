@@ -1,5 +1,7 @@
 const BATCH_SIZE = 5;
 const MEDIA_PRELOAD_MARGIN = "900px 0px";
+const FIRST_MEDIA_HEAD_START_MS = 360;
+const MEDIA_STAGGER_MS = 110;
 const CONTINUATION_GAP_MS = 1100;
 const VIEW_CACHE_CAPACITY = 1;
 const state = {
@@ -17,6 +19,7 @@ const state = {
   sort: "random",
 };
 const viewCache = new Map();
+const pendingMediaStarts = new Set();
 
 const $ = (id) => document.getElementById(id);
 
@@ -60,21 +63,19 @@ window.addEventListener("orientationchange", () => {
   window.setTimeout(lockMobileMediaHeight, 250);
 });
 
-const visibleVideos = new Map();
+const visibleVideos = new Set();
 const videoPlaybackObserver = "IntersectionObserver" in window
   ? new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
-        if (entry.isIntersecting) visibleVideos.set(entry.target, entry.intersectionRatio);
-        else visibleVideos.delete(entry.target);
+        if (entry.isIntersecting && entry.intersectionRatio > 0) {
+          visibleVideos.add(entry.target);
+          entry.target.play().catch(() => {});
+        } else {
+          visibleVideos.delete(entry.target);
+          entry.target.pause();
+        }
       });
-      const activeVideo = [...visibleVideos.entries()]
-        .filter(([, ratio]) => ratio >= 0.25)
-        .sort(([, left], [, right]) => right - left)[0]?.[0];
-      visibleVideos.forEach((_, video) => {
-        if (video === activeVideo) video.play().catch(() => {});
-        else video.pause();
-      });
-    }, { threshold: [0, 0.25, 0.5, 0.75, 1] })
+    }, { threshold: [0, 0.01] })
   : null;
 
 const mediaWindowObserver = "IntersectionObserver" in window
@@ -169,6 +170,7 @@ function refreshTimeline() {
 
 function clearFeed() {
   cancelContinuationTimer();
+  cancelPendingMediaStarts();
   const feed = $("feed");
   feed.querySelectorAll(".card").forEach((card) => card._mediaController?.dispose());
   while (feed.firstChild) feed.removeChild(feed.firstChild);
@@ -206,6 +208,7 @@ function cacheView(key, snapshot) {
 }
 
 function captureCurrentView() {
+  cancelPendingMediaStarts();
   // Read this before detaching the cards. Removing the feed collapses the
   // document and can clamp window.scrollY back to zero on mobile browsers.
   const scrollY = window.scrollY;
@@ -477,10 +480,32 @@ function renderCard(item) {
   return card;
 }
 
-function appendCards(items) {
+function cancelPendingMediaStarts() {
+  pendingMediaStarts.forEach((timer) => window.clearTimeout(timer));
+  pendingMediaStarts.clear();
+}
+
+function scheduleMediaStart(controller, delay) {
+  const timer = window.setTimeout(() => {
+    pendingMediaStarts.delete(timer);
+    if (controller.element.isConnected) controller.observe();
+  }, delay);
+  pendingMediaStarts.add(timer);
+}
+
+function appendCards(items, { staggerMedia = true } = {}) {
   const cards = items.map((item) => renderCard(item));
   $("feed").append(...cards);
-  cards.forEach((card) => card._mediaController.observe());
+  cards.forEach((card, index) => {
+    if (!staggerMedia || index === 0) {
+      card._mediaController.observe();
+      return;
+    }
+    scheduleMediaStart(
+      card._mediaController,
+      FIRST_MEDIA_HEAD_START_MS + (index - 1) * MEDIA_STAGGER_MS,
+    );
+  });
 }
 
 function renderFeed() {

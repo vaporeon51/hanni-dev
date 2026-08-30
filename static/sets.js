@@ -1,6 +1,8 @@
 const BATCH_SIZE = 5;
 const ALLOWED_SORTS = new Set(["latest", "oldest"]);
-const MEDIA_PRELOAD_MARGIN = "900px 0px";
+const MEDIA_PRELOAD_MARGIN = "550px 0px";
+const FIRST_MEDIA_HEAD_START_MS = 360;
+const MEDIA_STAGGER_MS = 110;
 const state = {
   sets: [],
   navigationToken: 0,
@@ -9,6 +11,7 @@ const state = {
   loadingMore: false,
   retryContinuation: false,
 };
+const pendingMediaStarts = new Set();
 
 const $ = (id) => document.getElementById(id);
 
@@ -27,21 +30,19 @@ function lockMobileMediaHeight() {
 lockMobileMediaHeight();
 window.addEventListener("orientationchange", () => window.setTimeout(lockMobileMediaHeight, 250));
 
-const visibleVideos = new Map();
+const visibleVideos = new Set();
 const videoPlaybackObserver = "IntersectionObserver" in window
   ? new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
-        if (entry.isIntersecting) visibleVideos.set(entry.target, entry.intersectionRatio);
-        else visibleVideos.delete(entry.target);
+        if (entry.isIntersecting && entry.intersectionRatio > 0) {
+          visibleVideos.add(entry.target);
+          entry.target.play().catch(() => {});
+        } else {
+          visibleVideos.delete(entry.target);
+          entry.target.pause();
+        }
       });
-      const activeVideo = [...visibleVideos.entries()]
-        .filter(([, ratio]) => ratio >= 0.25)
-        .sort(([, left], [, right]) => right - left)[0]?.[0];
-      visibleVideos.forEach((_, video) => {
-        if (video === activeVideo) video.play().catch(() => {});
-        else video.pause();
-      });
-    }, { threshold: [0, 0.25, 0.5, 0.75, 1] })
+    }, { threshold: [0, 0.01] })
   : null;
 
 const mediaWindowObserver = "IntersectionObserver" in window
@@ -94,11 +95,8 @@ function jumpToTop() {
   $("sets-form").scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
 }
 
-function refreshTimeline() {
-  loadSets();
-}
-
 function clearFeed() {
+  cancelPendingMediaStarts();
   $("feed").querySelectorAll(".set-card").forEach((card) => {
     card._setMedia?.forEach((media) => media.dispose());
   });
@@ -417,12 +415,36 @@ function navigateSet(card, direction) {
   card._setTrack.scrollTo({ left: slide.offsetLeft, behavior: reducedMotion ? "auto" : "smooth" });
 }
 
-function appendSetCards(contentSets) {
+function cancelPendingMediaStarts() {
+  pendingMediaStarts.forEach((timer) => window.clearTimeout(timer));
+  pendingMediaStarts.clear();
+}
+
+function observeSetCard(card) {
+  card._setMedia.forEach((media) => media.observe());
+}
+
+function scheduleSetMediaStart(card, delay) {
+  const timer = window.setTimeout(() => {
+    pendingMediaStarts.delete(timer);
+    if (card.isConnected) observeSetCard(card);
+  }, delay);
+  pendingMediaStarts.add(timer);
+}
+
+function appendSetCards(contentSets, { staggerMedia = true } = {}) {
   const cards = contentSets.map((contentSet) => renderSetCard(contentSet));
   $("feed").append(...cards);
-  cards.forEach((card) => {
-    card._setMedia.forEach((media) => media.observe());
-    activateSlide(card, 0);
+  cards.forEach((card) => activateSlide(card, 0));
+  cards.forEach((card, index) => {
+    if (!staggerMedia || index === 0) {
+      observeSetCard(card);
+      return;
+    }
+    scheduleSetMediaStart(
+      card,
+      FIRST_MEDIA_HEAD_START_MS + (index - 1) * MEDIA_STAGGER_MS,
+    );
   });
 }
 
@@ -586,7 +608,6 @@ async function loadMoreSets() {
 
 $("sets-form").addEventListener("submit", loadSets);
 $("timeline-search").addEventListener("click", focusSearch);
-$("timeline-refresh").addEventListener("click", refreshTimeline);
 $("timeline-top").addEventListener("click", jumpToTop);
 $("feed-sentinel").addEventListener("click", () => {
   if ($("feed-sentinel").classList.contains("is-error") && !state.retryContinuation) loadSets();

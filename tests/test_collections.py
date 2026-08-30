@@ -143,6 +143,7 @@ def test_collection_feed_batches_exact_parent_sets(monkeypatch):
     assert sets[0].label == "Hanni - NewJeans"
     assert [item.content_link_id for item in sets[0].items] == [42, 43]
     assert "cl.root_message_id IS NOT NULL" in connection.cursors[0].query
+    assert connection.cursors[0].params[-1] == 12
     assert "unnest(%s::text[], %s::text[])" in connection.cursors[1].query
 
 

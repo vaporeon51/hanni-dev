@@ -573,6 +573,8 @@ def test_homepage_renders():
     assert "font-weight: 400;" in css
     assert ".card-media video" in css
     assert ".card-media img, .card-media video" in css
+    assert ".card-media.is-ready img, .card-media.is-ready video { opacity: 1; }" in css
+    assert "transition: opacity 180ms ease-out;" in css
     assert "clip-path: inset(0 round 11px)" in css
     assert "width: auto" in css
     assert "max-width: min(100%, 520px)" in css
@@ -617,8 +619,16 @@ def test_sets_page_renders_separately():
     assert 'id="feed-sentinel"' in response.text
     assert 'id="timeline-tools"' in response.text
     assert '<svg class="timeline-icon timeline-icon-search"' in response.text
+    assert 'id="timeline-refresh"' not in response.text
     script = (web_app.REPO_ROOT / "static" / "sets.js").read_text()
     assert "const BATCH_SIZE = 5;" in script
+    assert 'const MEDIA_PRELOAD_MARGIN = "550px 0px";' in script
+    assert "FIRST_MEDIA_HEAD_START_MS = 360" in script
+    assert "MEDIA_STAGGER_MS = 110" in script
+    assert "threshold: [0, 0.01]" in script
+    assert "activeVideo" not in script
+    assert "scheduleSetMediaStart" in script
+    assert '$("timeline-refresh")' not in script
     assert "setEndObserver" in script
     assert "async function loadMoreSets()" in script
     assert "cursor: state.nextCursor" in script
@@ -665,6 +675,8 @@ def test_scroll_client_is_bounded_and_supports_desktop_paging():
     assert "object-fit: contain" in css
     assert "max-width: 100%" in css
     assert "max-height: 100%" in css
+    assert "--reel-stage-fill:" in css
+    assert "background: var(--reel-stage-fill);" in css
     assert "const fitInsideStage = () =>" in script
     assert "availableWidth / intrinsicWidth" in script
     assert "availableHeight / intrinsicHeight" in script
@@ -686,6 +698,11 @@ def test_client_loads_timeline_batches_and_autoplays_video():
     assert '$("limit")' not in script
     assert "media.autoplay = true" in script
     assert "videoPlaybackObserver" in script
+    assert "threshold: [0, 0.01]" in script
+    assert "activeVideo" not in script
+    assert "FIRST_MEDIA_HEAD_START_MS = 360" in script
+    assert "MEDIA_STAGGER_MS = 110" in script
+    assert "scheduleMediaStart" in script
     assert "mediaWindowObserver" in script
     assert "feedEndObserver" in script
     assert "async function loadMoreFeed()" in script

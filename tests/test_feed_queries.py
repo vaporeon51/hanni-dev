@@ -100,6 +100,24 @@ def test_random_feed_prioritizes_urls_outside_recent_history(monkeypatch):
     assert ["https://i.imgur.com/old.mp4"] in params
 
 
+def test_scroll_sampling_can_strictly_exclude_recent_history(monkeypatch):
+    pool = FakePool()
+    monkeypatch.setattr(feed_db, "POOL", pool)
+
+    feed_db.get_feed_items(
+        sort="random",
+        limit=8,
+        min_age="18 year 1 month",
+        recent_urls=("https://i.imgur.com/old.mp4",),
+        exclude_recent=True,
+    )
+
+    query, params = pool.connection_instance.cursor_instance.calls[-1]
+    assert "NOT (cl.url = ANY(%s))" in query
+    assert query.count("%s") == len(params)
+    assert params.count(["https://i.imgur.com/old.mp4"]) == 2
+
+
 def test_role_draws_are_uniform_but_do_not_exceed_available_links(monkeypatch):
     monkeypatch.setattr(feed_db.random, "choice", lambda roles: roles[0])
 

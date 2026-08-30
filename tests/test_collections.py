@@ -108,3 +108,37 @@ def test_collection_preview_returns_anchor_url_and_set_size(monkeypatch):
         url="https://i.imgur.com/one.mp4",
         count=3,
     )
+
+
+def test_collection_feed_batches_exact_parent_sets(monkeypatch):
+    connection = FakeConnection(
+        [
+            (
+                42,
+                "role-1",
+                "author-1",
+                "root-1",
+                "https://i.imgur.com/one.mp4",
+                "Hanni",
+                "NewJeans",
+                None,
+                3.0,
+                1.0,
+            )
+        ],
+        [("role-1", "root-1", 42), ("role-1", "root-1", 43)],
+        [
+            (42, "role-1", "Hanni", "NewJeans", "https://i.imgur.com/one.mp4", None, None, 3.0, 0, 0, 0, 0, None),
+            (43, "role-1", "Hanni", "NewJeans", "https://i.imgur.com/two.mp4", None, None, 2.0, 0, 0, 0, 0, None),
+        ],
+    )
+    monkeypatch.setattr(collection_db, "POOL", FakePool(connection))
+
+    sets = collection_db.get_collection_feed(sort="latest", limit=1, min_age="18 year 1 month")
+
+    assert len(sets) == 1
+    assert sets[0].collection_of == 42
+    assert sets[0].label == "Hanni - NewJeans"
+    assert [item.content_link_id for item in sets[0].items] == [42, 43]
+    assert "cl.root_message_id IS NOT NULL" in connection.cursors[0].query
+    assert "unnest(%s::text[], %s::text[])" in connection.cursors[1].query

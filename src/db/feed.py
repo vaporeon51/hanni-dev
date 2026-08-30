@@ -132,6 +132,7 @@ def get_feed_items(
     limit: int = 24,
     min_age: str,
     recent_urls: tuple[str, ...] = (),
+    exclude_recent: bool = False,
 ) -> list[FeedItem]:
     """Return live, low-report content for the web feed.
 
@@ -164,6 +165,9 @@ def get_feed_items(
         if role_ids is not None:
             where.append("cl.role_id = ANY(%s)")
             params.append(role_ids)
+        if exclude_recent and recent_urls:
+            where.append("NOT (cl.url = ANY(%s))")
+            params.append(list(recent_urls))
 
         order_by = {
             "latest": "cl.uploaded_date DESC, cl.content_link_id DESC",

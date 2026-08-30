@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>scroll · hanni♡</title>
+    <link rel="stylesheet" href="/static/app.css?v={{ static_version }}" />
+    <link rel="stylesheet" href="/static/scroll.css?v={{ static_version }}" />
+  </head>
+  <body class="scroll-page">
+    <header class="scroll-topbar">
+      <a class="scroll-brand" href="/" aria-label="hanni home">hanni<span aria-hidden="true">♡</span></a>
+      <nav class="scroll-nav" aria-label="Browse style">
+        <a href="/">links</a>
+        <a href="/sets">sets</a>
+        <span aria-current="page">scroll</span>
+      </nav>
+      <form id="scroll-form" class="scroll-search" role="search">
+        <label class="sr-only" for="query">Search by member or group</label>
+        <input id="query" name="query" type="search" placeholder="search" autocomplete="off" />
+        <button type="submit" aria-label="Search reels">go</button>
+      </form>
+    </header>
+
+    <main id="reel-feed" class="reel-feed" aria-live="polite" aria-label="Scrolling content feed"></main>
+    <div id="scroll-status" class="scroll-status" role="status" aria-live="polite" hidden></div>
+    <button id="scroll-top" class="scroll-top" type="button" aria-label="Return to first reel" hidden>↑ top</button>
+
+    <script src="/static/scroll.js?v={{ static_version }}" defer></script>
+  </body>
+</html>

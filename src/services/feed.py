@@ -9,7 +9,12 @@ from src.db.feed import FeedItem, FeedSort, get_feed_items, get_role_suggestions
 
 
 async def load_feed(
-    *, query: str | None, sort: FeedSort, limit: int, recent_urls: tuple[str, ...] = ()
+    *,
+    query: str | None,
+    sort: FeedSort,
+    limit: int,
+    recent_urls: tuple[str, ...] = (),
+    exclude_recent: bool = False,
 ) -> list[FeedItem]:
     return await asyncio.to_thread(
         get_feed_items,
@@ -18,6 +23,7 @@ async def load_feed(
         limit=limit,
         min_age=MIN_CONTENT_AGE,
         recent_urls=recent_urls,
+        exclude_recent=exclude_recent,
     )
 
 

@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>hanni♡</title>
+    <title>sets · hanni♡</title>
     <link rel="stylesheet" href="/static/app.css?v={{ static_version }}" />
   </head>
   <body>
@@ -15,32 +15,31 @@
       </header>
 
       <nav class="surface-nav" aria-label="Browse style">
-        <span aria-current="page">links</span>
-        <a href="/sets">sets</a>
+        <a href="/">links</a>
+        <span aria-current="page">sets</span>
         <a href="/scroll">scroll</a>
       </nav>
 
-      <form id="feed-form" class="search" role="search">
-        <label class="sr-only" for="query">Search by member or group</label>
-        <input id="query" name="query" type="search" placeholder="search a member or group" autocomplete="off" />
-        <label class="sr-only" for="sort">Sort feed</label>
-        <select id="sort" name="sort" aria-label="Sort feed">
+      <form id="sets-form" class="search" role="search">
+        <label class="sr-only" for="query">Search sets by member or group</label>
+        <input id="query" name="query" type="search" placeholder="search sets by member or group" autocomplete="off" />
+        <label class="sr-only" for="sort">Sort sets</label>
+        <select id="sort" name="sort" aria-label="Sort sets">
           <option value="random" selected>random</option>
           <option value="latest">latest</option>
           <option value="oldest">oldest</option>
           <option value="top">top</option>
         </select>
-        <label class="sr-only" for="limit">Number of links</label>
-        <select id="limit" name="limit" aria-label="Number of links">
-          <option value="1">1 link</option>
-          <option value="15" selected>15 links</option>
-          <option value="30">30 links</option>
+        <label class="sr-only" for="limit">Number of sets</label>
+        <select id="limit" name="limit" aria-label="Number of sets">
+          <option value="1">1 set</option>
+          <option value="15" selected>15 sets</option>
+          <option value="30">30 sets</option>
         </select>
         <button type="submit">Search</button>
       </form>
 
-      <div id="collection-heading" class="collection-heading" hidden></div>
-      <section id="feed" class="feed-list" aria-live="polite" aria-label="Content feed"></section>
+      <section id="feed" class="feed-list" aria-live="polite" aria-label="Content sets"></section>
       <div class="feed-status" aria-live="polite" hidden>
         <span class="feed-status-line">
           <span id="status" hidden></span>
@@ -52,6 +51,6 @@
       </div>
     </main>
     <footer class="site-credit">made by glaceon</footer>
-    <script src="/static/app.js?v={{ static_version }}" defer></script>
+    <script src="/static/sets.js?v={{ static_version }}" defer></script>
   </body>
 </html>

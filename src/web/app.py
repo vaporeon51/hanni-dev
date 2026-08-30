@@ -25,8 +25,8 @@ from src.db import POOL  # noqa: E402
 from src.db.feedback import ContentFeedback, add_content_report, add_content_vote  # noqa: E402
 from src.db.media import get_live_content_url  # noqa: E402
 from src.services.feed import load_feed, load_role_suggestions  # noqa: E402
-from src.services.feed_history import feed_history  # noqa: E402
-from src.services.collections import load_collection, load_collection_preview  # noqa: E402
+from src.services.feed_history import feed_history, scroll_history  # noqa: E402
+from src.services.collections import load_collection, load_collection_feed, load_collection_preview  # noqa: E402
 from src.services.dead_link_queue import enqueue_priority_url  # noqa: E402
 from src.services.media import MediaUpstreamError, open_media_stream, resolve_media_url_cached  # noqa: E402
 
@@ -37,6 +37,8 @@ FEEDBACK_COOLDOWN_SECONDS = 5 * 60
 FEEDBACK_CACHE_CAPACITY = 20
 SEARCH_COOLDOWN_SECONDS = 10
 SEARCH_CACHE_CAPACITY = 256
+SCROLL_COOLDOWN_SECONDS = 1
+SCROLL_CACHE_CAPACITY = 512
 
 
 class _RecentActionRateLimiter:
@@ -70,6 +72,7 @@ class _RecentActionRateLimiter:
 _vote_rate_limiter = _RecentActionRateLimiter(FEEDBACK_COOLDOWN_SECONDS, FEEDBACK_CACHE_CAPACITY)
 _report_rate_limiter = _RecentActionRateLimiter(FEEDBACK_COOLDOWN_SECONDS, FEEDBACK_CACHE_CAPACITY)
 _search_rate_limiter = _RecentActionRateLimiter(SEARCH_COOLDOWN_SECONDS, SEARCH_CACHE_CAPACITY)
+_scroll_rate_limiter = _RecentActionRateLimiter(SCROLL_COOLDOWN_SECONDS, SCROLL_CACHE_CAPACITY)
 
 
 def _ensure_visitor_cookie(request: Request, response: Response) -> str:
@@ -124,7 +127,7 @@ app.mount("/static", StaticFiles(directory=str(REPO_ROOT / "static")), name="sta
 def _static_version() -> str:
     """Change asset URLs whenever local CSS or JavaScript changes."""
 
-    assets = (REPO_ROOT / "static" / "app.css", REPO_ROOT / "static" / "app.js")
+    assets = tuple((REPO_ROOT / "static").glob("*.css")) + tuple((REPO_ROOT / "static").glob("*.js"))
     return str(max(asset.stat().st_mtime_ns for asset in assets))
 
 
@@ -133,6 +136,28 @@ async def index(request: Request) -> HTMLResponse:
     response = templates.TemplateResponse(
         request=request,
         name="index.html",
+        context={"static_version": _static_version()},
+    )
+    _ensure_visitor_cookie(request, response)
+    return response
+
+
+@app.get("/sets", response_class=HTMLResponse)
+async def sets_page(request: Request) -> HTMLResponse:
+    response = templates.TemplateResponse(
+        request=request,
+        name="sets.html",
+        context={"static_version": _static_version()},
+    )
+    _ensure_visitor_cookie(request, response)
+    return response
+
+
+@app.get("/scroll", response_class=HTMLResponse)
+async def scroll_page(request: Request) -> HTMLResponse:
+    response = templates.TemplateResponse(
+        request=request,
+        name="scroll.html",
         context={"static_version": _static_version()},
     )
     _ensure_visitor_cookie(request, response)
@@ -183,6 +208,91 @@ async def feed(
     recent_urls = feed_history.recent_urls(visitor_id) if sort == "random" else ()
     items = await load_feed(query=query, sort=sort, limit=limit, recent_urls=recent_urls)
     return {"items": [_serialize_item(item) for item in items], "count": len(items), "sort": sort, "query": query}
+
+
+@app.get("/api/sets")
+async def sets(
+    request: Request,
+    response: Response,
+    query: str | None = Query(default=None, max_length=100),
+    sort: str = Query(default="random"),
+    limit: int = Query(default=15, ge=1, le=30),
+) -> dict[str, Any]:
+    if sort not in {"random", "latest", "oldest", "top"}:
+        raise HTTPException(status_code=400, detail="sort must be random, latest, oldest, or top")
+    visitor_id = _ensure_visitor_cookie(request, response)
+    if not _search_rate_limiter.allow(visitor_id, "sets"):
+        raise HTTPException(
+            status_code=429,
+            detail="Please wait 10 seconds before searching again.",
+            headers={"Retry-After": str(SEARCH_COOLDOWN_SECONDS)},
+        )
+    results = await load_collection_feed(query=query, sort=sort, limit=limit)
+    return {
+        "sets": [
+            {
+                "collection_of": result.collection_of,
+                "label": result.label,
+                "count": len(result.items),
+                "items": [_serialize_item(item) for item in result.items],
+            }
+            for result in results
+        ],
+        "count": len(results),
+        "sort": sort,
+        "query": query,
+    }
+
+
+@app.get("/api/scroll")
+async def scroll_feed(
+    request: Request,
+    response: Response,
+    query: str | None = Query(default=None, max_length=100),
+    limit: int = Query(default=8, ge=1, le=12),
+) -> dict[str, Any]:
+    """Return a small random batch for the continuously prefetched reel view."""
+
+    visitor_id = _ensure_visitor_cookie(request, response)
+    if not _scroll_rate_limiter.allow(visitor_id, "scroll"):
+        raise HTTPException(
+            status_code=429,
+            detail="Please wait a moment before loading more.",
+            headers={"Retry-After": str(SCROLL_COOLDOWN_SECONDS)},
+        )
+    recent_urls = scroll_history.recent_urls(visitor_id)
+    items = await load_feed(
+        query=query,
+        sort="random",
+        limit=limit,
+        recent_urls=recent_urls,
+        exclude_recent=True,
+    )
+    cycle_reset = False
+    if not items and recent_urls:
+        # A narrow search can contain fewer than 100 live links. Only begin a
+        # new cycle after every currently remembered URL has been excluded and
+        # the query has no unseen result left.
+        scroll_history.clear(visitor_id)
+        items = await load_feed(
+            query=query,
+            sort="random",
+            limit=limit,
+            recent_urls=(),
+            exclude_recent=True,
+        )
+        cycle_reset = True
+    # Reserve the complete batch immediately. The scroll UI prefetches before
+    # each item is displayed, so waiting for media resolution could otherwise
+    # allow the next batch to select the same URL again.
+    for item in items:
+        scroll_history.remember(visitor_id, item.url)
+    return {
+        "items": [_serialize_item(item) for item in items],
+        "count": len(items),
+        "query": query,
+        "cycle_reset": cycle_reset,
+    }
 
 
 @app.get("/api/feed/{content_link_id}/media")

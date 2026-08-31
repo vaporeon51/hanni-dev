@@ -713,6 +713,9 @@ def test_scroll_client_is_bounded_and_supports_desktop_paging():
     assert 'thumbIcon("down")' in script
     assert '"Upvote this link"' in script
     assert '"Downvote this link"' in script
+    assert "view set (${count}) →" in script
+    assert "payload.collection_count" in script
+    assert ".reel-collection-link" in css
 
 
 def test_client_loads_timeline_batches_and_autoplays_video():

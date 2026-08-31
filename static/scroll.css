@@ -210,6 +210,15 @@
   font-size: .64rem;
 }
 .reel-meta .recovered { color: #b9e6ce; }
+.reel-collection-link {
+  border-bottom: 1px solid currentColor;
+  color: rgba(255, 255, 255, .9);
+  pointer-events: auto;
+  text-decoration: none;
+  transition: color 130ms ease;
+  white-space: nowrap;
+}
+.reel-collection-link:hover { color: #fff; }
 .reel-message {
   min-height: 1em;
   margin: 6px 0 0;
@@ -249,6 +258,7 @@
 .reel-action[data-action="downvote"]:hover { border-color: var(--red); color: var(--red); }
 .scroll-nav a:focus-visible,
 .scroll-brand:focus-visible,
+.reel-collection-link:focus-visible,
 .reel-action:focus-visible,
 .scroll-search button:focus-visible,
 .scroll-top:focus-visible {
@@ -422,6 +432,7 @@
 @media (prefers-reduced-motion: reduce) {
   .reel-feed { scroll-behavior: auto; }
   .scroll-nav a,
+  .reel-collection-link,
   .scroll-search button,
   .reel-action { transition: none; }
 }

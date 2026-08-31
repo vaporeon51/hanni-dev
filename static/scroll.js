@@ -74,7 +74,7 @@ function renderMeta(meta, item) {
   }
 }
 
-function createMedia(item) {
+function createMedia(item, onResolved = () => {}) {
   const wrapper = document.createElement("div");
   wrapper.className = "reel-media is-loading";
   wrapper.textContent = "loading…";
@@ -171,6 +171,7 @@ function createMedia(item) {
   const showResolvedMedia = (payload) => {
     resolved = payload;
     if (disposed || !wantsLoaded) return;
+    onResolved(payload);
     if (!resolved || !["video", "image"].includes(resolved.kind) || !resolved.url) {
       showSourceLink();
       return;
@@ -340,8 +341,6 @@ function createReel(item) {
   layout.className = "reel-layout";
   const stage = document.createElement("div");
   stage.className = "reel-stage";
-  const media = createMedia(item);
-  stage.appendChild(media.element);
 
   const caption = document.createElement("div");
   caption.className = "reel-caption";
@@ -351,6 +350,18 @@ function createReel(item) {
   const meta = document.createElement("div");
   meta.className = "reel-meta";
   renderMeta(meta, item);
+  const collectionLink = document.createElement("a");
+  collectionLink.className = "reel-collection-link";
+  collectionLink.hidden = true;
+  collectionLink.href = `/?collection=${item.content_link_id}`;
+  meta.appendChild(collectionLink);
+  const media = createMedia(item, (payload) => {
+    const count = Number(payload.collection_count) || 0;
+    if (count < 2) return;
+    collectionLink.textContent = `view set (${count}) →`;
+    collectionLink.hidden = false;
+  });
+  stage.appendChild(media.element);
   const message = document.createElement("p");
   message.className = "reel-message";
   message.setAttribute("aria-live", "polite");

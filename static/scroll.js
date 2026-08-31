@@ -347,14 +347,16 @@ function createReel(item) {
   const title = document.createElement("div");
   title.className = "reel-title";
   title.textContent = item.label || "untitled link";
-  const meta = document.createElement("div");
-  meta.className = "reel-meta";
-  renderMeta(meta, item);
+  const titleRow = document.createElement("div");
+  titleRow.className = "reel-title-row";
   const collectionLink = document.createElement("a");
   collectionLink.className = "reel-collection-link";
   collectionLink.hidden = true;
   collectionLink.href = `/?collection=${item.content_link_id}`;
-  meta.appendChild(collectionLink);
+  titleRow.append(title, collectionLink);
+  const meta = document.createElement("div");
+  meta.className = "reel-meta";
+  renderMeta(meta, item);
   const media = createMedia(item, (payload) => {
     const count = Number(payload.collection_count) || 0;
     if (count < 2) return;
@@ -365,7 +367,7 @@ function createReel(item) {
   const message = document.createElement("p");
   message.className = "reel-message";
   message.setAttribute("aria-live", "polite");
-  caption.append(title, meta, message);
+  caption.append(titleRow, meta, message);
   stage.appendChild(caption);
 
   layout.append(stage, createActions(item));

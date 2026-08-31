@@ -376,31 +376,31 @@
   .scroll-search input {
     padding-block: 4px;
     padding-left: 30px;
-    border-color: rgba(255, 255, 255, .24);
-    background: rgba(37, 27, 32, .7);
-    box-shadow: 0 4px 18px rgba(0, 0, 0, .2);
+    border-color: rgba(255, 255, 255, .18);
+    background: rgba(37, 27, 32, .5);
+    box-shadow: 0 3px 14px rgba(0, 0, 0, .12);
     color: #fff;
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
   }
   .scroll-search input::placeholder {
-    color: rgba(255, 255, 255, .78);
+    color: rgba(255, 255, 255, .82);
     font-size: 13px;
     opacity: 1;
   }
   .scroll-search input:focus {
     border-color: rgba(233, 154, 186, .9);
-    box-shadow: 0 0 0 2px rgba(233, 154, 186, .3), 0 4px 18px rgba(0, 0, 0, .2);
+    box-shadow: 0 0 0 2px rgba(233, 154, 186, .26), 0 3px 14px rgba(0, 0, 0, .12);
   }
   .scroll-filter-icon {
     left: 10px;
-    stroke: rgba(255, 255, 255, .82);
+    stroke: rgba(255, 255, 255, .78);
   }
   .scroll-search button {
     width: 36px;
     padding: 0;
-    border-color: rgba(233, 154, 186, .82);
-    background: rgba(233, 154, 186, .82);
+    border-color: rgba(233, 154, 186, .74);
+    background: rgba(233, 154, 186, .74);
     font-size: .65rem;
   }
   .scroll-search-label { display: none; }
@@ -448,8 +448,8 @@
   .reel-action {
     width: 43px;
     height: 43px;
-    border-color: rgba(255, 255, 255, .2);
-    background: rgba(37, 27, 32, .48);
+    border-color: rgba(255, 255, 255, .16);
+    background: rgba(37, 27, 32, .38);
     box-shadow: none;
     color: #fff;
     backdrop-filter: blur(8px);

@@ -673,6 +673,8 @@ def test_scroll_page_renders_as_a_separate_reel_surface():
     assert 'id="scroll-form"' in response.text
     assert '/static/scroll.css?v=' in response.text
     assert '/static/scroll.js?v=' in response.text
+    assert 'placeholder="idol or group"' in response.text
+    assert 'id="scroll-filter-hint"' not in response.text
 
 
 def test_scroll_client_is_bounded_and_supports_desktop_paging():
@@ -713,6 +715,8 @@ def test_scroll_client_is_bounded_and_supports_desktop_paging():
     assert 'thumbIcon("down")' in script
     assert '"Upvote this link"' in script
     assert '"Downvote this link"' in script
+    assert ".scroll-filter-icon" in css
+    assert ".scroll-filter-hint" not in css
     assert "view set (${count}) →" in script
     assert "payload.collection_count" in script
     assert ".reel-collection-link" in css

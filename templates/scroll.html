@@ -16,19 +16,22 @@
         <span aria-current="page">scroll</span>
       </nav>
       <form id="scroll-form" class="scroll-search" role="search">
-        <label class="sr-only" for="query">Search by member or group</label>
+        <label class="sr-only" for="query">Filter by idol or group</label>
+        <svg class="scroll-filter-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M4 5h16l-6.25 7.1v5.15l-3.5 1.75v-6.9L4 5Z"></path>
+        </svg>
         <input
           id="query"
           name="query"
           type="search"
-          placeholder="search"
+          placeholder="idol or group"
           autocomplete="off"
           autocapitalize="none"
           autocorrect="off"
           spellcheck="false"
           enterkeyhint="search"
         />
-        <button type="submit" aria-label="Search reels">
+        <button type="submit" aria-label="Filter reels">
           <span class="scroll-search-label">go</span>
           <svg class="scroll-search-icon" viewBox="0 0 24 24" aria-hidden="true">
             <circle cx="11" cy="11" r="6.5"></circle>

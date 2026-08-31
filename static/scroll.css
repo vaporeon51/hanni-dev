@@ -376,15 +376,25 @@
   .scroll-search input {
     padding-block: 4px;
     padding-left: 30px;
-    border-color: rgba(236, 222, 228, .72);
-    background: rgba(255, 255, 255, .68);
+    border-color: rgba(255, 255, 255, .24);
+    background: rgba(37, 27, 32, .7);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, .2);
+    color: #fff;
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
   }
-  .scroll-search input::placeholder { font-size: 13px; }
+  .scroll-search input::placeholder {
+    color: rgba(255, 255, 255, .78);
+    font-size: 13px;
+    opacity: 1;
+  }
+  .scroll-search input:focus {
+    border-color: rgba(233, 154, 186, .9);
+    box-shadow: 0 0 0 2px rgba(233, 154, 186, .3), 0 4px 18px rgba(0, 0, 0, .2);
+  }
   .scroll-filter-icon {
     left: 10px;
-    stroke: rgba(51, 39, 45, .68);
+    stroke: rgba(255, 255, 255, .82);
   }
   .scroll-search button {
     width: 36px;

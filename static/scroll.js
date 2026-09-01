@@ -593,7 +593,11 @@ function resetFeed(query) {
   const url = new URL(window.location.href);
   if (query) url.searchParams.set("q", query);
   else url.searchParams.delete("q");
-  window.history.replaceState({}, "", url);
+  window.history.replaceState(
+    { ...(window.history.state || {}), scrollQuery: query },
+    "",
+    url,
+  );
   loadMore({ initial: true });
 }
 
@@ -663,16 +667,22 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
-function queryFromLocation() {
-  return new URL(window.location.href).searchParams.get("q")?.trim() || "";
+function restoredQuery() {
+  const urlQuery = new URL(window.location.href).searchParams.get("q");
+  if (urlQuery !== null) return urlQuery.trim();
+  const historyQuery = window.history.state?.scrollQuery;
+  if (typeof historyQuery === "string") return historyQuery.trim();
+  return state.query;
 }
 
 window.addEventListener("pageshow", () => {
   // Safari may clear autocomplete-off fields when restoring from its
   // back-forward cache even though the filtered URL and reel state survive.
-  $("query").value = queryFromLocation();
+  const restoreInput = () => { $("query").value = restoredQuery(); };
+  restoreInput();
+  window.requestAnimationFrame(restoreInput);
 });
 
-const initialQuery = queryFromLocation();
+const initialQuery = restoredQuery();
 $("query").value = initialQuery;
 resetFeed(initialQuery);

@@ -719,7 +719,9 @@ def test_scroll_client_is_bounded_and_supports_desktop_paging():
     assert 'button[data-filter-query]' in script
     assert "resetFeed(query)" in script
     assert 'window.addEventListener("pageshow"' in script
-    assert "function queryFromLocation()" in script
+    assert "function restoredQuery()" in script
+    assert "scrollQuery: query" in script
+    assert "window.requestAnimationFrame(restoreInput)" in script
     assert ".scroll-filter-icon" in css
     assert ".scroll-filter-hint" not in css
     assert "view set (${count}) →" in script

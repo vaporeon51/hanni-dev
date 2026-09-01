@@ -220,10 +220,17 @@
 }
 .reel-title {
   min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
   font-size: .93rem;
   font-weight: 700;
   line-height: 1.25;
+  pointer-events: auto;
+  text-align: left;
 }
+.reel-title:hover { color: rgba(255, 255, 255, .84); }
 .reel-meta {
   display: flex;
   flex-wrap: wrap;
@@ -235,7 +242,6 @@
 .reel-meta .recovered { color: #b9e6ce; }
 .reel-collection-link {
   flex: none;
-  border-bottom: 1px solid currentColor;
   color: rgba(255, 255, 255, .9);
   font-size: .64rem;
   line-height: 1.25;
@@ -284,6 +290,7 @@
 .reel-action[data-action="downvote"]:hover { border-color: var(--red); color: var(--red); }
 .scroll-nav a:focus-visible,
 .scroll-brand:focus-visible,
+.reel-title:focus-visible,
 .reel-collection-link:focus-visible,
 .reel-action:focus-visible,
 .scroll-search button:focus-visible,
@@ -367,7 +374,7 @@
   .scroll-nav { display: none; }
   .scroll-search {
     width: 100%;
-    max-width: 176px;
+    max-width: 168px;
     justify-self: end;
     transform: translateY(3px);
   }
@@ -376,6 +383,7 @@
   .scroll-search input {
     padding-block: 4px;
     padding-left: 30px;
+    padding-right: 5px;
     border-color: rgba(255, 255, 255, .18);
     background: rgba(37, 27, 32, .5);
     box-shadow: 0 3px 14px rgba(0, 0, 0, .12);
@@ -385,7 +393,7 @@
   }
   .scroll-search input::placeholder {
     color: rgba(255, 255, 255, .82);
-    font-size: 13px;
+    font-size: 11px;
     opacity: 1;
   }
   .scroll-search input:focus {
@@ -397,7 +405,7 @@
     stroke: rgba(255, 255, 255, .78);
   }
   .scroll-search button {
-    width: 36px;
+    width: 34px;
     padding: 0;
     border-color: rgba(233, 154, 186, .74);
     background: rgba(233, 154, 186, .74);
@@ -462,7 +470,7 @@
 
 @media (max-width: 360px) {
   .scroll-topbar { padding-left: 17px; }
-  .scroll-search { max-width: 160px; }
+  .scroll-search { max-width: 152px; }
 }
 
 @media (max-height: 650px) and (min-width: 701px) {

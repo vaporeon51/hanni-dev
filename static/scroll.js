@@ -74,6 +74,15 @@ function renderMeta(meta, item) {
   }
 }
 
+function itemFilterQuery(item) {
+  const values = [item.member_name, item.group_name]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+  return values.filter(
+    (value, index) => values.findIndex((candidate) => candidate.toLocaleLowerCase() === value.toLocaleLowerCase()) === index,
+  ).join(" ");
+}
+
 function createMedia(item, onResolved = () => {}) {
   const wrapper = document.createElement("div");
   wrapper.className = "reel-media is-loading";
@@ -344,9 +353,12 @@ function createReel(item) {
 
   const caption = document.createElement("div");
   caption.className = "reel-caption";
-  const title = document.createElement("div");
+  const title = document.createElement("button");
+  title.type = "button";
   title.className = "reel-title";
   title.textContent = item.label || "untitled link";
+  title.dataset.filterQuery = itemFilterQuery(item);
+  title.setAttribute("aria-label", `Filter scroll to ${title.textContent}`);
   const titleRow = document.createElement("div");
   titleRow.className = "reel-title-row";
   const collectionLink = document.createElement("a");
@@ -607,6 +619,15 @@ $("scroll-form").addEventListener("submit", (event) => {
 });
 
 $("reel-feed").addEventListener("click", (event) => {
+  const titleFilter = event.target.closest("button[data-filter-query]");
+  if (titleFilter) {
+    const query = titleFilter.dataset.filterQuery.trim();
+    if (query) {
+      $("query").value = query;
+      resetFeed(query);
+    }
+    return;
+  }
   const control = event.target.closest("button[data-action]");
   const card = control?.closest(".reel");
   if (card) handleFeedback(card, control);
@@ -642,6 +663,16 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
-const initialQuery = new URL(window.location.href).searchParams.get("q")?.trim() || "";
+function queryFromLocation() {
+  return new URL(window.location.href).searchParams.get("q")?.trim() || "";
+}
+
+window.addEventListener("pageshow", () => {
+  // Safari may clear autocomplete-off fields when restoring from its
+  // back-forward cache even though the filtered URL and reel state survive.
+  $("query").value = queryFromLocation();
+});
+
+const initialQuery = queryFromLocation();
 $("query").value = initialQuery;
 resetFeed(initialQuery);

@@ -715,6 +715,11 @@ def test_scroll_client_is_bounded_and_supports_desktop_paging():
     assert 'thumbIcon("down")' in script
     assert '"Upvote this link"' in script
     assert '"Downvote this link"' in script
+    assert "function itemFilterQuery(item)" in script
+    assert 'button[data-filter-query]' in script
+    assert "resetFeed(query)" in script
+    assert 'window.addEventListener("pageshow"' in script
+    assert "function queryFromLocation()" in script
     assert ".scroll-filter-icon" in css
     assert ".scroll-filter-hint" not in css
     assert "view set (${count}) →" in script

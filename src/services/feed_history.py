@@ -45,3 +45,4 @@ class RecentFeedHistory:
 
 feed_history = RecentFeedHistory()
 scroll_history = RecentFeedHistory(per_visitor_capacity=100)
+link_history = RecentFeedHistory(per_visitor_capacity=100)

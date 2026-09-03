@@ -14,7 +14,7 @@ from typing import Any, Literal
 
 from dotenv import load_dotenv
 from fastapi import Body, FastAPI, HTTPException, Query, Request, Response
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -27,7 +27,7 @@ from src.db.analytics import record_country_session  # noqa: E402
 from src.db.feedback import ContentFeedback, add_content_report, add_content_vote  # noqa: E402
 from src.db.media import get_live_content_url  # noqa: E402
 from src.services.feed import load_feed, load_role_suggestions  # noqa: E402
-from src.services.feed_history import feed_history, scroll_history  # noqa: E402
+from src.services.feed_history import feed_history, link_history, scroll_history  # noqa: E402
 from src.services.collections import load_collection, load_collection_feed, load_collection_preview  # noqa: E402
 from src.services.dead_link_queue import enqueue_priority_url  # noqa: E402
 from src.services.media import (  # noqa: E402
@@ -417,6 +417,41 @@ async def scroll_feed(
         "query": query,
         "cycle_reset": cycle_reset,
     }
+
+
+@app.get("/api/link", response_class=PlainTextResponse)
+async def random_content_link(
+    q: str | None = Query(default=None, max_length=100),
+) -> PlainTextResponse:
+    """Return one random source URL while avoiding recent results per query."""
+
+    query = q.strip() if q else None
+    history_key = query.casefold() if query else "__all__"
+    recent_urls = link_history.recent_urls(history_key)
+    items = await load_feed(
+        query=query,
+        sort="random",
+        limit=1,
+        recent_urls=recent_urls,
+        exclude_recent=True,
+    )
+    if not items and recent_urls:
+        # Narrow searches may exhaust their entire pool before the 100-item
+        # history fills. Begin a new cycle only when no unseen result remains.
+        link_history.clear(history_key)
+        items = await load_feed(
+            query=query,
+            sort="random",
+            limit=1,
+            recent_urls=(),
+            exclude_recent=True,
+        )
+    if not items:
+        raise HTTPException(status_code=404, detail="No content links found")
+
+    item = items[0]
+    link_history.remember(history_key, item.url)
+    return PlainTextResponse(item.url, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/feed/{content_link_id}/media")

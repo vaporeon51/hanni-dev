@@ -12,6 +12,19 @@ from src.services.media import MediaResolutionError, ResolvedMedia
 from src.web import app as web_app
 
 
+def sample_item(*, content_link_id: int, url: str) -> FeedItem:
+    return FeedItem(
+        content_link_id=content_link_id,
+        role_id="role-1",
+        member_name="Karina",
+        group_name="aespa",
+        url=url,
+        original_url=None,
+        uploaded_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        score=1.0,
+    )
+
+
 def test_feed_endpoint_serializes_feed_items(monkeypatch):
     async def fake_load_feed(**kwargs):
         assert kwargs["sort"] == "latest"
@@ -675,6 +688,57 @@ def test_scroll_page_renders_as_a_separate_reel_surface():
     assert '/static/scroll.js?v=' in response.text
     assert 'placeholder="idol or group"' in response.text
     assert 'id="scroll-filter-hint"' not in response.text
+
+
+def test_plain_link_endpoint_avoids_recent_urls_and_returns_source(monkeypatch):
+    calls = []
+
+    async def fake_load_feed(**kwargs):
+        calls.append(kwargs)
+        return [sample_item(content_link_id=len(calls), url=f"https://i.imgur.com/{len(calls)}.mp4")]
+
+    monkeypatch.setattr(web_app, "load_feed", fake_load_feed)
+    web_app.link_history.clear("aespa")
+
+    async def request():
+        transport = httpx.ASGITransport(app=web_app.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            first = await client.get("/api/link?q=Aespa")
+            second = await client.get("/api/link?q=aespa")
+            return first, second
+
+    first, second = asyncio.run(request())
+
+    assert first.status_code == 200
+    assert first.text == "https://i.imgur.com/1.mp4"
+    assert first.headers["content-type"].startswith("text/plain")
+    assert first.headers["cache-control"] == "no-store"
+    assert second.text == "https://i.imgur.com/2.mp4"
+    assert calls[0]["query"] == "Aespa"
+    assert calls[0]["limit"] == 1
+    assert calls[0]["recent_urls"] == ()
+    assert calls[1]["recent_urls"] == ("https://i.imgur.com/1.mp4",)
+
+
+def test_plain_link_endpoint_restarts_an_exhausted_small_pool(monkeypatch):
+    responses = [[], [sample_item(content_link_id=9, url="https://i.imgur.com/repeat.mp4")]]
+
+    async def fake_load_feed(**_kwargs):
+        return responses.pop(0)
+
+    monkeypatch.setattr(web_app, "load_feed", fake_load_feed)
+    web_app.link_history.clear("tiny")
+    web_app.link_history.remember("tiny", "https://i.imgur.com/repeat.mp4")
+
+    async def request():
+        transport = httpx.ASGITransport(app=web_app.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            return await client.get("/api/link?q=tiny")
+
+    response = asyncio.run(request())
+
+    assert response.status_code == 200
+    assert response.text == "https://i.imgur.com/repeat.mp4"
 
 
 def test_scroll_client_is_bounded_and_supports_desktop_paging():

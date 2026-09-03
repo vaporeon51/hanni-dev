@@ -692,12 +692,14 @@ def test_scroll_page_renders_as_a_separate_reel_surface():
 
 def test_plain_link_endpoint_avoids_recent_urls_and_returns_source(monkeypatch):
     calls = []
+    analytics = []
 
     async def fake_load_feed(**kwargs):
         calls.append(kwargs)
         return [sample_item(content_link_id=len(calls), url=f"https://i.imgur.com/{len(calls)}.mp4")]
 
     monkeypatch.setattr(web_app, "load_feed", fake_load_feed)
+    monkeypatch.setattr(web_app, "record_link_request", lambda **kwargs: analytics.append(kwargs))
     web_app.link_history.clear("aespa")
 
     async def request():
@@ -718,15 +720,21 @@ def test_plain_link_endpoint_avoids_recent_urls_and_returns_source(monkeypatch):
     assert calls[0]["limit"] == 1
     assert calls[0]["recent_urls"] == ()
     assert calls[1]["recent_urls"] == ("https://i.imgur.com/1.mp4",)
+    assert analytics == [
+        {"found": True, "cycle_reset": False},
+        {"found": True, "cycle_reset": False},
+    ]
 
 
 def test_plain_link_endpoint_restarts_an_exhausted_small_pool(monkeypatch):
     responses = [[], [sample_item(content_link_id=9, url="https://i.imgur.com/repeat.mp4")]]
+    analytics = []
 
     async def fake_load_feed(**_kwargs):
         return responses.pop(0)
 
     monkeypatch.setattr(web_app, "load_feed", fake_load_feed)
+    monkeypatch.setattr(web_app, "record_link_request", lambda **kwargs: analytics.append(kwargs))
     web_app.link_history.clear("tiny")
     web_app.link_history.remember("tiny", "https://i.imgur.com/repeat.mp4")
 
@@ -739,6 +747,28 @@ def test_plain_link_endpoint_restarts_an_exhausted_small_pool(monkeypatch):
 
     assert response.status_code == 200
     assert response.text == "https://i.imgur.com/repeat.mp4"
+    assert analytics == [{"found": True, "cycle_reset": True}]
+
+
+def test_plain_link_endpoint_records_no_result_without_query_text(monkeypatch):
+    analytics = []
+
+    async def fake_load_feed(**_kwargs):
+        return []
+
+    monkeypatch.setattr(web_app, "load_feed", fake_load_feed)
+    monkeypatch.setattr(web_app, "record_link_request", lambda **kwargs: analytics.append(kwargs))
+    web_app.link_history.clear("missing")
+
+    async def request():
+        transport = httpx.ASGITransport(app=web_app.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            return await client.get("/api/link?q=missing")
+
+    response = asyncio.run(request())
+
+    assert response.status_code == 404
+    assert analytics == [{"found": False, "cycle_reset": False}]
 
 
 def test_scroll_client_is_bounded_and_supports_desktop_paging():

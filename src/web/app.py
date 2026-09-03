@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import secrets
 import time
@@ -13,7 +14,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from dotenv import load_dotenv
-from fastapi import Body, FastAPI, HTTPException, Query, Request, Response
+from fastapi import BackgroundTasks, Body, FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import HTMLResponse, PlainTextResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -23,7 +24,7 @@ load_dotenv(REPO_ROOT / ".env")
 load_dotenv(REPO_ROOT / ".env.local", override=True)
 
 from src.db import POOL  # noqa: E402
-from src.db.analytics import record_country_session  # noqa: E402
+from src.db.analytics import record_country_session, record_link_request  # noqa: E402
 from src.db.feedback import ContentFeedback, add_content_report, add_content_vote  # noqa: E402
 from src.db.media import get_live_content_url  # noqa: E402
 from src.services.feed import load_feed, load_role_suggestions  # noqa: E402
@@ -39,6 +40,7 @@ from src.services.media import (  # noqa: E402
 )
 
 templates = Jinja2Templates(directory=str(REPO_ROOT / "templates"))
+logger = logging.getLogger(__name__)
 
 VISITOR_COOKIE = "hanni_visitor"
 ANALYTICS_SESSION_COOKIE = "hanni_analytics_session"
@@ -86,6 +88,15 @@ _analytics_rate_limiter = _RecentActionRateLimiter(
     ANALYTICS_SESSION_SECONDS,
     ANALYTICS_CACHE_CAPACITY,
 )
+
+
+def _record_link_request_safely(*, found: bool, cycle_reset: bool) -> None:
+    try:
+        record_link_request(found=found, cycle_reset=cycle_reset)
+    except Exception:
+        # Analytics should never turn a successful content request into an
+        # error, including during a deploy before its migration is applied.
+        logger.exception("Could not record /api/link analytics")
 
 
 def _ensure_visitor_cookie(request: Request, response: Response) -> str:
@@ -421,12 +432,13 @@ async def scroll_feed(
 
 @app.get("/api/link", response_class=PlainTextResponse)
 async def random_content_link(
+    background_tasks: BackgroundTasks,
     q: str | None = Query(default=None, max_length=100),
 ) -> PlainTextResponse:
     """Return one random source URL while avoiding recent results per query."""
 
     query = q.strip() if q else None
-    history_key = query.casefold() if query else "__all__"
+    history_key = " ".join(query.casefold().split())[:100] if query else "__all__"
     recent_urls = link_history.recent_urls(history_key)
     items = await load_feed(
         query=query,
@@ -435,10 +447,12 @@ async def random_content_link(
         recent_urls=recent_urls,
         exclude_recent=True,
     )
+    cycle_reset = False
     if not items and recent_urls:
         # Narrow searches may exhaust their entire pool before the 100-item
         # history fills. Begin a new cycle only when no unseen result remains.
         link_history.clear(history_key)
+        cycle_reset = True
         items = await load_feed(
             query=query,
             sort="random",
@@ -447,11 +461,25 @@ async def random_content_link(
             exclude_recent=True,
         )
     if not items:
+        await asyncio.to_thread(
+            _record_link_request_safely,
+            found=False,
+            cycle_reset=cycle_reset,
+        )
         raise HTTPException(status_code=404, detail="No content links found")
 
     item = items[0]
     link_history.remember(history_key, item.url)
-    return PlainTextResponse(item.url, headers={"Cache-Control": "no-store"})
+    background_tasks.add_task(
+        _record_link_request_safely,
+        found=True,
+        cycle_reset=cycle_reset,
+    )
+    return PlainTextResponse(
+        item.url,
+        headers={"Cache-Control": "no-store"},
+        background=background_tasks,
+    )
 
 
 @app.get("/api/feed/{content_link_id}/media")

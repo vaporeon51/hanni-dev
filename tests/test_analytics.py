@@ -53,3 +53,19 @@ def test_country_session_increments_one_daily_aggregate(monkeypatch):
     assert "ON CONFLICT (analytics_date, country_code)" in cursor.query
     assert "session_count = web_analytics_daily.session_count + 1" in cursor.query
     assert cursor.params == ("US",)
+
+
+def test_link_request_increments_daily_query_outcomes(monkeypatch):
+    pool = FakePool()
+    monkeypatch.setattr(analytics_db, "POOL", pool)
+
+    count = analytics_db.record_link_request(
+        found=True,
+        cycle_reset=False,
+    )
+
+    cursor = pool.connection_instance.cursor_instance
+    assert count == 7
+    assert "ON CONFLICT (analytics_date)" in cursor.query
+    assert "success_count = api_link_analytics_daily.success_count" in cursor.query
+    assert cursor.params == (1, 0, 0)

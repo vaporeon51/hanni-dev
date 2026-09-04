@@ -29,6 +29,7 @@ from src.db import POOL  # noqa: E402
 from src.db.dead_links import get_candidates_by_urls, get_due_urls, record_check  # noqa: E402
 from src.db.locks import advisory_lock  # noqa: E402
 from src.services.discord_embed_probe import post_discord_notice, probe_discord_embed  # noqa: E402
+from src.services.discord_feed_commands import discord_feed_command_loop  # noqa: E402
 from src.services.dead_link_queue import take_priority_urls  # noqa: E402
 
 
@@ -123,8 +124,8 @@ async def _run_blocking(
         print(f"{name} failed: {type(error).__name__}: {error}", flush=True)
 
 
-async def scheduler_loop() -> None:
-    """Run jobs continuously when the app is deployed as the one-dyno version."""
+async def _scheduled_jobs_loop() -> None:
+    """Run the periodic ingestion, dead-link, and recovery jobs."""
 
     last_ingestion = 0.0
     last_dead_links = 0.0
@@ -150,9 +151,20 @@ async def scheduler_loop() -> None:
         await asyncio.sleep(min(5, max(0.1, float(DEAD_LINK_RUN_INTERVAL_SECONDS))))
 
 
+async def scheduler_loop() -> None:
+    """Run all background services together in the one-dyno deployment."""
+
+    await asyncio.gather(_scheduled_jobs_loop(), discord_feed_command_loop())
+
+
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run Hanni background jobs")
-    parser.add_argument("job", choices=("ingest", "dead-links", "recovery", "all", "scheduler"), default="all", nargs="?")
+    parser.add_argument(
+        "job",
+        choices=("ingest", "dead-links", "recovery", "feed-commands", "all", "scheduler"),
+        default="all",
+        nargs="?",
+    )
     return parser.parse_args(argv)
 
 
@@ -162,6 +174,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.job == "scheduler":
             asyncio.run(scheduler_loop())
+        elif args.job == "feed-commands":
+            asyncio.run(discord_feed_command_loop())
         elif args.job == "ingest":
             print(run_ingestion_once())
         elif args.job == "dead-links":

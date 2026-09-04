@@ -26,7 +26,7 @@ def _channel_id() -> str:
     return os.getenv("DISCORD_CONTENT_CHANNEL_ID", DISCORD_CONTENT_CHANNEL_ID).strip()
 
 
-def _get_messages(params: dict[str, str | int]) -> list[dict[str, Any]]:
+def _get_messages(params: dict[str, str | int], *, channel_id: str | None = None) -> list[dict[str, Any]]:
     """Fetch one history page, honoring rate limits and retrying transient failures."""
 
     transient_attempts = 0
@@ -34,7 +34,7 @@ def _get_messages(params: dict[str, str | int]) -> list[dict[str, Any]]:
         response = None
         try:
             response = requests.get(
-                f"{DISCORD_API_BASE}/channels/{_channel_id()}/messages",
+                f"{DISCORD_API_BASE}/channels/{channel_id or _channel_id()}/messages",
                 params=params,
                 headers={"authorization": _user_auth()},
                 timeout=(10, 30),
@@ -88,8 +88,21 @@ def get_messages_after(after_message_id: str) -> list[dict[str, Any]]:
     return _get_messages({"limit": 100, "after": after_message_id})
 
 
+def get_channel_messages(
+    channel_id: str,
+    *,
+    after_message_id: str | None = None,
+    limit: int = 100,
+) -> list[dict[str, Any]]:
+    """Fetch a page from an explicitly configured Discord channel."""
+
+    params: dict[str, str | int] = {"limit": min(max(int(limit), 1), 100)}
+    if after_message_id:
+        params["after"] = after_message_id
+    return _get_messages(params, channel_id=channel_id)
+
+
 def get_messages_around(message_id: str, limit: int = 100) -> list[dict[str, Any]]:
     """Get nearby history to prime the continuation classifier."""
 
     return _get_messages({"limit": min(max(limit, 1), 100), "around": message_id})
-

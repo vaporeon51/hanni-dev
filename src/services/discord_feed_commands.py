@@ -14,6 +14,7 @@ from src.config.constants import (
     MIN_CONTENT_AGE,
 )
 from src.db.feed import FeedItem, get_feed_items
+from src.db.locks import advisory_lock
 from src.services.dead_link_queue import enqueue_priority_url
 from src.services.discord_embed_probe import post_discord_notice
 from src.services.feed_history import discord_feed_history
@@ -141,18 +142,24 @@ class DiscordFeedCommandListener:
 
 
 async def discord_feed_command_loop() -> None:
-    """Poll continuously without blocking the scheduler's other jobs."""
+    """Run one active listener across every web/worker process.
+
+    Heroku may start multiple Uvicorn workers inside one dyno. Each process has
+    its own cursor, so a Postgres advisory lock elects one active listener and
+    lets a standby take over if that process exits.
+    """
 
     if not DISCORD_FEED_CHANNEL_ID or not DISCORD_FEED_WEBHOOK_URL:
         return
-    listener = DiscordFeedCommandListener()
-    announced = False
     while True:
-        try:
-            await asyncio.to_thread(listener.poll_once)
-            if not announced:
+        with advisory_lock("hanni:discord-feed-command-listener") as acquired:
+            if acquired:
+                listener = DiscordFeedCommandListener()
                 print(f"Discord feed listener active for channel {DISCORD_FEED_CHANNEL_ID}.", flush=True)
-                announced = True
-        except Exception as error:
-            print(f"Discord feed listener failed: {type(error).__name__}: {error}", flush=True)
+                while True:
+                    try:
+                        await asyncio.to_thread(listener.poll_once)
+                    except Exception as error:
+                        print(f"Discord feed listener failed: {type(error).__name__}: {error}", flush=True)
+                    await asyncio.sleep(COMMAND_POLL_SECONDS + random.random())
         await asyncio.sleep(COMMAND_POLL_SECONDS + random.random())

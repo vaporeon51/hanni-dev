@@ -2,6 +2,8 @@ const BATCH_SIZE = 8;
 const MAX_MOUNTED_REELS = 24;
 const CLIENT_HISTORY_CAPACITY = 100;
 const MEDIA_RETRY_DELAYS_MS = [1500, 4000, 9000];
+const AUTOPLAY_STORAGE_KEY = "hanni-scroll-autoplay-ms";
+const AUTOPLAY_DURATIONS_MS = [0, 5000, 10000, 20000];
 const state = {
   cards: [],
   activeCard: null,
@@ -13,6 +15,10 @@ const state = {
   wheelLocked: false,
   wheelUnlockTimer: null,
   trimTimer: null,
+  autoplayTimer: null,
+  autoplayRaf: 0,
+  autoplayStart: 0,
+  autoplayDurationMs: 0,
   seenQueue: [],
   seenUrls: new Set(),
   spacer: null,
@@ -340,6 +346,137 @@ function createActions(item) {
   return actions;
 }
 
+function autoplayEnabled() {
+  return state.autoplayDurationMs > 0 && !reducedMotionQuery.matches;
+}
+
+function setProgressScale(bar, ratio) {
+  if (!bar) return;
+  bar.style.transform = `scaleX(${Math.min(1, Math.max(0, ratio))})`;
+}
+
+function clearAutoplayTimers() {
+  if (state.autoplayTimer !== null) {
+    window.clearTimeout(state.autoplayTimer);
+    state.autoplayTimer = null;
+  }
+  if (state.autoplayRaf) {
+    window.cancelAnimationFrame(state.autoplayRaf);
+    state.autoplayRaf = 0;
+  }
+  if (state.activeCard) setProgressScale(state.activeCard._progressBar, 0);
+}
+
+function activeMediaReady(card) {
+  const media = card?.querySelector(".reel-media");
+  return Boolean(media) && !media.classList.contains("is-loading");
+}
+
+function tickAutoplayProgress() {
+  state.autoplayRaf = 0;
+  if (!autoplayEnabled() || !state.activeCard || document.hidden) return;
+  if (!activeMediaReady(state.activeCard)) {
+    state.autoplayStart = window.performance.now();
+    setProgressScale(state.activeCard._progressBar, 0);
+  } else {
+    const elapsed = window.performance.now() - state.autoplayStart;
+    setProgressScale(state.activeCard._progressBar, elapsed / state.autoplayDurationMs);
+  }
+  state.autoplayRaf = window.requestAnimationFrame(tickAutoplayProgress);
+}
+
+function advanceAutoplay() {
+  state.autoplayTimer = null;
+  if (!autoplayEnabled() || document.hidden) return;
+  navigateBy(1);
+  state.autoplayStart = window.performance.now();
+  state.autoplayTimer = window.setTimeout(advanceAutoplay, state.autoplayDurationMs);
+}
+
+function scheduleAutoplay() {
+  clearAutoplayTimers();
+  if (!autoplayEnabled() || !state.activeCard || document.hidden) return;
+  state.autoplayStart = window.performance.now();
+  state.autoplayTimer = window.setTimeout(advanceAutoplay, state.autoplayDurationMs);
+  state.autoplayRaf = window.requestAnimationFrame(tickAutoplayProgress);
+}
+
+function refreshAutoplayChrome() {
+  const root = $("autoplay");
+  if (!root) return;
+  root.dataset.duration = String(state.autoplayDurationMs);
+  const label = state.autoplayDurationMs === 0 ? "off" : `${Math.round(state.autoplayDurationMs / 1000)}s`;
+  $("autoplay-label").textContent = label;
+  $("autoplay-toggle").setAttribute("aria-label", `Autoplay next reel: ${label.toLowerCase()}`);
+  root.querySelectorAll("#autoplay-menu button").forEach((option) => {
+    option.setAttribute("aria-checked", String(Number(option.dataset.duration) === state.autoplayDurationMs));
+  });
+  const on = autoplayEnabled();
+  state.cards.forEach((card) => {
+    card.querySelector(".autoplay-progress")?.classList.toggle("is-on", on && card === state.activeCard);
+  });
+}
+
+function setAutoplayDuration(durationMs, { silent = false } = {}) {
+  if (!AUTOPLAY_DURATIONS_MS.includes(durationMs)) return;
+  state.autoplayDurationMs = durationMs;
+  try {
+    window.localStorage.setItem(AUTOPLAY_STORAGE_KEY, String(durationMs));
+  } catch (_) {}
+  refreshAutoplayChrome();
+  scheduleAutoplay();
+  if (!silent) announce(durationMs === 0 ? "autoplay off" : `autoplay every ${Math.round(durationMs / 1000)} seconds`);
+}
+
+function initAutoplay() {
+  const root = $("autoplay");
+  if (!root) return;
+  let stored = 0;
+  try {
+    stored = Number(window.localStorage.getItem(AUTOPLAY_STORAGE_KEY)) || 0;
+  } catch (_) {}
+  if (!AUTOPLAY_DURATIONS_MS.includes(stored)) stored = 0;
+  state.autoplayDurationMs = reducedMotionQuery.matches ? 0 : stored;
+  refreshAutoplayChrome();
+  const toggle = $("autoplay-toggle");
+  const menu = $("autoplay-menu");
+  const closeMenu = () => {
+    menu.hidden = true;
+    toggle.setAttribute("aria-expanded", "false");
+  };
+  toggle.addEventListener("click", () => {
+    const open = menu.hidden;
+    menu.hidden = !open;
+    toggle.setAttribute("aria-expanded", String(open));
+    if (open) menu.querySelector('button[aria-checked="true"]')?.focus();
+  });
+  menu.addEventListener("click", (event) => {
+    const option = event.target.closest("button[data-duration]");
+    if (!option) return;
+    setAutoplayDuration(Number(option.dataset.duration));
+    closeMenu();
+    toggle.focus();
+  });
+  document.addEventListener("click", (event) => {
+    if (!menu.hidden && !root.contains(event.target)) closeMenu();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !menu.hidden) {
+      closeMenu();
+      toggle.focus();
+    }
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) clearAutoplayTimers();
+    else scheduleAutoplay();
+  });
+  reducedMotionQuery.addEventListener?.("change", (event) => {
+    if (event.matches) clearAutoplayTimers();
+    refreshAutoplayChrome();
+    scheduleAutoplay();
+  });
+}
+
 function createReel(item) {
   const card = document.createElement("article");
   card.className = "reel";
@@ -350,6 +487,12 @@ function createReel(item) {
   layout.className = "reel-layout";
   const stage = document.createElement("div");
   stage.className = "reel-stage";
+  const progress = document.createElement("div");
+  progress.className = "autoplay-progress";
+  progress.setAttribute("aria-hidden", "true");
+  const progressBar = document.createElement("div");
+  progressBar.className = "autoplay-progress-bar";
+  progress.appendChild(progressBar);
 
   const caption = document.createElement("div");
   caption.className = "reel-caption";
@@ -376,6 +519,7 @@ function createReel(item) {
     collectionLink.hidden = false;
   });
   stage.appendChild(media.element);
+  stage.appendChild(progress);
   const message = document.createElement("p");
   message.className = "reel-message";
   message.setAttribute("aria-live", "polite");
@@ -385,6 +529,7 @@ function createReel(item) {
   layout.append(stage, createActions(item));
   card.appendChild(layout);
   card._media = media;
+  card._progressBar = progressBar;
   return card;
 }
 
@@ -477,8 +622,14 @@ function scheduleMountedCardTrim() {
 
 function setActiveCard(card) {
   if (!card || card === state.activeCard) return;
+  state.activeCard?.classList.remove("is-active");
   state.activeCard?._media.pause();
   state.activeCard = card;
+  card.classList.add("is-active");
+  const on = autoplayEnabled();
+  state.cards.forEach((candidate) => {
+    candidate.querySelector(".autoplay-progress")?.classList.toggle("is-on", on && candidate === card);
+  });
   const index = state.cards.indexOf(card);
   state.cards.forEach((candidate, candidateIndex) => {
     const distance = Math.abs(candidateIndex - index);
@@ -492,6 +643,7 @@ function setActiveCard(card) {
   });
   if (index >= state.cards.length - 3) loadMore();
   scheduleMountedCardTrim();
+  scheduleAutoplay();
 }
 
 const reelObserver = new IntersectionObserver((entries) => {
@@ -580,6 +732,7 @@ function resetFeed(query) {
   state.wheelLocked = false;
   state.loading = false;
   state.activeCard = null;
+  clearAutoplayTimers();
   state.query = query;
   state.seenQueue = [];
   state.seenUrls.clear();
@@ -635,6 +788,7 @@ $("reel-feed").addEventListener("click", (event) => {
   const control = event.target.closest("button[data-action]");
   const card = control?.closest(".reel");
   if (card) handleFeedback(card, control);
+  if (card) scheduleAutoplay();
 });
 
 $("reel-feed").addEventListener("wheel", (event) => {
@@ -683,6 +837,7 @@ window.addEventListener("pageshow", () => {
   window.requestAnimationFrame(restoreInput);
 });
 
+initAutoplay();
 const initialQuery = restoredQuery();
 $("query").value = initialQuery;
 resetFeed(initialQuery);

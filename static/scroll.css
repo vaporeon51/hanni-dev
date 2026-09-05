@@ -299,6 +299,8 @@
 .reel-collection-link:focus-visible,
 .reel-action:focus-visible,
 .scroll-search button:focus-visible,
+.autoplay-toggle:focus-visible,
+.autoplay-menu button:focus-visible,
 .scroll-top:focus-visible {
   outline: 2px solid var(--pink);
   outline-offset: 2px;
@@ -338,6 +340,97 @@
 }
 .scroll-status[hidden] { display: none; }
 .scroll-top { display: none; }
+.autoplay {
+  position: fixed;
+  z-index: 40;
+  right: 22px;
+  bottom: max(18px, env(safe-area-inset-bottom));
+}
+.autoplay-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 7px 14px 7px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 250, 251, .94);
+  box-shadow: 0 8px 28px rgba(82, 45, 60, .13);
+  color: var(--muted);
+  font-size: .68rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.autoplay-toggle:hover { border-color: var(--pink); color: var(--pink-dark); }
+.autoplay[data-duration="0"] .autoplay-toggle { font-weight: 400; }
+.autoplay[data-duration]:not([data-duration="0"]) .autoplay-toggle {
+  border-color: var(--pink);
+  color: var(--pink-dark);
+}
+.autoplay-icon {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.autoplay-prefix {
+  font-weight: 400;
+  opacity: .8;
+}
+.autoplay-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  display: flex;
+  gap: 4px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 250, 251, .97);
+  box-shadow: 0 8px 28px rgba(82, 45, 60, .16);
+}
+.autoplay-menu[hidden] { display: none; }
+.autoplay-menu button {
+  min-width: 44px;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  font-size: .68rem;
+  font-weight: 700;
+}
+.autoplay-menu button:hover { border-color: var(--line); color: var(--text); }
+.autoplay-menu button[aria-checked="true"] {
+  border-color: var(--pink);
+  background: var(--pink-soft);
+  color: var(--pink-dark);
+}
+.autoplay-progress {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 18px 18px 0 0;
+  background: rgba(255, 255, 255, .22);
+  opacity: 0;
+  pointer-events: none;
+}
+.autoplay-progress-bar {
+  width: 100%;
+  height: 100%;
+  background: var(--pink);
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+.reel.is-active .autoplay-progress.is-on { opacity: 1; }
 
 @media (min-width: 1000px) {
   .reel-layout { transform: translateX(29px); }
@@ -472,6 +565,47 @@
   .reel-action-label { color: rgba(255, 255, 255, .66); }
   .reel-score { color: rgba(255, 255, 255, .76); }
   .scroll-status { bottom: max(16px, calc(env(safe-area-inset-bottom) + 8px)); }
+  .autoplay {
+    top: calc(max(54px, env(safe-area-inset-top)) + 10px);
+    right: 12px;
+    bottom: auto;
+    left: auto;
+  }
+  .autoplay-toggle {
+    min-height: 32px;
+    padding: 5px 12px 5px 10px;
+    border-color: rgba(255, 255, 255, .18);
+    background: rgba(37, 27, 32, .5);
+    box-shadow: 0 3px 14px rgba(0, 0, 0, .12);
+    color: #fff;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  .autoplay-toggle:hover { border-color: rgba(233, 154, 186, .9); color: #fff; }
+  .autoplay-prefix { display: none; }
+  .autoplay[data-duration]:not([data-duration="0"]) .autoplay-toggle {
+    border-color: rgba(233, 154, 186, .9);
+    background: rgba(233, 154, 186, .85);
+    color: #fff;
+  }
+  .autoplay-menu {
+    top: calc(100% + 8px);
+    right: 0;
+    bottom: auto;
+    left: auto;
+    border-color: rgba(255, 255, 255, .18);
+    background: rgba(37, 27, 32, .82);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  .autoplay-menu button { color: rgba(255, 255, 255, .8); }
+  .autoplay-menu button:hover { border-color: rgba(255, 255, 255, .25); color: #fff; }
+  .autoplay-menu button[aria-checked="true"] {
+    border-color: rgba(233, 154, 186, .9);
+    background: rgba(233, 154, 186, .28);
+    color: #fff;
+  }
+  .autoplay-progress { border-radius: 15px 15px 0 0; }
 }
 
 @media (max-width: 360px) {
@@ -490,5 +624,7 @@
   .scroll-nav a,
   .reel-collection-link,
   .scroll-search button,
+  .autoplay-toggle,
+  .autoplay-menu button,
   .reel-action { transition: none; }
 }

@@ -44,6 +44,22 @@
     <main id="reel-feed" class="reel-feed" aria-live="polite" aria-label="Scrolling content feed"></main>
     <div id="scroll-status" class="scroll-status" role="status" aria-live="polite" hidden></div>
     <button id="scroll-top" class="scroll-top" type="button" aria-label="Return to first reel" hidden>↑ top</button>
+    <div id="autoplay" class="autoplay" data-duration="0">
+      <button id="autoplay-toggle" class="autoplay-toggle" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Autoplay next reel: off">
+        <svg class="autoplay-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <circle cx="12" cy="12" r="8.5"></circle>
+          <path d="M12 7.5V12l3 2"></path>
+        </svg>
+        <span class="autoplay-prefix" aria-hidden="true">autoplay:</span>
+        <span id="autoplay-label" class="autoplay-label">off</span>
+      </button>
+      <div id="autoplay-menu" class="autoplay-menu" role="radiogroup" aria-label="Autoplay interval" hidden>
+        <button type="button" role="radio" data-duration="0" aria-checked="true">off</button>
+        <button type="button" role="radio" data-duration="5000" aria-checked="false">5s</button>
+        <button type="button" role="radio" data-duration="10000" aria-checked="false">10s</button>
+        <button type="button" role="radio" data-duration="20000" aria-checked="false">20s</button>
+      </div>
+    </div>
 
     <script src="/static/analytics.js?v={{ static_version }}" defer></script>
     <script src="/static/scroll.js?v={{ static_version }}" defer></script>

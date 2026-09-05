@@ -349,15 +349,15 @@
 .autoplay-toggle {
   display: flex;
   align-items: center;
-  gap: 7px;
-  min-height: 36px;
-  padding: 7px 14px 7px 11px;
+  gap: 8px;
+  min-height: 42px;
+  padding: 9px 18px 9px 14px;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: rgba(255, 250, 251, .94);
   box-shadow: 0 8px 28px rgba(82, 45, 60, .13);
   color: var(--muted);
-  font-size: .68rem;
+  font-size: .76rem;
   font-weight: 700;
   white-space: nowrap;
 }
@@ -368,8 +368,8 @@
   color: var(--pink-dark);
 }
 .autoplay-icon {
-  width: 15px;
-  height: 15px;
+  width: 17px;
+  height: 17px;
   fill: none;
   stroke: currentColor;
   stroke-width: 2;
@@ -394,14 +394,14 @@
 }
 .autoplay-menu[hidden] { display: none; }
 .autoplay-menu button {
-  min-width: 44px;
-  min-height: 34px;
-  padding: 6px 10px;
+  min-width: 48px;
+  min-height: 38px;
+  padding: 7px 11px;
   border: 1px solid transparent;
-  border-radius: 9px;
+  border-radius: 10px;
   background: transparent;
   color: var(--muted);
-  font-size: .68rem;
+  font-size: .72rem;
   font-weight: 700;
 }
 .autoplay-menu button:hover { border-color: var(--line); color: var(--text); }
@@ -598,7 +598,7 @@
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
   }
-  .autoplay-menu button { color: rgba(255, 255, 255, .8); }
+  .autoplay-menu button { min-width: 44px; min-height: 34px; padding: 6px 10px; border-radius: 9px; color: rgba(255, 255, 255, .8); font-size: .68rem; }
   .autoplay-menu button:hover { border-color: rgba(255, 255, 255, .25); color: #fff; }
   .autoplay-menu button[aria-checked="true"] {
     border-color: rgba(233, 154, 186, .9);

@@ -1,5 +1,5 @@
-const BATCH_SIZE = 8;
-const MAX_MOUNTED_REELS = 24;
+const BATCH_SIZE = 9;
+const MAX_MOUNTED_ROWS = 12;
 const CLIENT_HISTORY_CAPACITY = 100;
 const MEDIA_RETRY_DELAYS_MS = [1500, 4000, 9000];
 const AUTOPLAY_STORAGE_KEY = "hanni-scroll-autoplay-ms";
@@ -28,6 +28,44 @@ const state = {
 const $ = (id) => document.getElementById(id);
 const dateFormatter = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
 const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+const collageQuery = window.matchMedia("(min-width: 1024px)");
+const VIEW_STORAGE_KEY = "hanni-scroll-view";
+let viewMode = "feed";
+function collageColumns() {
+  return viewMode === "collage" && collageQuery.matches ? 3 : 1;
+}
+function applyViewMode(mode, { silent = false } = {}) {
+  viewMode = mode === "collage" ? "collage" : "feed";
+  const on = viewMode === "collage";
+  try {
+    window.localStorage.setItem(VIEW_STORAGE_KEY, viewMode);
+  } catch (_) {}
+  document.body.dataset.scrollMode = on ? "collage" : "feed";
+  const toggle = $("view-toggle");
+  if (toggle) {
+    toggle.setAttribute("aria-pressed", String(on));
+    toggle.setAttribute("aria-label", on ? "Collage mode: on" : "Collage mode: off");
+    const stateLabel = toggle.querySelector("#view-state");
+    if (stateLabel) stateLabel.textContent = on ? "on" : "off";
+  }
+  if (!silent) announce(on ? "collage mode on" : "collage mode off");
+}
+function initViewMode() {
+  let stored = "feed";
+  try {
+    stored = window.localStorage.getItem(VIEW_STORAGE_KEY) || "feed";
+  } catch (_) {}
+  applyViewMode(stored, { silent: true });
+  $("view-toggle")?.addEventListener("click", () => {
+    const next = viewMode === "collage" ? "feed" : "collage";
+    if (next === viewMode) return;
+    applyViewMode(next);
+    resetFeed(state.query);
+  });
+}
+function rowProgressBars(row) {
+  return [...(row?._progressBars || []), ...(row?._rowBar ? [row._rowBar] : [])];
+}
 
 function formatDate(value) {
   if (!value) return null;
@@ -105,6 +143,7 @@ function createMedia(item, onResolved = () => {}) {
   let disposed = false;
 
   const fitInsideStage = () => {
+    if (collageColumns() > 1) return;
     if (!media) return;
     const intrinsicWidth = media.tagName === "VIDEO" ? media.videoWidth : media.naturalWidth;
     const intrinsicHeight = media.tagName === "VIDEO" ? media.videoHeight : media.naturalHeight;
@@ -364,23 +403,23 @@ function clearAutoplayTimers() {
     window.cancelAnimationFrame(state.autoplayRaf);
     state.autoplayRaf = 0;
   }
-  if (state.activeCard) setProgressScale(state.activeCard._progressBar, 0);
+  rowProgressBars(state.activeCard).forEach((bar) => setProgressScale(bar, 0));
 }
 
-function activeMediaReady(card) {
-  const media = card?.querySelector(".reel-media");
-  return Boolean(media) && !media.classList.contains("is-loading");
+function activeMediaReady(row) {
+  return Boolean(row) && !row.querySelector(".reel-media.is-loading");
 }
 
 function tickAutoplayProgress() {
   state.autoplayRaf = 0;
   if (!autoplayEnabled() || !state.activeCard || document.hidden) return;
+  const bars = rowProgressBars(state.activeCard);
   if (!activeMediaReady(state.activeCard)) {
     state.autoplayStart = window.performance.now();
-    setProgressScale(state.activeCard._progressBar, 0);
+    bars.forEach((bar) => setProgressScale(bar, 0));
   } else {
     const elapsed = window.performance.now() - state.autoplayStart;
-    setProgressScale(state.activeCard._progressBar, elapsed / state.autoplayDurationMs);
+    bars.forEach((bar) => setProgressScale(bar, elapsed / state.autoplayDurationMs));
   }
   state.autoplayRaf = window.requestAnimationFrame(tickAutoplayProgress);
 }
@@ -412,8 +451,9 @@ function refreshAutoplayChrome() {
     option.setAttribute("aria-checked", String(Number(option.dataset.duration) === state.autoplayDurationMs));
   });
   const on = autoplayEnabled();
-  state.cards.forEach((card) => {
-    card.querySelector(".autoplay-progress")?.classList.toggle("is-on", on && card === state.activeCard);
+  state.cards.forEach((row) => {
+    const active = on && row === state.activeCard;
+    row.querySelectorAll(".autoplay-progress").forEach((panel) => panel.classList.toggle("is-on", active));
   });
 }
 
@@ -477,14 +517,12 @@ function initAutoplay() {
   });
 }
 
-function createReel(item) {
-  const card = document.createElement("article");
-  card.className = "reel";
-  card.dataset.contentLinkId = String(item.content_link_id);
-  card._item = item;
+function createReelCell(item) {
+  const cell = document.createElement("div");
+  cell.className = "reel-layout";
+  cell.dataset.contentLinkId = String(item.content_link_id);
+  cell._item = item;
 
-  const layout = document.createElement("div");
-  layout.className = "reel-layout";
   const stage = document.createElement("div");
   stage.className = "reel-stage";
   const progress = document.createElement("div");
@@ -526,12 +564,116 @@ function createReel(item) {
   caption.append(titleRow, meta, message);
   stage.appendChild(caption);
 
-  layout.append(stage, createActions(item));
-  card.appendChild(layout);
-  card._media = media;
-  card._progressBar = progressBar;
-  return card;
+  cell.append(stage, createActions(item));
+  cell._media = media;
+  cell._progressBar = progressBar;
+  return cell;
 }
+
+function createReelRow(cells) {
+  const row = document.createElement("article");
+  row.className = "reel";
+  const grid = document.createElement("div");
+  grid.className = "reel-grid";
+  if (collageColumns() > 1 && cells.length < collageColumns()) grid.classList.add(`is-partial-${cells.length}`);
+  grid.append(...cells);
+  const rowProgress = document.createElement("div");
+  rowProgress.className = "autoplay-progress reel-row-progress";
+  rowProgress.setAttribute("aria-hidden", "true");
+  const rowBar = document.createElement("div");
+  rowBar.className = "autoplay-progress-bar";
+  rowProgress.appendChild(rowBar);
+  grid.prepend(rowProgress);
+  row.appendChild(grid);
+  row._cells = cells;
+  row._progressBars = cells.map((cell) => cell._progressBar);
+  row._rowBar = rowBar;
+  cells[0]?.classList.add("is-first-cell");
+  cells[cells.length - 1]?.classList.add("is-last-cell");
+  return row;
+}
+
+let lightboxOpener = null;
+
+function openLightbox(cell) {
+  const box = $("lightbox");
+  const media = cell.querySelector(".reel-media img, .reel-media video");
+  if (!box || !media || !box.hidden) return;
+  const item = cell._item;
+  box.dataset.contentLinkId = cell.dataset.contentLinkId;
+  box._item = item;
+  const stage = $("lightbox-stage");
+  stage.replaceChildren();
+  const clone = media.cloneNode(true);
+  clone.removeAttribute("id");
+  clone.style.width = "";
+  clone.style.height = "";
+  if (clone.tagName === "VIDEO") {
+    clone.muted = true;
+    clone.loop = true;
+    clone.controls = false;
+    clone.playsInline = true;
+    clone.preload = "auto";
+    clone.play().catch(() => {});
+  }
+  stage.appendChild(clone);
+  const title = $("lightbox-title");
+  title.textContent = item.label || "untitled link";
+  title.dataset.filterQuery = itemFilterQuery(item);
+  title.setAttribute("aria-label", `Filter scroll to ${title.textContent}`);
+  const sourceLink = cell.querySelector(".reel-collection-link");
+  const collection = $("lightbox-collection");
+  if (sourceLink && !sourceLink.hidden) {
+    collection.textContent = sourceLink.textContent;
+    collection.href = sourceLink.href;
+    collection.hidden = false;
+  } else {
+    collection.hidden = true;
+  }
+  renderMeta($("lightbox-meta"), item);
+  setCardMessage(box, "");
+  const actions = $("lightbox-actions");
+  actions.replaceChildren();
+  actions.appendChild(createActions(item));
+  const score = cell.querySelector('[data-count="vote-score"]');
+  if (score) {
+    const live = actions.querySelector('[data-count="vote-score"]');
+    if (live) live.textContent = score.textContent;
+  }
+  lightboxOpener = cell;
+  box.hidden = false;
+  clearAutoplayTimers();
+  $("lightbox-close").focus();
+}
+
+function closeLightbox({ refocus = true } = {}) {
+  const box = $("lightbox");
+  if (!box || box.hidden) return;
+  box.querySelectorAll("video").forEach((video) => video.pause());
+  $("lightbox-stage").replaceChildren();
+  box.hidden = true;
+  scheduleAutoplay();
+  if (refocus) lightboxOpener?.querySelector(".reel-title")?.focus();
+}
+
+$("lightbox").addEventListener("click", (event) => {
+  if (event.target.closest("[data-lightbox-close]")) {
+    closeLightbox();
+    return;
+  }
+  const titleFilter = event.target.closest("button[data-filter-query]");
+  if (titleFilter) {
+    const query = titleFilter.dataset.filterQuery.trim();
+    closeLightbox({ refocus: false });
+    if (query) {
+      $("query").value = query;
+      resetFeed(query);
+    }
+    return;
+  }
+  const control = event.target.closest("button[data-action]");
+  if (control) handleFeedback($("lightbox"), control);
+});
 
 function setCardMessage(card, text) {
   card.querySelector(".reel-message").textContent = text;
@@ -594,21 +736,21 @@ async function handleFeedback(card, control) {
   }
 }
 
-function disposeCard(card) {
-  reelObserver.unobserve(card);
-  card._media.dispose();
-  card.remove();
+function disposeRow(row) {
+  reelObserver.unobserve(row);
+  row._cells.forEach((cell) => cell._media.dispose());
+  row.remove();
 }
 
 function trimMountedCards() {
   const activeIndex = state.cards.indexOf(state.activeCard);
-  if (state.cards.length <= MAX_MOUNTED_REELS || activeIndex < 10) return;
-  const removeCount = Math.min(8, activeIndex - 4);
+  if (state.cards.length <= MAX_MOUNTED_ROWS || activeIndex < 4) return;
+  const removeCount = Math.min(4, activeIndex - 2);
   const removed = state.cards.slice(0, removeCount);
-  const removedHeight = removed.reduce((height, card) => height + card.offsetHeight, 0);
+  const removedHeight = removed.reduce((height, row) => height + row.offsetHeight, 0);
   state.spacerHeight += removedHeight;
   state.spacer.style.height = `${state.spacerHeight}px`;
-  removed.forEach(disposeCard);
+  removed.forEach(disposeRow);
   state.cards.splice(0, removeCount);
 }
 
@@ -620,26 +762,27 @@ function scheduleMountedCardTrim() {
   }, 900);
 }
 
-function setActiveCard(card) {
-  if (!card || card === state.activeCard) return;
+function setActiveCard(row) {
+  if (!row || row === state.activeCard) return;
   state.activeCard?.classList.remove("is-active");
-  state.activeCard?._media.pause();
-  state.activeCard = card;
-  card.classList.add("is-active");
+  state.activeCard?._cells.forEach((cell) => cell._media.pause());
+  state.activeCard = row;
+  row.classList.add("is-active");
   const on = autoplayEnabled();
   state.cards.forEach((candidate) => {
-    candidate.querySelector(".autoplay-progress")?.classList.toggle("is-on", on && candidate === card);
+    const active = on && candidate === row;
+    candidate.querySelectorAll(".autoplay-progress").forEach((panel) => panel.classList.toggle("is-on", active));
   });
-  const index = state.cards.indexOf(card);
+  const index = state.cards.indexOf(row);
   state.cards.forEach((candidate, candidateIndex) => {
     const distance = Math.abs(candidateIndex - index);
-    if (candidate === card) candidate._media.play();
+    if (candidate === row) candidate._cells.forEach((cell) => cell._media.play());
     else if (distance <= 1) {
-      candidate._media.pause();
-      candidate._media.load();
-    } else {
-      candidate._media.unload();
-    }
+      candidate._cells.forEach((cell) => {
+        cell._media.pause();
+        cell._media.load();
+      });
+    } else candidate._cells.forEach((cell) => cell._media.unload());
   });
   if (index >= state.cards.length - 3) loadMore();
   scheduleMountedCardTrim();
@@ -659,17 +802,20 @@ const reelObserver = new IntersectionObserver((entries) => {
 function appendItems(items) {
   const feed = $("reel-feed");
   const fragment = document.createDocumentFragment();
-  const addedCards = [];
+  const addedCells = [];
   items.forEach((item) => {
     if (!item?.url || !rememberUrl(item.url)) return;
-    const card = createReel(item);
-    state.cards.push(card);
-    addedCards.push(card);
-    fragment.appendChild(card);
+    addedCells.push(createReelCell(item));
   });
+  const groupSize = collageColumns();
+  for (let index = 0; index < addedCells.length; index += groupSize) {
+    const row = createReelRow(addedCells.slice(index, index + groupSize));
+    state.cards.push(row);
+    fragment.appendChild(row);
+    reelObserver.observe(row);
+  }
   feed.appendChild(fragment);
-  addedCards.forEach((card) => reelObserver.observe(card));
-  return addedCards.length;
+  return addedCells.length;
 }
 
 async function loadMore({ initial = false } = {}) {
@@ -705,8 +851,8 @@ async function loadMore({ initial = false } = {}) {
       const first = state.cards[0];
       $("reel-feed").scrollTo({ top: 0, behavior: "auto" });
       setActiveCard(first);
-      first._media.load();
-      state.cards[1]?._media.load();
+      first._cells.forEach((cell) => cell._media.load());
+      state.cards[1]?._cells.forEach((cell) => cell._media.load());
       announce("");
     } else if (initial && !state.cards.length) {
       announce("no reels found · try another search ♡", { sticky: true });
@@ -737,7 +883,7 @@ function resetFeed(query) {
   state.seenQueue = [];
   state.seenUrls.clear();
   state.spacerHeight = 0;
-  state.cards.forEach(disposeCard);
+  state.cards.forEach(disposeRow);
   state.cards = [];
   state.spacer = document.createElement("div");
   state.spacer.className = "reel-spacer";
@@ -776,6 +922,14 @@ $("scroll-form").addEventListener("submit", (event) => {
 });
 
 $("reel-feed").addEventListener("click", (event) => {
+  const mediaHit = event.target.closest(".reel-media");
+  if (mediaHit && collageColumns() > 1) {
+    const cell = mediaHit.closest(".reel-layout");
+    if (cell && cell.querySelector(".reel-media img, .reel-media video")) {
+      openLightbox(cell);
+      return;
+    }
+  }
   const titleFilter = event.target.closest("button[data-filter-query]");
   if (titleFilter) {
     const query = titleFilter.dataset.filterQuery.trim();
@@ -786,7 +940,7 @@ $("reel-feed").addEventListener("click", (event) => {
     return;
   }
   const control = event.target.closest("button[data-action]");
-  const card = control?.closest(".reel");
+  const card = control?.closest(".reel-layout");
   if (card) handleFeedback(card, control);
   if (card) scheduleAutoplay();
 });
@@ -810,8 +964,15 @@ $("reel-feed").addEventListener("wheel", (event) => {
 }, { passive: false });
 
 document.addEventListener("keydown", (event) => {
+  const lightbox = $("lightbox");
+  if (lightbox && !lightbox.hidden) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeLightbox();
+    }
+    return;
+  }
   if (event.target.matches("input, button, a")) return;
-  if (event.repeat) return;
   if (["ArrowDown", "PageDown", " "].includes(event.key)) {
     event.preventDefault();
     navigateBy(1);
@@ -837,6 +998,17 @@ window.addEventListener("pageshow", () => {
   window.requestAnimationFrame(restoreInput);
 });
 
+let collageColumnCount = collageColumns();
+if (collageQuery.addEventListener) {
+  collageQuery.addEventListener("change", () => {
+    const columns = collageColumns();
+    if (columns === collageColumnCount) return;
+    collageColumnCount = columns;
+    resetFeed(state.query);
+  });
+}
+
+initViewMode();
 initAutoplay();
 const initialQuery = restoredQuery();
 $("query").value = initialQuery;

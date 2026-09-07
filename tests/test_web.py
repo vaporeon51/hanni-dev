@@ -775,7 +775,7 @@ def test_scroll_client_is_bounded_and_supports_desktop_paging():
     script = (web_app.REPO_ROOT / "static" / "scroll.js").read_text()
     css = (web_app.REPO_ROOT / "static" / "scroll.css").read_text()
 
-    assert "MAX_MOUNTED_REELS = 24" in script
+    assert "MAX_MOUNTED_ROWS = 12" in script
     assert "CLIENT_HISTORY_CAPACITY = 100" in script
     assert "function trimMountedCards()" in script
     assert "function scheduleMountedCardTrim()" in script
@@ -804,7 +804,7 @@ def test_scroll_client_is_bounded_and_supports_desktop_paging():
     assert "new ResizeObserver(fitInsideStage)" in script
     assert "MEDIA_RETRY_DELAYS_MS" in script
     assert 'media.preload = wantsPlayback ? "auto" : "metadata"' in script
-    assert "candidate._media.unload()" in script
+    assert "cell._media.unload()" in script
     assert 'thumbIcon("up")' in script
     assert 'thumbIcon("down")' in script
     assert '"Upvote this link"' in script
@@ -821,6 +821,28 @@ def test_scroll_client_is_bounded_and_supports_desktop_paging():
     assert "view set (${count}) →" in script
     assert "payload.collection_count" in script
     assert ".reel-collection-link" in css
+    assert "const BATCH_SIZE = 9;" in script
+    assert "function collageColumns()" in script
+    assert "function createReelCell(item)" in script
+    assert "function createReelRow(cells)" in script
+    assert "reel-grid" in script
+    assert "row._cells" in script
+    assert ".reel-grid" in css
+    assert "@media (min-width: 1024px)" in css
+    assert "object-fit: cover" in css
+    assert "object-position: 50% 20%" in css
+    assert ".lightbox-stage" in css
+    assert "function openLightbox" in script
+    assert "function closeLightbox" in script
+    assert 'id="lightbox"' in (web_app.REPO_ROOT / "templates" / "scroll.html").read_text()
+    assert "data-scroll-mode" in css
+    assert ".view-toggle" in css
+    assert "gap: 0" in css
+    assert "function applyViewMode" in script
+    assert "VIEW_STORAGE_KEY" in script
+    assert 'id="view-toggle"' in (web_app.REPO_ROOT / "templates" / "scroll.html").read_text()
+    assert "reel-row-progress" in script
+    assert "reel-row-progress" in css
 
 
 def test_client_loads_timeline_batches_and_autoplays_video():

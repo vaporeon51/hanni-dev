@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import re
+import threading
 import time
 from dataclasses import asdict, dataclass
 from functools import lru_cache
@@ -25,6 +26,79 @@ PROXIED_MEDIA_HOSTS = IMGUR_HOSTS | {"cdn.goyangi.pics", "cdn.kpopping.com"}
 VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".m4v"}
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif"}
 TRANSIENT_UPSTREAM_STATUSES = {429, 502, 503, 504}
+
+_IMGUR_TRANSIENT_TTL_SECONDS = 120.0
+_IMGUR_COOLDOWN_MAX_SECONDS = 6 * 60 * 60
+_IMGUR_TRANSIENT_CAP = 2048
+
+_state_lock = threading.Lock()
+_shared_session_instance: requests.Session | None = None
+_transient_errors: dict[str, tuple[float, MediaResolutionError]] = {}
+_imgur_cooldown_until: float = 0.0
+
+
+def _shared_session() -> requests.Session:
+    """Reuse one connection-pooled session for production metadata lookups."""
+
+    global _shared_session_instance
+    with _state_lock:
+        if _shared_session_instance is None:
+            _shared_session_instance = requests.Session()
+            _shared_session_instance.headers.update({"User-Agent": "hanni-web/1.0"})
+        return _shared_session_instance
+
+
+def _transient_error(url: str) -> MediaResolutionError | None:
+    now = time.monotonic()
+    with _state_lock:
+        entry = _transient_errors.get(url)
+        if entry is None:
+            return None
+        expires_at, error = entry
+        if expires_at <= now:
+            del _transient_errors[url]
+            return None
+        return error
+
+
+def _note_transient_error(url: str, error: MediaResolutionError) -> None:
+    with _state_lock:
+        if len(_transient_errors) >= _IMGUR_TRANSIENT_CAP:
+            now = time.monotonic()
+            for key, (expires_at, _) in list(_transient_errors.items()):
+                if expires_at <= now:
+                    del _transient_errors[key]
+                if len(_transient_errors) < _IMGUR_TRANSIENT_CAP:
+                    break
+        _transient_errors[url] = (time.monotonic() + _IMGUR_TRANSIENT_TTL_SECONDS, error)
+
+
+def _imgur_cooldown_remaining() -> float:
+    with _state_lock:
+        return max(0.0, _imgur_cooldown_until - time.monotonic())
+
+
+def _note_imgur_rate_limit(response: requests.Response) -> None:
+    """Pause all metadata lookups when Imgur reports an exhausted quota."""
+
+    if response.status_code != 429:
+        return
+    headers = response.headers or {}
+    try:
+        remaining = int(headers.get("X-RateLimit-ClientRemaining", ""))
+    except (TypeError, ValueError):
+        remaining = None
+    try:
+        reset = float(headers.get("X-RateLimit-ClientReset", ""))
+    except (TypeError, ValueError):
+        reset = 0.0
+    if remaining == 0 and reset > 0:
+        delay = min(reset, _IMGUR_COOLDOWN_MAX_SECONDS)
+    else:
+        delay = 30.0
+    global _imgur_cooldown_until
+    with _state_lock:
+        _imgur_cooldown_until = max(_imgur_cooldown_until, time.monotonic() + delay)
 
 
 class MediaUpstreamError(RuntimeError):
@@ -157,11 +231,25 @@ def resolve_media_url(
     media_id = _imgur_id(url)
     album_id = _imgur_album_id(url)
     resolved_client_id = (client_id if client_id is not None else os.getenv("IMGUR_CLIENT_ID", "")).strip()
+    if media_id and not album_id and session is None:
+        probed = _probe_imgur_direct(media_id)
+        if probed is not None:
+            return probed
     if not (media_id or album_id) or not resolved_client_id:
         return ResolvedMedia("link", url)
 
-    requester = session or requests.Session()
-    should_close = session is None
+    managed = session is None
+    if managed:
+        cooldown = _imgur_cooldown_remaining()
+        if cooldown > 0:
+            raise MediaResolutionError(
+                "Imgur metadata lookups are cooling down",
+                retry_after_seconds=int(min(cooldown, _IMGUR_COOLDOWN_MAX_SECONDS)),
+            )
+        cached = _transient_error(url)
+        if cached is not None:
+            raise cached
+    requester = session if session is not None else _shared_session()
     try:
         metadata_url = (
             IMGUR_ALBUM_IMAGES_API.format(media_id=album_id)
@@ -180,21 +268,25 @@ def resolve_media_url(
             response.raise_for_status()
         except requests.HTTPError as error:
             if response.status_code in TRANSIENT_UPSTREAM_STATUSES:
-                raise MediaResolutionError(
+                failure = MediaResolutionError(
                     f"Imgur metadata temporarily returned HTTP {response.status_code}",
                     retry_after_seconds=_retry_after_seconds(response, 3),
-                ) from error
+                )
+                if managed:
+                    _note_imgur_rate_limit(response)
+                    _note_transient_error(url, failure)
+                raise failure from error
             return ResolvedMedia("link", url)
         payload = response.json()
     except MediaResolutionError:
         raise
     except requests.RequestException as error:
-        raise MediaResolutionError("Imgur metadata request temporarily failed") from error
+        failure = MediaResolutionError("Imgur metadata request temporarily failed")
+        if managed:
+            _note_transient_error(url, failure)
+        raise failure from error
     except ValueError:
         return ResolvedMedia("link", url)
-    finally:
-        if should_close:
-            requester.close()
 
     data = payload.get("data") if isinstance(payload, dict) else None
     if album_id and isinstance(data, list):
@@ -266,3 +358,33 @@ def open_media_stream(
         response.close()
         raise MediaUpstreamError("Upstream host returned a non-media response")
     return response
+
+
+_IMGUR_PROBE_EXTENSIONS = (("mp4", "video"), ("jpg", "image"), ("png", "image"), ("gif", "image"))
+_IMGUR_PROBE_TIMEOUT = (3, 5)
+
+
+def _probe_imgur_direct(media_id: str) -> ResolvedMedia | None:
+    """Map a single-image page ID to its file with keyless CDN HEADs.
+
+    Page IDs double as file IDs, so a direct fetch needs no API quota.
+    Order matters: only take an image when no video exists, because video
+    IDs also serve small poster JPEGs. Albums never reach here.
+    """
+
+    requester = _shared_session()
+    for extension, kind in _IMGUR_PROBE_EXTENSIONS:
+        candidate = f"https://i.imgur.com/{media_id}.{extension}"
+        try:
+            response = requester.head(candidate, timeout=_IMGUR_PROBE_TIMEOUT)
+        except requests.RequestException:
+            return None
+        if response.status_code != 200:
+            continue
+        content_type = (response.headers.get("Content-Type", "") or "").lower()
+        if kind == "video" and not content_type.startswith("video/"):
+            continue
+        if kind == "image" and not content_type.startswith("image/"):
+            continue
+        return ResolvedMedia(kind, candidate)
+    return None

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import os
 import re
 import threading
@@ -219,6 +220,10 @@ def resolve_media_url(
     of probing several possible file extensions for every item.
     """
 
+    if (urlsplit(url).hostname or "").lower() == GOYANGI_PAGE_HOST:
+        resolved_page = _resolve_goyangi_page(url, session=session)
+        return resolved_page if resolved_page is not None else ResolvedMedia("link", url)
+
     if (urlsplit(url).hostname or "").lower() in EPHEMERAL_MEDIA_HOSTS:
         return ResolvedMedia("link", url)
 
@@ -240,15 +245,18 @@ def resolve_media_url(
 
     managed = session is None
     if managed:
+        cached = _transient_error(url)
+        if cached is not None:
+            raise cached
         cooldown = _imgur_cooldown_remaining()
         if cooldown > 0:
+            og_resolved = _resolve_imgur_page_og(url)
+            if og_resolved is not None:
+                return og_resolved
             raise MediaResolutionError(
                 "Imgur metadata lookups are cooling down",
                 retry_after_seconds=int(min(cooldown, _IMGUR_COOLDOWN_MAX_SECONDS)),
             )
-        cached = _transient_error(url)
-        if cached is not None:
-            raise cached
     requester = session if session is not None else _shared_session()
     try:
         metadata_url = (
@@ -274,6 +282,9 @@ def resolve_media_url(
                 )
                 if managed:
                     _note_imgur_rate_limit(response)
+                    og_resolved = _resolve_imgur_page_og(url)
+                    if og_resolved is not None:
+                        return og_resolved
                     _note_transient_error(url, failure)
                 raise failure from error
             return ResolvedMedia("link", url)
@@ -283,6 +294,9 @@ def resolve_media_url(
     except requests.RequestException as error:
         failure = MediaResolutionError("Imgur metadata request temporarily failed")
         if managed:
+            og_resolved = _resolve_imgur_page_og(url)
+            if og_resolved is not None:
+                return og_resolved
             _note_transient_error(url, failure)
         raise failure from error
     except ValueError:
@@ -387,4 +401,77 @@ def _probe_imgur_direct(media_id: str) -> ResolvedMedia | None:
         if kind == "image" and not content_type.startswith("image/"):
             continue
         return ResolvedMedia(kind, candidate)
+    return None
+
+
+GOYANGI_PAGE_HOST = "goyangi.pics"
+GOYANGI_REFRESH_PATTERN = re.compile(
+    r"<meta[^>]+http-equiv=[\"']?refresh[\"']?[^>]*content=[\"']?\d+\s*;\s*url=([^\"'\s>]+)",
+    re.IGNORECASE,
+)
+
+
+def _resolve_goyangi_page(url: str, *, session: requests.Session | None = None) -> ResolvedMedia | None:
+    """Follow a goyangi viewer page to its file without any API quota.
+
+    Viewer pages are tiny meta-refresh stubs whose filenames morph, so only
+    the redirect target is usable. Anything off-allowlist stays a plain link.
+    """
+
+    requester = session if session is not None else _shared_session()
+    try:
+        response = requester.get(url, timeout=(5, 12))
+    except requests.RequestException:
+        return None
+    final = _safe_proxied_asset(response.url)
+    if final is not None and final != url:
+        target: str | None = final
+    else:
+        text = getattr(response, "text", "") or ""
+        match = GOYANGI_REFRESH_PATTERN.search(text[:32768])
+        if not match:
+            return None
+        target = _safe_proxied_asset(html.unescape(match.group(1)))
+        if target is None:
+            return None
+    extension = _extension(target)
+    if extension in VIDEO_EXTENSIONS:
+        return ResolvedMedia("video", target)
+    if extension in IMAGE_EXTENSIONS:
+        return ResolvedMedia("image", target)
+    return None
+
+
+OG_VIDEO_PATTERN = re.compile(
+    r"<meta[^>]+property=[\"']og:video[\"'][^>]*content=[\"']([^\"']+)",
+    re.IGNORECASE,
+)
+OG_IMAGE_PATTERN = re.compile(
+    r"<meta[^>]+property=[\"']og:image[\"'][^>]*content=[\"']([^\"']+)",
+    re.IGNORECASE,
+)
+OG_PAGE_SCAN_LIMIT = 131072
+
+
+def _resolve_imgur_page_og(url: str) -> ResolvedMedia | None:
+    """Scrape Open Graph tags as a last resort when the API quota is dead.
+
+    Unfurl tags must stay correct for Discord/Twitter previews, which makes
+    them stabler than internal markup. Yields the first attachment only.
+    """
+
+    try:
+        response = _shared_session().get(url, timeout=(5, 12))
+    except requests.RequestException:
+        return None
+    if getattr(response, "status_code", 200) != 200:
+        return None
+    text = getattr(response, "text", "") or ""
+    for pattern, kind in ((OG_VIDEO_PATTERN, "video"), (OG_IMAGE_PATTERN, "image")):
+        match = pattern.search(text[:OG_PAGE_SCAN_LIMIT])
+        if not match:
+            continue
+        asset = _safe_imgur_asset(html.unescape(match.group(1)))
+        if asset is not None:
+            return ResolvedMedia(kind, asset)
     return None

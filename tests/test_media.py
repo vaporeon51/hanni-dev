@@ -289,15 +289,37 @@ def test_exhausted_quota_cools_down_without_recalling(monkeypatch):
         assert error.retry_after_seconds == 5
     else:  # pragma: no cover
         raise AssertionError("Expected a transient media resolution error")
-    assert len(session.requests) == 1
+    assert session.requests == [
+        "https://api.imgur.com/3/image/abc123",
+        "https://imgur.com/abc123",
+    ]
 
+    try:
+        resolve_media_url("https://imgur.com/abc123", client_id="client-id")
+    except MediaResolutionError as error:
+        assert error.retry_after_seconds == 5
+    else:  # pragma: no cover
+        raise AssertionError("Expected the cached transient error without refetching")
+    assert session.requests == [
+        "https://api.imgur.com/3/image/abc123",
+        "https://imgur.com/abc123",
+    ]
+
+    import time
+
+    expired, error = media_module._transient_errors["https://imgur.com/abc123"]
+    media_module._transient_errors["https://imgur.com/abc123"] = (time.monotonic() - 1, error)
     try:
         resolve_media_url("https://imgur.com/abc123", client_id="client-id")
     except MediaResolutionError as error:
         assert 3300 < error.retry_after_seconds <= 3600
     else:  # pragma: no cover
-        raise AssertionError("Expected a cooldown error without another lookup")
-    assert len(session.requests) == 1
+        raise AssertionError("Expected a cooldown error after cache expiry")
+    assert session.requests == [
+        "https://api.imgur.com/3/image/abc123",
+        "https://imgur.com/abc123",
+        "https://imgur.com/abc123",
+    ]
     _reset_throttle_state()
 
 
@@ -315,7 +337,7 @@ def test_transient_network_failure_is_cached_briefly(monkeypatch):
             pass
         else:  # pragma: no cover
             raise AssertionError("Expected a transient media resolution error")
-    assert len(session.requests) == 1
+    assert len(session.requests) == 2
 
     expired, error = media_module._transient_errors["https://imgur.com/abc123"]
     media_module._transient_errors["https://imgur.com/abc123"] = (time.monotonic() - 1, error)
@@ -325,7 +347,7 @@ def test_transient_network_failure_is_cached_briefly(monkeypatch):
         pass
     else:  # pragma: no cover
         raise AssertionError("Expected a fresh lookup after cache expiry")
-    assert len(session.requests) == 2
+    assert len(session.requests) == 4
     _reset_throttle_state()
 
 
@@ -416,4 +438,150 @@ def test_probe_skipped_for_albums(monkeypatch):
 
     assert result == ResolvedMedia("link", "https://imgur.com/a/XYZ123")
     assert session.head_requests == []
+    _reset_throttle_state()
+
+
+class GoyangiPageResponse:
+    def __init__(self, url, text=""):
+        self.url = url
+        self.text = text
+
+
+class GoyangiPageSession:
+    def __init__(self, response=None, error=None):
+        self.response = response
+        self.error = error
+        self.requests = []
+
+    def get(self, url, **kwargs):
+        self.requests.append(url)
+        if self.error is not None:
+            raise self.error
+        return self.response
+
+
+def test_goyangi_viewer_page_follows_meta_refresh():
+    session = GoyangiPageSession(
+        GoyangiPageResponse(
+            "https://goyangi.pics/v/260911-stayc-j-2014f9db.mp4",
+            '<meta http-equiv="refresh" content="0; url=https://cdn.goyangi.pics/v1/stayc/j/260911-stayc-j-f9db.mp4">',
+        )
+    )
+
+    result = resolve_media_url("https://goyangi.pics/v/260911-stayc-j-2014f9db.mp4", session=session)
+
+    assert result == ResolvedMedia(
+        "video", "https://cdn.goyangi.pics/v1/stayc/j/260911-stayc-j-f9db.mp4"
+    )
+
+
+def test_goyangi_http_redirect_target_is_used_directly():
+    session = GoyangiPageSession(
+        GoyangiPageResponse("https://cdn.goyangi.pics/v/260912-stayc-isa-cbbf8538.webp")
+    )
+
+    result = resolve_media_url("https://goyangi.pics/v/260912-stayc-isa-cbbf8538.webp", session=session)
+
+    assert result == ResolvedMedia(
+        "image", "https://cdn.goyangi.pics/v/260912-stayc-isa-cbbf8538.webp"
+    )
+
+
+def test_goyangi_unresolvable_page_stays_a_plain_link():
+    page_url = "https://goyangi.pics/v/260911-stayc-j-2014f9db.mp4"
+
+    failing = GoyangiPageSession(error=requests.ConnectionError("boom"))
+    assert resolve_media_url(page_url, session=failing) == ResolvedMedia("link", page_url)
+
+    off_allowlist = GoyangiPageSession(
+        GoyangiPageResponse(page_url, '<meta http-equiv="refresh" content="0; url=https://evil.example/x.mp4">')
+    )
+    assert resolve_media_url(page_url, session=off_allowlist) == ResolvedMedia("link", page_url)
+
+    assert failing.requests == [page_url]
+
+
+OG_ALBUM_HTML = (
+    "<html><head>"
+    '<meta property="og:video" content="https://i.imgur.com/ABC123.mp4" />'
+    '<meta property="og:image" content="https://i.imgur.com/ABC123.jpg" />'
+    '<meta property="og:title" content="aespa" />'
+    "</head></html>"
+)
+
+
+class OgPageResponse:
+    status_code = 200
+
+    def __init__(self, text):
+        self.text = text
+
+    def raise_for_status(self):
+        return None
+
+
+class OgFallbackSession:
+    """Probes miss, the API is quota-dead, page HTML carries unfurl tags."""
+
+    def __init__(self, html=OG_ALBUM_HTML):
+        self.html = html
+        self.head_requests = []
+        self.get_requests = []
+
+    def head(self, url, **kwargs):
+        self.head_requests.append(url)
+        return ProbeHeadResponse(404, "text/html")
+
+    def get(self, url, **kwargs):
+        self.get_requests.append(url)
+        if "/3/album/" in url or "/3/image/" in url:
+            return ExhaustedQuotaResponse()
+        return OgPageResponse(self.html)
+
+
+def _api_calls(session):
+    return [url for url in session.get_requests if "/3/album/" in url or "/3/image/" in url]
+
+
+def test_og_fallback_rescues_album_on_dead_quota(monkeypatch):
+    media_module = _reset_throttle_state()
+    session = OgFallbackSession()
+    monkeypatch.setattr(media_module, "_shared_session", lambda: session)
+
+    result = resolve_media_url("https://imgur.com/a/XYZ123", client_id="client-id")
+
+    assert result == ResolvedMedia("video", "https://i.imgur.com/ABC123.mp4")
+    assert session.head_requests == []
+    assert len(_api_calls(session)) == 1
+    _reset_throttle_state()
+
+
+def test_og_image_only_yields_image(monkeypatch):
+    media_module = _reset_throttle_state()
+    session = OgFallbackSession(
+        '<html><head><meta property="og:image" content="https://i.imgur.com/ABC123.jpg" /></head></html>'
+    )
+    monkeypatch.setattr(media_module, "_shared_session", lambda: session)
+
+    result = resolve_media_url("https://imgur.com/a/XYZ123", client_id="client-id")
+
+    assert result == ResolvedMedia("image", "https://i.imgur.com/ABC123.jpg")
+    _reset_throttle_state()
+
+
+def test_og_missing_tags_preserves_transient_error(monkeypatch):
+    media_module = _reset_throttle_state()
+    session = OgFallbackSession("<html><head></head></html>")
+    monkeypatch.setattr(media_module, "_shared_session", lambda: session)
+
+    for _ in range(2):
+        try:
+            resolve_media_url("https://imgur.com/a/XYZ123", client_id="client-id")
+        except MediaResolutionError:
+            pass
+        else:  # pragma: no cover
+            raise AssertionError("Expected a transient media resolution error")
+
+    assert len(_api_calls(session)) == 1
+    assert len(session.get_requests) == 2
     _reset_throttle_state()

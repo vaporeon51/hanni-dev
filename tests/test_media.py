@@ -585,3 +585,15 @@ def test_og_missing_tags_preserves_transient_error(monkeypatch):
     assert len(_api_calls(session)) == 1
     assert len(session.get_requests) == 2
     _reset_throttle_state()
+
+
+def test_media_stream_allows_imgur_gg_mirror():
+    url = "https://i.imgur.gg/1Lks39U-2.mp4"
+    session = FakeStreamSession(
+        [FakeStreamResponse(status_code=200, content_type="video/mp4", url=url)]
+    )
+
+    response = open_media_stream(url, session=session)
+
+    assert response.status_code == 200
+    assert session.requests[0][0] == url

@@ -165,3 +165,67 @@ def test_collection_feed_applies_chronological_cursor(monkeypatch):
     assert "(set_date, content_link_id) < (%s, %s)" in query
     assert cursor_date in connection.cursors[0].params
     assert 42 in connection.cursors[0].params
+
+
+def test_normalize_content_url_strips_tracking_and_case():
+    assert (
+        collection_db.normalize_content_url("HTTPS://I.Imgur.COM/ABC.mp4?utm_source=x&fbclid=9#frag")
+        == "https://i.imgur.com/ABC.mp4"
+    )
+    assert collection_db.normalize_content_url("imgur.com/favrXaZ/") == "https://imgur.com/favrXaZ"
+    assert collection_db.normalize_content_url("https://example.com:443/a/?b=2") == "https://example.com/a?b=2"
+    assert collection_db.normalize_content_url("http://example.com:8080/a") == "http://example.com:8080/a"
+
+
+def test_normalize_content_url_rejects_unusable_input():
+    assert collection_db.normalize_content_url("") is None
+    assert collection_db.normalize_content_url(None) is None
+    assert collection_db.normalize_content_url("ftp://x.com/y") is None
+    assert collection_db.normalize_content_url("not a url") is None
+    assert collection_db.normalize_content_url("x" * 2001) is None
+
+
+def test_content_url_candidates_expand_imgur_forms():
+    assert collection_db.content_url_candidates("https://imgur.com/favrXaZ") == [
+        "https://imgur.com/favrXaZ",
+        "https://i.imgur.com/favrXaZ.mp4",
+        "https://i.imgur.com/favrXaZ",
+    ]
+    assert collection_db.content_url_candidates("https://i.imgur.com/tNe8t7L.mp4") == [
+        "https://i.imgur.com/tNe8t7L.mp4",
+        "https://imgur.com/tNe8t7L",
+        "https://i.imgur.com/tNe8t7L",
+    ]
+    assert collection_db.content_url_candidates("favrXaZ") == [
+        "https://imgur.com/favrXaZ",
+        "https://i.imgur.com/favrXaZ.mp4",
+    ]
+
+
+def test_content_url_candidates_keep_albums_and_foreign_exact():
+    assert collection_db.content_url_candidates("https://imgur.com/a/XYZ123") == [
+        "https://imgur.com/a/XYZ123"
+    ]
+    giphy = "https://media1.giphy.com/media/abc/giphy.mp4?cid=123&rid=giphy.mp4"
+    assert collection_db.content_url_candidates(giphy) == [giphy]
+    assert collection_db.content_url_candidates("hi!") == []
+
+
+def test_find_content_link_ids_prefers_exact_then_recent(monkeypatch):
+    connection = FakeConnection([(7,), (9,)])
+    monkeypatch.setattr(collection_db, "POOL", FakePool(connection))
+
+    assert collection_db.find_content_link_ids_by_url("https://imgur.com/favrXaZ") == [7, 9]
+
+    cursor = connection.cursors[0]
+    assert "url = ANY(%s) OR original_url = ANY(%s)" in cursor.query
+    candidates = collection_db.content_url_candidates("https://imgur.com/favrXaZ")
+    assert cursor.params == (candidates, candidates, candidates[0], candidates[0], 10)
+
+
+def test_find_content_link_ids_empty_for_unusable_input(monkeypatch):
+    connection = FakeConnection([])
+    monkeypatch.setattr(collection_db, "POOL", FakePool(connection))
+
+    assert collection_db.find_content_link_ids_by_url("not a url") == []
+    assert connection.cursors == []

@@ -567,6 +567,10 @@ async function handleFeedback(card, control) {
   }
 }
 
+function isUrlLike(value) {
+  return /^(https?:\/\/\S+|\S+\.\S+\/\S+)$/i.test(value.trim());
+}
+
 async function loadSets(event) {
   if (event) event.preventDefault();
   const navigationToken = ++state.navigationToken;
@@ -582,14 +586,21 @@ async function loadSets(event) {
   const requestedSort = $("sort").value;
   const sort = ALLOWED_SORTS.has(requestedSort) ? requestedSort : "latest";
   const query = $("query").value.trim();
+  const urlMode = isUrlLike(query);
   state.requestParams = { limit: String(BATCH_SIZE), sort, query };
-  const params = new URLSearchParams({ limit: String(BATCH_SIZE), sort });
-  if (query) params.set("query", query);
+  let endpoint;
+  if (urlMode) {
+    endpoint = `/api/collections/by-url?url=${encodeURIComponent(query)}`;
+  } else {
+    const params = new URLSearchParams({ limit: String(BATCH_SIZE), sort });
+    if (query) params.set("query", query);
+    endpoint = `/api/sets?${params.toString()}`;
+  }
   const submit = $("sets-form").querySelector('button[type="submit"]');
   submit.disabled = true;
   setSentinel("finding little sets…", "is-loading");
   try {
-    const response = await fetch(`/api/sets?${params.toString()}`);
+    const response = await fetch(endpoint);
     const payload = await response.json().catch(() => ({}));
     if (navigationToken !== state.navigationToken) return;
     if (!response.ok) throw new Error(payload.detail || "sets unavailable");
@@ -602,7 +613,9 @@ async function loadSets(event) {
     } else {
       const empty = document.createElement("p");
       empty.className = "empty";
-      empty.textContent = "no little sets found · try another search ♡";
+      empty.textContent = urlMode
+        ? "that link isn't in the library · sets form around ingested posts ♡"
+        : "no little sets found · try another search ♡";
       $("feed").appendChild(empty);
       setStatus("0 sets");
     }

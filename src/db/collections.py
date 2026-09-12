@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import datetime
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from src.config.constants import (
     EPHEMERAL_MEDIA_HOSTS,
@@ -553,3 +555,140 @@ def get_collection_feed(
             if len(results) >= limit:
                 break
         return results
+
+
+TRACKING_QUERY_PREFIXES = ("utm_",)
+TRACKING_QUERY_KEYS = frozenset(
+    {
+        "fbclid",
+        "gclid",
+        "gclsrc",
+        "dclid",
+        "msclkid",
+        "ttclid",
+        "wbraid",
+        "gbraid",
+        "mc_cid",
+        "mc_eid",
+        "igshid",
+        "_hsenc",
+        "_hsmi",
+        "mkt_tok",
+    }
+)
+IMGUR_HOSTS = frozenset({"imgur.com", "www.imgur.com", "m.imgur.com", "i.imgur.com"})
+IMGUR_DIRECT_EXTENSIONS = ("mp4", "jpg", "jpeg", "png", "gif", "webm")
+URL_CANDIDATE_LIMIT = 12
+URL_MATCH_LIMIT = 10
+URL_ANCHOR_LIMIT = 5
+
+
+def normalize_content_url(value: str | None) -> str | None:
+    """Normalize a pasted link for exact matching, or return None when unusable."""
+
+    text = (value or "").strip()
+    if not text or len(text) > 2000:
+        return None
+    if "://" not in text:
+        if not re.match(r"^[\w-]+(\.[\w-]+)+(:\d+)?(/.*)?$", text):
+            return None
+        text = "https://" + text
+    try:
+        parts = urlsplit(text)
+    except ValueError:
+        return None
+    scheme = parts.scheme.lower()
+    if scheme not in {"http", "https"}:
+        return None
+    host = (parts.hostname or "").lower()
+    if not host or "." not in host:
+        return None
+    try:
+        port = parts.port
+    except ValueError:
+        return None
+    netloc = host
+    if port and not ((scheme == "http" and port == 80) or (scheme == "https" and port == 443)):
+        netloc = f"{host}:{port}"
+    path = parts.path or ""
+    if len(path) > 1:
+        path = path.rstrip("/")
+    query = ""
+    if parts.query:
+        kept = [
+            (key, item_value)
+            for key, item_value in parse_qsl(parts.query, keep_blank_values=True)
+            if key
+            and not key.lower().startswith(TRACKING_QUERY_PREFIXES)
+            and key.lower() not in TRACKING_QUERY_KEYS
+        ]
+        if kept:
+            query = urlencode(kept, doseq=True)
+    return urlunsplit((scheme, netloc, path, query, ""))
+
+
+def content_url_candidates(raw: str | None) -> list[str]:
+    """Expand one pasted link into the stored forms worth exact-matching.
+
+    Page IDs and direct-file hashes live in disjoint namespaces (14 overlaps
+    in ~150k rows), so cross-form candidates can only hit true matches.
+    Albums (`/a/`, `/gallery/`) match exactly: an album is its own row.
+    """
+
+    text = (raw or "").strip()
+    if not text:
+        return []
+    if "://" not in text and "." not in text:
+        if not re.fullmatch(r"[A-Za-z0-9_-]{5,}", text):
+            return []
+        candidates = [f"https://imgur.com/{text}", f"https://i.imgur.com/{text}.mp4"]
+        return candidates[:URL_CANDIDATE_LIMIT]
+    normalized = normalize_content_url(text)
+    if normalized is None:
+        return []
+    candidates = [normalized]
+    parts = urlsplit(normalized)
+    host = parts.hostname or ""
+    first, _, rest = host.partition(".")
+    if first in {"www", "m"}:
+        candidates.append(urlunsplit((parts.scheme, rest, parts.path, parts.query, "")))
+    if host in IMGUR_HOSTS:
+        segments = [segment for segment in parts.path.split("/") if segment]
+        if len(segments) == 1:
+            page_id = segments[0]
+            if host == "i.imgur.com" and "." in page_id:
+                root, _, extension = page_id.rpartition(".")
+                if root and extension.lower() in IMGUR_DIRECT_EXTENSIONS:
+                    candidates.append(f"{parts.scheme}://imgur.com/{root}")
+                    if extension.lower() != "mp4":
+                        candidates.append(f"{parts.scheme}://i.imgur.com/{root}.mp4")
+                    candidates.append(f"{parts.scheme}://i.imgur.com/{root}")
+            elif "." not in page_id:
+                candidates.append(f"{parts.scheme}://i.imgur.com/{page_id}.mp4")
+                candidates.append(f"{parts.scheme}://i.imgur.com/{page_id}")
+    seen: set[str] = set()
+    ordered = [candidate for candidate in candidates if not (candidate in seen or seen.add(candidate))]
+    return ordered[:URL_CANDIDATE_LIMIT]
+
+
+def find_content_link_ids_by_url(raw: str | None) -> list[int]:
+    """Return recent content_link_ids whose stored URL matches a pasted link."""
+
+    candidates = content_url_candidates(raw)
+    if not candidates:
+        return []
+    preferred = candidates[0]
+    with POOL.connection() as connection, connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT content_link_id
+            FROM content_links
+            WHERE url = ANY(%s) OR original_url = ANY(%s)
+            ORDER BY (url = %s OR original_url = %s) DESC,
+                uploaded_date DESC NULLS LAST,
+                content_link_id DESC
+            LIMIT %s
+            """,
+            (candidates, candidates, preferred, preferred, URL_MATCH_LIMIT),
+        )
+        return [int(row[0]) for row in cursor.fetchall()]

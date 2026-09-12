@@ -644,7 +644,7 @@ def test_sets_page_renders_separately():
     response = asyncio.run(request())
 
     assert response.status_code == 200
-    assert "search sets by member or group" in response.text
+    assert "search sets by member, group, or link" in response.text
     assert '/static/sets.js?v=' in response.text
     assert '<option value="latest" selected>newest</option>' in response.text
     assert '<option value="oldest">oldest</option>' in response.text
@@ -906,3 +906,44 @@ def test_client_loads_timeline_batches_and_autoplays_video():
     )
     assert "view set (${count}) →" in script
     assert "?collection=${item.content_link_id}" in script
+
+
+def test_collections_by_url_returns_matching_sets(monkeypatch):
+    from src.db.collections import ContentSet
+
+    async def fake_load_collections_for_url(url):
+        assert url == "https://i.imgur.com/tNe8t7L.mp4"
+        return [
+            ContentSet(
+                collection_of=7,
+                label="Karina - aespa",
+                items=[sample_item(content_link_id=7, url="https://i.imgur.com/tNe8t7L.mp4")],
+            )
+        ]
+
+    monkeypatch.setattr(web_app, "load_collections_for_url", fake_load_collections_for_url)
+
+    async def request():
+        transport = httpx.ASGITransport(app=web_app.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            return await client.get("/api/collections/by-url", params={"url": "https://i.imgur.com/tNe8t7L.mp4"})
+
+    response = asyncio.run(request())
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["count"] == 1
+    assert payload["sets"][0]["collection_of"] == 7
+    assert payload["sets"][0]["label"] == "Karina - aespa"
+    assert payload["sets"][0]["items"][0]["url"] == "https://i.imgur.com/tNe8t7L.mp4"
+
+
+def test_collections_by_url_rejects_blank_url():
+    async def request():
+        transport = httpx.ASGITransport(app=web_app.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            return await client.get("/api/collections/by-url", params={"url": "   "})
+
+    response = asyncio.run(request())
+
+    assert response.status_code == 400

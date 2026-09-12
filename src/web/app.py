@@ -29,7 +29,7 @@ from src.db.feedback import ContentFeedback, add_content_report, add_content_vot
 from src.db.media import get_live_content_url  # noqa: E402
 from src.services.feed import load_feed, load_role_suggestions  # noqa: E402
 from src.services.feed_history import feed_history, link_history, scroll_history  # noqa: E402
-from src.services.collections import load_collection, load_collection_feed, load_collection_preview  # noqa: E402
+from src.services.collections import load_collection, load_collection_feed, load_collection_preview, load_collections_for_url  # noqa: E402
 from src.services.dead_link_queue import enqueue_priority_url  # noqa: E402
 from src.services.media import (  # noqa: E402
     TRANSIENT_UPSTREAM_STATUSES,
@@ -507,6 +507,40 @@ async def media(content_link_id: int, request: Request, response: Response) -> d
             "collection_count": preview.count,
         }
     return {**resolved.as_dict(), "collection_count": preview.count}
+
+
+@app.get("/api/collections/by-url")
+async def collection_by_url(
+    request: Request,
+    response: Response,
+    url: str = Query(default="", max_length=2000),
+) -> dict[str, Any]:
+    """Return the live sets built around rows matching a pasted link."""
+
+    raw = url.strip()
+    if not raw:
+        raise HTTPException(status_code=400, detail="Provide a content link URL")
+    visitor_id = _ensure_visitor_cookie(request, response)
+    if not _search_rate_limiter.allow(visitor_id, "collections-by-url"):
+        raise HTTPException(
+            status_code=429,
+            detail=f"Please wait {SEARCH_COOLDOWN_SECONDS} seconds before searching again.",
+            headers={"Retry-After": str(SEARCH_COOLDOWN_SECONDS)},
+        )
+    results = await load_collections_for_url(raw)
+    return {
+        "sets": [
+            {
+                "collection_of": result.collection_of,
+                "label": result.label,
+                "count": len(result.items),
+                "items": [_serialize_item(item) for item in result.items],
+            }
+            for result in results
+        ],
+        "count": len(results),
+        "url": raw,
+    }
 
 
 @app.get("/api/collections/{content_link_id}")

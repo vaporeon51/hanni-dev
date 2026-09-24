@@ -859,6 +859,14 @@ def test_feed_client_boots_unfiltered_and_pages_continuations():
     assert "async function loadCollection(contentLinkId)" in script
 
 
+def test_collection_links_point_at_feed_collection_view():
+    for name in ("app.js", "scroll.js"):
+        script = (web_app.REPO_ROOT / "static" / name).read_text()
+
+        assert "`/feed?collection=${item.content_link_id}`" in script
+        assert "`/?collection=" not in script
+
+
 def test_collections_by_url_returns_matching_sets(monkeypatch):
     from src.db.collections import ContentSet
 

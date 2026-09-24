@@ -28,12 +28,8 @@ from src.db import POOL  # noqa: E402
 from src.db.analytics import record_country_session, record_link_request  # noqa: E402
 from src.db.bias import (  # noqa: E402
     LEADERBOARD_SNAPSHOT_LIMIT,
-    ensure_visitor_snapshot,
     get_global_group_leaderboard,
     get_global_leaderboard,
-    get_or_create_visitor,
-    get_personal_group_leaderboard,
-    get_personal_leaderboard,
     record_sorter_vote,
 )
 from src.db.feedback import ContentFeedback, add_content_report, add_content_vote  # noqa: E402
@@ -838,8 +834,7 @@ async def sorter_vote(
     if not _sorter_vote_rate_limiter.allow(visitor_token, "sorter-vote"):
         return {"recorded": False}
     try:
-        visitor_id = await asyncio.to_thread(get_or_create_visitor, visitor_token)
-        recorded = await asyncio.to_thread(record_sorter_vote, visitor_id, winner_id, loser_id)
+        recorded = await asyncio.to_thread(record_sorter_vote, winner_id, loser_id)
     except Exception:
         logger.exception("Could not record sorter vote")
         return {"recorded": False}
@@ -848,68 +843,19 @@ async def sorter_vote(
 
 @app.get("/api/leaderboard")
 async def leaderboard(
-    request: Request,
-    response: Response,
-    scope: str = Query(default="global"),
     kind: str = Query(default="idols"),
 ) -> dict[str, Any]:
-    if scope not in {"global", "personal"}:
-        raise HTTPException(status_code=400, detail="scope must be global or personal")
+    """Global consensus board. The Mine tab renders the visitor's own sorter
+    ranking client-side, so it never hits this endpoint."""
     if kind not in {"idols", "groups"}:
         raise HTTPException(status_code=400, detail="kind must be idols or groups")
-    visitor_token = _ensure_visitor_cookie(request, response)
     try:
-        if scope == "global":
-            if kind == "idols":
-                board = await asyncio.to_thread(
-                    get_global_leaderboard, LEADERBOARD_SNAPSHOT_LIMIT
-                )
-                return {
-                    "scope": scope,
-                    "kind": kind,
-                    "vote_count": board.vote_count,
-                    "movement_baseline_date": board.movement_baseline_date.isoformat()
-                    if board.movement_baseline_date
-                    else None,
-                    "entries": [
-                        {
-                            "rank": index + 1,
-                            "role_id": entry.role_id,
-                            "member_name": entry.member_name,
-                            "group_name": entry.group_name,
-                            "elo": entry.elo,
-                            "image_url": _board_image(entry.role_id, entry.image_url),
-                            "previous_rank": entry.previous_rank,
-                            "votes": entry.votes,
-                        }
-                        for index, entry in enumerate(board.entries)
-                    ],
-                }
-            group_board = await asyncio.to_thread(get_global_group_leaderboard, 15, 3)
-            return {
-                "scope": scope,
-                "kind": kind,
-                "vote_count": group_board.vote_count,
-                "top_n": group_board.top_n,
-                "entries": [
-                    {
-                        "group_name": entry.group_name,
-                        "elo": entry.elo,
-                        "member_count": entry.member_count,
-                        "ranked_member_count": entry.ranked_member_count,
-                        "top_members": _serialize_top_members(entry),
-                        "image_url": _group_image(entry.group_name, entry.image_url),
-                        "votes": entry.votes,
-                    }
-                    for entry in group_board.entries
-                ],
-            }
-        visitor_id = await asyncio.to_thread(get_or_create_visitor, visitor_token)
         if kind == "idols":
-            board = await asyncio.to_thread(get_personal_leaderboard, visitor_id, LEADERBOARD_SNAPSHOT_LIMIT)
-            await asyncio.to_thread(ensure_visitor_snapshot, visitor_id)
+            board = await asyncio.to_thread(
+                get_global_leaderboard, LEADERBOARD_SNAPSHOT_LIMIT
+            )
             return {
-                "scope": scope,
+                "scope": "global",
                 "kind": kind,
                 "vote_count": board.vote_count,
                 "movement_baseline_date": board.movement_baseline_date.isoformat()
@@ -929,10 +875,9 @@ async def leaderboard(
                     for index, entry in enumerate(board.entries)
                 ],
             }
-        group_board = await asyncio.to_thread(get_personal_group_leaderboard, visitor_id, 15, 3)
-        await asyncio.to_thread(ensure_visitor_snapshot, visitor_id)
+        group_board = await asyncio.to_thread(get_global_group_leaderboard, 15, 3)
         return {
-            "scope": scope,
+            "scope": "global",
             "kind": kind,
             "vote_count": group_board.vote_count,
             "top_n": group_board.top_n,

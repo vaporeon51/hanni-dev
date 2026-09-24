@@ -1,4 +1,9 @@
-/* Leaderboard ♡ — fetches ELO boards and renders podium + spotlight + list. */
+/* Leaderboard ♡ — global ELO board plus your own sorter ranking.
+ *
+ * Global tabs fetch the server ELO board. The Mine tab renders your last
+ * sorter session straight from localStorage (same merge-sort output as the
+ * sorter results page), so the two can never disagree.
+ */
 (() => {
   "use strict";
   const $ = (id) => document.getElementById(id);
@@ -207,24 +212,163 @@
   }
 
   function renderEmpty() {
-    return `<div class="empty"><div class="big">♡</div><h2>No votes yet</h2><p>Rank some idols in the sorter and your personal board will appear here.</p><a href="/sorter">Start sorting →</a></div>`;
+    return `<div class="empty"><div class="big">♡</div><h2>No finished ranking yet</h2><p>Finish a sorter run and your ranking will show up here — exactly as the sorter called it.</p><a href="/sorter">Start sorting →</a></div>`;
+  }
+
+  function mineImg(item, cls) {
+    return `<img src="${escape(item.img)}" alt="${escape(item.name)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='${fallbackImage()}'" class="${cls}">`;
+  }
+
+  function minePodiumCard(item, rank) {
+    return `<div class="podium-card${rank === 1 ? " first" : ""}"><div class="podium-photo">${mineImg(item, "")}<span class="podium-rank">#${rank}</span></div><strong>${escape(item.name)}</strong><small>${escape(item.group)}</small></div>`;
+  }
+
+  function mineMiniCard(item) {
+    return `<div class="mini-card"><div class="mini-photo">${mineImg(item, "")}<span class="mini-rank">#${item.rank}</span></div><strong>${escape(item.name)}</strong><small>${escape(item.group)}</small></div>`;
+  }
+
+  function mineListRow(item) {
+    return `<div class="row"><span class="row-rank">#${item.rank}</span>${mineImg(item, "row-thumb")}<div class="row-names"><strong>${escape(item.name)}</strong><small>${escape(item.group)}</small></div></div>`;
+  }
+
+  function renderMine(ranked, session) {
+    const tops = ranked.slice(0, 3);
+    const gridFour = ranked.slice(3, 7);
+    const gridFive = ranked.slice(7, 12);
+    const rest = ranked.slice(12);
+    let html = "";
+    if (tops.length) {
+      const ordered = [tops[1], tops[0], tops[2]].filter(Boolean);
+      html += '<div class="podium">';
+      ordered.forEach((item) => {
+        html += minePodiumCard(item, item.rank);
+      });
+      html += "</div>";
+    }
+    if (gridFour.length) {
+      html += '<div class="mini-grid mini-grid-4">';
+      gridFour.forEach((item) => {
+        html += mineMiniCard(item);
+      });
+      html += "</div>";
+    }
+    if (gridFive.length) {
+      html += '<div class="mini-grid mini-grid-5">';
+      gridFive.forEach((item) => {
+        html += mineMiniCard(item);
+      });
+      html += "</div>";
+    }
+    if (rest.length) {
+      html += '<div class="rows">';
+      rest.forEach((item) => {
+        html += mineListRow(item);
+      });
+      html += "</div>";
+    }
+    html += `<p class="board-foot">your sorter ranking · ${session.ids.length} ${escape(session.mode)} · ${session.choices.length} matchups · <a href="/sorter">open in sorter →</a></p>`;
+    return html;
+  }
+
+  function validMineSession(session) {
+    return (
+      !!session &&
+      ["idols", "groups"].includes(session.mode) &&
+      Array.isArray(session.ids) &&
+      session.ids.length >= 2 &&
+      Array.isArray(session.choices) &&
+      session.choices.every((c) => ["left", "right", "tie"].includes(c))
+    );
+  }
+
+  async function loadMine() {
+    const board = $("board");
+    board.innerHTML = '<div class="loading">Finding your ranking</div>';
+    if (typeof BiasSorter === "undefined") {
+      board.innerHTML = '<div class="loading">Could not load the sorter engine. Please refresh to try again.</div>';
+      return;
+    }
+    let session = null;
+    try {
+      session = JSON.parse(localStorage.getItem("bias-club-session-v1"));
+    } catch {
+      session = null;
+    }
+    if (!validMineSession(session)) {
+      board.innerHTML = renderEmpty();
+      return;
+    }
+    let catalog;
+    let embeds = {};
+    try {
+      const [catalogResponse, embedsResponse] = await Promise.all([
+        fetch("/static/sorter/catalog.json", { credentials: "same-origin" }),
+        fetch("/static/sorter/embed-photos.json", { credentials: "same-origin" }),
+      ]);
+      if (!catalogResponse.ok) throw new Error("catalog " + catalogResponse.status);
+      catalog = await catalogResponse.json();
+      if (embedsResponse.ok) {
+        const embedsData = await embedsResponse.json();
+        embeds = (embedsData && embedsData.by_role) || {};
+      }
+    } catch {
+      board.innerHTML = '<div class="loading">Could not load the idol catalog. Please refresh to try again.</div>';
+      return;
+    }
+    if ((catalog.version || "2025-11-01") !== session.version) {
+      board.innerHTML = renderEmpty();
+      return;
+    }
+    const byId = new Map(catalog.entries.map((item) => [item.id, item]));
+    if (!session.ids.every((id) => byId.has(id))) {
+      board.innerHTML = renderEmpty();
+      return;
+    }
+    let sorter = null;
+    try {
+      sorter = BiasSorter.replay(session.ids, session.choices);
+    } catch {
+      board.innerHTML = renderEmpty();
+      return;
+    }
+    if (!sorter.result) {
+      board.innerHTML = `<div class="empty"><div class="big">♡</div><h2>Ranking in progress</h2><p>${session.choices.length} choices in — pick up where you left off.</p><a href="/sorter">Resume sorting →</a></div>`;
+      return;
+    }
+    const imageURL = (item) =>
+      (item.role_id && embeds[item.role_id]) || item.local || item.fallback;
+    const ranked = [];
+    let rank = 1;
+    sorter.result.forEach((bucket) => {
+      bucket.forEach((id) => {
+        const item = byId.get(id);
+        ranked.push({
+          rank,
+          name: item.short || item.name,
+          group: item.group || "Group",
+          img: imageURL(item),
+        });
+      });
+      rank += bucket.length;
+    });
+    board.innerHTML = renderMine(ranked, session);
   }
 
   async function load() {
+    if (scope === "personal") {
+      loadMine();
+      return;
+    }
     const board = $("board");
     board.innerHTML = '<div class="loading">Gathering idols</div>';
     try {
-      const response = await fetch(`/api/leaderboard?scope=${scope}&kind=${kind}`, {
+      const response = await fetch(`/api/leaderboard?kind=${kind}`, {
         credentials: "same-origin",
       });
       if (!response.ok) throw new Error("board " + response.status);
       const data = await response.json();
-      if (kind === "idols" && scope === "personal" && !data.entries.length) {
-        board.innerHTML = renderEmpty();
-        return;
-      }
-      if (kind === "groups" && !data.entries.length) {
-        board.innerHTML = scope === "personal" ? renderEmpty() : '<div class="loading">No groups ranked yet.</div>';
+      if (!data.entries.length) {
+        board.innerHTML = '<div class="loading">No groups ranked yet.</div>';
         return;
       }
       board.innerHTML = kind === "idols" ? renderIdols(data) : renderGroups(data);
@@ -240,6 +384,8 @@
     document.querySelectorAll("[data-kind]").forEach((b) =>
       b.setAttribute("aria-pressed", String(b.dataset.kind === kind)),
     );
+    const subtabs = document.querySelector(".subtabs");
+    if (subtabs) subtabs.hidden = scope === "personal";
   }
 
   document.querySelectorAll("[data-scope]").forEach((button) => {

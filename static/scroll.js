@@ -550,7 +550,7 @@ function createReelCell(item) {
   const collectionLink = document.createElement("a");
   collectionLink.className = "reel-collection-link";
   collectionLink.hidden = true;
-  collectionLink.href = `/?collection=${item.content_link_id}`;
+  collectionLink.href = `/feed?collection=${item.content_link_id}`;
   titleRow.append(title, collectionLink);
   const meta = document.createElement("div");
   meta.className = "reel-meta";

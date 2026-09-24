@@ -460,7 +460,7 @@ function showCollectionLink(item, count) {
   if (!header || header.querySelector(".collection-link")) return;
   const link = document.createElement("a");
   link.className = "collection-link";
-  link.href = `/?collection=${item.content_link_id}`;
+  link.href = `/feed?collection=${item.content_link_id}`;
   link.dataset.collectionId = String(item.content_link_id);
   link.textContent = `view set (${count}) →`;
   header.appendChild(link);

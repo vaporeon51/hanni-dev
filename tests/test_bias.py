@@ -9,16 +9,9 @@ from src.web import app as web_app
 
 
 def test_calculate_elo_delta_equal_ratings():
-    winner, loser = bias.calculate_elo_delta(1200, 1200, bias.PERSONAL_ELO_K)
-    assert winner == 16
-    assert loser == -16
-
-
-def test_calculate_elo_delta_uses_scope_k_factors():
-    global_winner, _ = bias.calculate_elo_delta(1200, 1200, bias.GLOBAL_ELO_K)
-    personal_winner, _ = bias.calculate_elo_delta(1200, 1200, bias.PERSONAL_ELO_K)
-    assert global_winner == 4
-    assert personal_winner == 16
+    winner, loser = bias.calculate_elo_delta(1200, 1200, bias.GLOBAL_ELO_K)
+    assert winner == 4
+    assert loser == -4
 
 
 def test_calculate_elo_delta_upset_moves_more():
@@ -37,19 +30,17 @@ def test_format_movement_tokens():
 
 
 def test_record_sorter_vote_rejects_bad_ids():
-    assert bias.record_sorter_vote(1, "", "role-2") is None
-    assert bias.record_sorter_vote(1, "role-1", "role-1") is None
-    assert bias.record_sorter_vote(1, "", "") is None
+    assert bias.record_sorter_vote("", "role-2") is None
+    assert bias.record_sorter_vote("role-1", "role-1") is None
+    assert bias.record_sorter_vote("", "") is None
 
 
 def _post_vote(monkeypatch, payload):
-    monkeypatch.setattr(web_app, "get_or_create_visitor", lambda token: 7)
     recorded = {}
 
-    def fake_record(visitor_id, winner_id, loser_id):
-        recorded["args"] = (visitor_id, winner_id, loser_id)
-        return {"global_winner_delta": 4, "global_loser_delta": -4,
-                "personal_winner_delta": 16, "personal_loser_delta": -16}
+    def fake_record(winner_id, loser_id):
+        recorded["args"] = (winner_id, loser_id)
+        return {"winner_delta": 4, "loser_delta": -4}
 
     monkeypatch.setattr(web_app, "record_sorter_vote", fake_record)
 
@@ -67,7 +58,7 @@ def test_sorter_vote_records_matchup(monkeypatch):
     )
     assert response.status_code == 200
     assert response.json() == {"recorded": True}
-    assert recorded["args"] == (7, "role-a", "role-b")
+    assert recorded["args"] == ("role-a", "role-b")
 
 
 def test_sorter_vote_rejects_same_idol(monkeypatch):
@@ -93,10 +84,9 @@ def test_sorter_vote_rate_limits_rapid_beacons(monkeypatch):
             )
             return first, second
 
-    monkeypatch.setattr(web_app, "get_or_create_visitor", lambda token: 9)
     monkeypatch.setattr(
         web_app, "record_sorter_vote",
-        lambda visitor_id, winner_id, loser_id: {"ok": True},
+        lambda winner_id, loser_id: {"ok": True},
     )
     first, second = asyncio.run(request())
     assert first.status_code == 200
@@ -104,17 +94,21 @@ def test_sorter_vote_rate_limits_rapid_beacons(monkeypatch):
     assert second.json() == {"recorded": False}
 
 
-def test_leaderboard_rejects_bad_params():
+def test_leaderboard_rejects_bad_kind_but_ignores_legacy_scope(monkeypatch):
+    board = bias.Leaderboard(entries=[], vote_count=0, movement_baseline_date=None)
+    monkeypatch.setattr(web_app, "get_global_leaderboard", lambda limit: board)
+
     async def request():
         transport = httpx.ASGITransport(app=web_app.app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-            bad_scope = await client.get("/api/leaderboard?scope=server")
             bad_kind = await client.get("/api/leaderboard?kind=vibes")
-            return bad_scope, bad_kind
+            legacy_scope = await client.get("/api/leaderboard?scope=server")
+            return bad_kind, legacy_scope
 
-    bad_scope, bad_kind = asyncio.run(request())
-    assert bad_scope.status_code == 400
+    bad_kind, legacy_scope = asyncio.run(request())
     assert bad_kind.status_code == 400
+    assert legacy_scope.status_code == 200
+    assert legacy_scope.json()["scope"] == "global"
 
 
 def test_global_idol_leaderboard_serializes_movement(monkeypatch):
@@ -236,28 +230,6 @@ def test_global_group_board_resolves_photos_and_members(monkeypatch):
     assert entry["top_members"][2] == {"name": "NingNing", "image_url": None}
 
 
-def test_personal_leaderboard_ensures_snapshot(monkeypatch):
-    board = bias.Leaderboard(entries=[], vote_count=0)
-    calls = []
-    monkeypatch.setattr(web_app, "get_or_create_visitor", lambda token: 11)
-    monkeypatch.setattr(
-        web_app, "get_personal_leaderboard", lambda visitor_id, limit: calls.append("board") or board
-    )
-    monkeypatch.setattr(
-        web_app, "ensure_visitor_snapshot", lambda visitor_id: calls.append("snapshot") or False
-    )
-
-    async def request():
-        transport = httpx.ASGITransport(app=web_app.app)
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-            return await client.get("/api/leaderboard?scope=personal&kind=idols")
-
-    response = asyncio.run(request())
-    assert response.status_code == 200
-    assert response.json()["entries"] == []
-    assert calls == ["board", "snapshot"]
-
-
 def test_sorter_page_renders():
     async def request():
         transport = httpx.ASGITransport(app=web_app.app)
@@ -280,5 +252,15 @@ def test_leaderboard_page_renders():
     response = asyncio.run(request())
     assert response.status_code == 200
     assert "/static/leaderboard.js?v=" in response.text
+    assert "/static/sorter/engine.js?v=" in response.text
     assert 'data-scope="personal"' in response.text
     assert 'data-kind="groups"' in response.text
+
+
+def test_leaderboard_mine_tab_replays_sorter_session():
+    script = (web_app.REPO_ROOT / "static" / "leaderboard.js").read_text()
+
+    assert "bias-club-session-v1" in script
+    assert "BiasSorter.replay" in script
+    assert "/api/leaderboard?kind=" in script
+    assert "scope=${scope}" not in script

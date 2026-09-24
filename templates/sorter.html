@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    {% include "_social_meta.html" %}
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Choose idols and groups to create your K-pop ranking. Every pick counts toward the hanni leaderboard ♡" />
+    <title>bias sorter ♡ · hanni</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext x='32' y='46' text-anchor='middle' font-size='44' fill='%23b84d79'%3E%E2%99%A1%3C/text%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="/static/nav.css?v={{ static_version }}" />
+    <link rel="stylesheet" href="/static/sorter/sorter.css?v={{ static_version }}" />
+    <script defer src="/static/sorter/lz-string.min.js?v={{ static_version }}"></script>
+    <script defer src="/static/sorter/engine.js?v={{ static_version }}"></script>
+    <script defer src="/static/sorter/result-image.js?v={{ static_version }}"></script>
+    <script defer src="/static/sorter/sorter.js?v={{ static_version }}"></script>
+  </head>
+  <body data-catalog="/static/sorter/catalog.json?v={{ static_version }}" data-embeds="/static/sorter/embed-photos.json?v={{ static_version }}">
+    {% set active = "sorter" %}{% include "_nav.html" %}
+    <div class="topbar">
+      <button id="help" class="text-button">how it works ↗</button>
+    </div>
+    <main>
+      <nav class="steps" aria-label="Sorting progress">
+        <span id="step-setup" aria-current="step">01 <b>Select</b></span><i
+        >──</i><span id="step-sort">02 <b>Sort</b></span><i>──</i><span
+          id="step-results"
+        >03 <b>Results</b></span>
+      </nav>
+      <section id="setup">
+        <div id="resume-banner" class="resume" hidden>
+          <span>You have a saved session.</span><button
+            id="resume"
+          >
+            Resume →
+          </button>
+        </div>
+        <div class="workspace">
+          <section class="library" aria-labelledby="library-title">
+            <div class="section-heading">
+              <h2 id="library-title">Select your lineup</h2>
+              <div class="mode-toggle">
+                <button data-mode="idols" aria-pressed="true">Idols</button>
+                <button data-mode="groups" aria-pressed="false">Groups</button>
+              </div>
+            </div>
+            <label class="search"><span aria-hidden="true">⌕</span><input
+                id="search"
+                type="search"
+                placeholder="Search groups or idols"
+                aria-label="Search groups and idols"
+              ><kbd>/</kbd></label>
+            <div class="filters" aria-label="Filter groups">
+              <button data-gen="all" aria-pressed="true">
+                All generations
+              </button>
+              <button data-gen="gen2" aria-pressed="false">2nd gen</button>
+              <button data-gen="gen3" aria-pressed="false">3rd gen</button>
+              <button data-gen="gen4" aria-pressed="false">4th gen</button>
+              <button data-gen="gen5" aria-pressed="false">5th gen</button>
+              <button data-gen="selected" aria-pressed="false">
+                Selected
+              </button>
+            </div>
+            <div class="list-meta">
+              <span id="group-count"></span><button
+                id="select-visible"
+                class="text-button"
+              >
+                Select shown
+              </button>
+            </div>
+            <div id="groups" class="group-grid"></div>
+            <p id="empty" class="empty" hidden>
+              No matches. Try another name or generation.
+            </p>
+          </section>
+          <aside class="lineup">
+            <div class="aside-heading">
+              <span class="eyebrow">SELECTED</span>
+            </div>
+            <h2>
+              <span id="selection-count">0</span> <span id="selection-unit"
+              >idols</span>
+            </h2>
+            <div id="selected-groups" class="selected-groups"></div>
+            <button id="clear" class="text-button">Clear lineup</button>
+            <div class="estimate">
+              <span>Estimated matchups <b id="estimate">—</b></span><span
+              >Estimated time <b id="duration">—</b></span>
+            </div>
+            <button id="start" class="primary" disabled>
+              Start sorting <span>→</span>
+            </button>
+            <p class="fine" id="start-hint">Choose at least 2 idols to start</p>
+          </aside>
+        </div>
+      </section>
+      <section id="sorting" hidden tabindex="-1">
+        <div class="intro">
+          <span class="eyebrow" id="battle-label"></span><h1>
+            Choose your favorite
+          </h1>
+        </div>
+        <div class="progress-meta">
+          <span id="progress-label"></span><span>Autosaved</span>
+        </div>
+        <progress id="progress" max="100" value="0"></progress>
+        <div class="matchup">
+          <button id="pick-left" class="idol-card"></button><span class="versus"
+          >or</span><button id="pick-right" class="idol-card"></button>
+        </div>
+        <div class="battle-actions">
+          <button id="undo">↶ Undo</button>
+          <button id="tie">Tie</button>
+          <button id="pause">Save & exit</button>
+        </div>
+        <p class="fine">← / → to choose · ↑ to tie · ↓ to undo</p>
+      </section>
+      <section id="results" hidden tabindex="-1">
+        <div class="intro">
+          <h1>
+            Your ranking
+          </h1>
+          <p id="result-meta"></p>
+        </div>
+        <div id="ranking" class="ranking"></div>
+        <p id="leaderboard-cta" class="leaderboard-cta" hidden>
+          Your picks are already on the boards ♡ <a href="/leaderboard">See the leaderboard →</a>
+        </p>
+        <div class="result-actions">
+          <button id="share">Copy result link ↗</button>
+          <button id="download">Save image ↓</button>
+          <button id="text-export">Download text ↓</button>
+          <button id="undo-final">↶ Undo last choice</button>
+          <button id="new-lineup">Edit lineup</button><label
+            class="result-image-label"
+          >Photos <select
+              id="result-images"
+              aria-label="Number of result photos"
+            >
+              <option value="0">None</option>
+              <option value="10" selected>Top 10</option>
+              <option value="50">Top 50</option>
+              <option value="10000">All</option>
+            </select></label>
+        </div>
+      </section>
+    </main>
+    <footer>
+      <span>bias sorter ♡ · made by glaceon</span><a href="/leaderboard">leaderboard →</a>
+    </footer>
+    <dialog id="help-dialog">
+      <button id="close-help" class="close" aria-label="Close help">
+        ×
+      </button>
+      <h2>
+        How it works
+      </h2>
+      <p>
+        Choose groups, then expand them to include only the idols you want.
+        Switch to Groups to rank whole groups instead.
+      </p>
+      <p>
+        Pick your favorite in each pair, or tie them. We merge your choices into
+        a complete ranking without asking every possible pair.
+      </p>
+      <p>
+        Every idol pick (except ties) counts as one vote on the
+        <a href="/leaderboard">leaderboard</a> — globally and on your personal
+        board. Undo fixes your ranking, but votes already counted stay counted.
+        Group-mode duels are just for fun and don't vote.
+      </p>
+      <p>
+        Your session saves on this device after every choice. Undo works all the
+        way back. Shared result links include your ranking.
+      </p>
+      <p class="fine">
+        Idol portraits come from our kpopping collection, with the classic
+        sorter photos as backup.
+      </p>
+    </dialog>
+    <div id="toast" role="status" hidden></div>
+  </body>
+</html>

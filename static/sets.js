@@ -701,3 +701,5 @@ $("feed").addEventListener("click", (event) => {
   const card = control?.closest(".set-card");
   if (card) handleFeedback(card, control);
 });
+
+loadSets();

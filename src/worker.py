@@ -15,6 +15,7 @@ load_dotenv(REPO_ROOT / ".env")
 load_dotenv(REPO_ROOT / ".env.local", override=True)
 
 from src.config.constants import (  # noqa: E402
+    BIAS_SNAPSHOT_INTERVAL_SECONDS,
     CONTENT_RECOVERY_BATCH_SIZE,
     DEAD_LINK_INTERVAL_SECONDS,
     DEAD_LINK_RUN_INTERVAL_SECONDS,
@@ -26,6 +27,7 @@ from src.config.constants import (  # noqa: E402
 from src.content_recovery import RecoveryBatchConfig, dead_link_role_notice, run_recovery_batch  # noqa: E402
 from src.content_update import run_incremental_update  # noqa: E402
 from src.db import POOL  # noqa: E402
+from src.db.bias import create_weekly_global_snapshot  # noqa: E402
 from src.db.dead_links import get_candidates_by_urls, get_due_urls, record_check  # noqa: E402
 from src.db.locks import advisory_lock  # noqa: E402
 from src.services.discord_embed_probe import post_discord_notice, probe_discord_embed  # noqa: E402
@@ -99,6 +101,14 @@ def run_recovery_once() -> dict[str, object]:
         )
 
 
+def run_bias_snapshot_once() -> dict[str, object]:
+    with advisory_lock("hanni:bias-snapshot") as acquired:
+        if not acquired:
+            return {"status": "skipped", "reason": "another bias snapshot job holds the lock"}
+        written = create_weekly_global_snapshot()
+        return {"status": "completed", "global_snapshot_written": written}
+
+
 def run_all_once() -> dict[str, object]:
     """Run one pass in a predictable order for a single web dyno."""
 
@@ -106,6 +116,7 @@ def run_all_once() -> dict[str, object]:
         "ingestion": run_ingestion_once(),
         "dead_links": run_dead_link_checks_once(),
         "recovery": run_recovery_once(),
+        "bias_snapshot": run_bias_snapshot_once(),
     }
 
 
@@ -129,6 +140,7 @@ async def scheduler_loop() -> None:
     last_ingestion = 0.0
     last_dead_links = 0.0
     last_recovery = 0.0
+    last_bias_snapshot = 0.0
     loop = asyncio.get_running_loop()
     while True:
         now = loop.time()
@@ -141,6 +153,9 @@ async def scheduler_loop() -> None:
         if now - last_recovery >= RECOVERY_INTERVAL_SECONDS:
             jobs.append(("recovery", run_recovery_once))
             last_recovery = now
+        if now - last_bias_snapshot >= BIAS_SNAPSHOT_INTERVAL_SECONDS:
+            jobs.append(("bias snapshot", run_bias_snapshot_once))
+            last_bias_snapshot = now
         for name, function in jobs:
             await _run_blocking(name, function, log_result=name != "dead-link checks")
             if name == "dead-link checks":
@@ -152,7 +167,7 @@ async def scheduler_loop() -> None:
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run Hanni background jobs")
-    parser.add_argument("job", choices=("ingest", "dead-links", "recovery", "all", "scheduler"), default="all", nargs="?")
+    parser.add_argument("job", choices=("ingest", "dead-links", "recovery", "bias-snapshot", "all", "scheduler"), default="all", nargs="?")
     return parser.parse_args(argv)
 
 
@@ -168,6 +183,8 @@ def main(argv: list[str] | None = None) -> int:
             print(run_dead_link_checks_once())
         elif args.job == "recovery":
             print(run_recovery_once())
+        elif args.job == "bias-snapshot":
+            print(run_bias_snapshot_once())
         else:
             print(run_all_once())
     finally:

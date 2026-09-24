@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    {% include "_social_meta.html" %}
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="hanni♡ — rank your biases wholesomely, then feed them unwholesomely." />
+    <title>hanni♡</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext x='32' y='46' text-anchor='middle' font-size='44' fill='%23b84d79'%3E%E2%99%A1%3C/text%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="/static/nav.css?v={{ static_version }}" />
+    <link rel="stylesheet" href="/static/home.css?v={{ static_version }}" />
+  </head>
+  <body>
+    {% set active = "home" %}{% include "_nav.html" %}
+    <main class="shell">
+      <header class="hero">
+        <h1>hanni<span aria-hidden="true">♡</span></h1>
+      </header>
+
+      <section class="menu-section" aria-labelledby="wholesome-title">
+        <h2 id="wholesome-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="/static/icons.svg?v={{ static_version }}#i-angel"/></svg> wholesome</h2>
+        <div class="menu-grid menu-grid-2">
+          <a class="menu-card" href="/sorter">
+            <span class="menu-emoji" aria-hidden="true"><svg class="icon" focusable="false"><use href="/static/icons.svg?v={{ static_version }}#i-heart"/></svg></span>
+            <strong>bias sorter</strong>
+            <span class="menu-desc">duel your faves till your ranking appears</span>
+          </a>
+          <a class="menu-card" href="/leaderboard">
+            <span class="menu-emoji" aria-hidden="true"><svg class="icon" focusable="false"><use href="/static/icons.svg?v={{ static_version }}#i-crown"/></svg></span>
+            <strong>leaderboard</strong>
+            <span class="menu-desc">global ELO plus your own personal taste</span>
+          </a>
+        </div>
+      </section>
+
+      <div class="nsfw-divider" aria-hidden="true"><svg class="icon" focusable="false"><use href="/static/icons.svg?v={{ static_version }}#i-heart"/></svg></div>
+
+      <section class="menu-section nsfw" aria-labelledby="nsfw-title">
+        <h2 id="nsfw-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="/static/icons.svg?v={{ static_version }}#i-flame"/></svg> nsfw</h2>
+        <div class="menu-grid menu-grid-3">
+          <a class="menu-card" href="/feed">
+            <span class="menu-emoji" aria-hidden="true"><svg class="icon" focusable="false"><use href="/static/icons.svg?v={{ static_version }}#i-dice"/></svg></span>
+            <strong>feed</strong>
+            <span class="menu-desc">the endless shuffle</span>
+          </a>
+          <a class="menu-card" href="/sets">
+            <span class="menu-emoji" aria-hidden="true"><svg class="icon" focusable="false"><use href="/static/icons.svg?v={{ static_version }}#i-folder"/></svg></span>
+            <strong>sets</strong>
+            <span class="menu-desc">every drop, grouped</span>
+          </a>
+          <a class="menu-card" href="/scroll">
+            <span class="menu-emoji" aria-hidden="true"><svg class="icon" focusable="false"><use href="/static/icons.svg?v={{ static_version }}#i-swirl"/></svg></span>
+            <strong>scroll</strong>
+            <span class="menu-desc">doomscroll, but make it idols</span>
+          </a>
+        </div>
+      </section>
+    </main>
+    <footer class="site-credit">made by glaceon</footer>
+    <script src="/static/analytics.js?v={{ static_version }}" defer></script>
+  </body>
+</html>

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import secrets
@@ -25,6 +26,16 @@ load_dotenv(REPO_ROOT / ".env.local", override=True)
 
 from src.db import POOL  # noqa: E402
 from src.db.analytics import record_country_session, record_link_request  # noqa: E402
+from src.db.bias import (  # noqa: E402
+    LEADERBOARD_SNAPSHOT_LIMIT,
+    ensure_visitor_snapshot,
+    get_global_group_leaderboard,
+    get_global_leaderboard,
+    get_or_create_visitor,
+    get_personal_group_leaderboard,
+    get_personal_leaderboard,
+    record_sorter_vote,
+)
 from src.db.feedback import ContentFeedback, add_content_report, add_content_vote  # noqa: E402
 from src.db.media import get_live_content_url  # noqa: E402
 from src.services.feed import load_feed, load_role_suggestions  # noqa: E402
@@ -41,6 +52,109 @@ from src.services.media import (  # noqa: E402
 
 templates = Jinja2Templates(directory=str(REPO_ROOT / "templates"))
 logger = logging.getLogger(__name__)
+
+
+def _norm_group_name(value: str | None) -> str:
+    import re
+
+    return re.sub(r"[^a-z0-9]", "", (value or "").lower())
+
+
+_GROUP_ALIASES = {"idle": "gidle", "ohmygirl": "omg"}
+
+
+def _resolve_group_name(value: str | None) -> str:
+    key = _norm_group_name(value)
+    if key == _norm_group_name("Girls' Generation"):
+        return _norm_group_name("SNSD")
+    return _GROUP_ALIASES.get(key, key)
+
+
+def _load_sorter_photo_maps() -> tuple[dict[str, str], dict[str, str], dict[str, str], dict[str, str], dict[str, str]]:
+    """Load sorter portrait overrides.
+
+    Returns ``(embed_by_role, local_by_role, embed_by_source, local_by_source,
+    group_photos)``:
+    - ``embed_*``: Discord-proxied kpopping bytes (preferred — the actual
+      kpopping portrait, hotlinkable with no expiry).
+    - ``local_*``: vendored same-origin sorter portraits (fallback).
+    - ``group_photos``: vendored group shots keyed by normalized group name.
+    Missing files (fresh checkout before the build scripts run) fall back to
+    database image urls.
+    """
+
+    embed_by_role: dict[str, str] = {}
+    embed_by_source: dict[str, str] = {}
+    try:
+        payload = json.loads((REPO_ROOT / "static" / "sorter" / "embed-photos.json").read_text())
+        embed_by_role = {str(k): str(v) for k, v in payload.get("by_role", {}).items()}
+        embed_by_source = {str(k): str(v) for k, v in payload.get("by_source", {}).items()}
+    except (OSError, ValueError):
+        pass
+    by_role: dict[str, str] = {}
+    by_source: dict[str, str] = {}
+    group_photos: dict[str, str] = {}
+    try:
+        payload = json.loads((REPO_ROOT / "static" / "sorter" / "role-photos.json").read_text())
+        by_role = {str(role_id): str(url) for role_id, url in payload.items()}
+    except (OSError, ValueError):
+        logger.warning("role-photos.json missing; leaderboard will use database image urls")
+    try:
+        catalog = json.loads((REPO_ROOT / "static" / "sorter" / "catalog.json").read_text())
+        for entry in catalog.get("entries", []):
+            local = entry.get("local")
+            if not local:
+                continue
+            for source in (entry.get("photo"), entry.get("fallback")):
+                if source:
+                    by_source.setdefault(str(source), str(local))
+            if entry.get("kind") == "group" and entry.get("group"):
+                group_photos.setdefault(_resolve_group_name(entry.get("group")), str(local))
+    except (OSError, ValueError):
+        pass
+    return embed_by_role, by_role, embed_by_source, by_source, group_photos
+
+
+EMBED_PHOTOS, ROLE_PHOTOS, EMBED_SOURCES, SOURCE_PHOTOS, GROUP_PHOTOS = _load_sorter_photo_maps()
+
+
+def _board_image(entry_role_id: str, image_url: str | None) -> str | None:
+    if entry_role_id and entry_role_id in EMBED_PHOTOS:
+        return EMBED_PHOTOS[entry_role_id]
+    if entry_role_id and entry_role_id in ROLE_PHOTOS:
+        return ROLE_PHOTOS[entry_role_id]
+    if image_url and image_url in EMBED_SOURCES:
+        return EMBED_SOURCES[image_url]
+    if image_url and image_url in SOURCE_PHOTOS:
+        return SOURCE_PHOTOS[image_url]
+    return image_url
+
+
+def _member_image(image_url: str | None) -> str | None:
+    """Resolve one top-member portrait to something hotlinkable."""
+
+    if image_url and image_url in EMBED_SOURCES:
+        return EMBED_SOURCES[image_url]
+    if image_url and image_url in SOURCE_PHOTOS:
+        return SOURCE_PHOTOS[image_url]
+    return image_url
+
+
+def _group_image(group_name: str | None, fallback_url: str | None) -> str | None:
+    """Prefer the vendored group shot; fall back to the top member portrait."""
+
+    photo = GROUP_PHOTOS.get(_resolve_group_name(group_name))
+    if photo:
+        return photo
+    return _board_image("", fallback_url)
+
+
+def _serialize_top_members(entry: Any) -> list[dict[str, str | None]]:
+    images = list(entry.top_member_images or [])
+    return [
+        {"name": name, "image_url": _member_image(images[index] if index < len(images) else None)}
+        for index, name in enumerate(entry.top_members or [])
+    ]
 
 VISITOR_COOKIE = "hanni_visitor"
 ANALYTICS_SESSION_COOKIE = "hanni_analytics_session"
@@ -87,6 +201,12 @@ _scroll_rate_limiter = _RecentActionRateLimiter(SCROLL_COOLDOWN_SECONDS, SCROLL_
 _analytics_rate_limiter = _RecentActionRateLimiter(
     ANALYTICS_SESSION_SECONDS,
     ANALYTICS_CACHE_CAPACITY,
+)
+SORTER_VOTE_COOLDOWN_SECONDS = 2
+SORTER_VOTE_CACHE_CAPACITY = 2048
+_sorter_vote_rate_limiter = _RecentActionRateLimiter(
+    SORTER_VOTE_COOLDOWN_SECONDS,
+    SORTER_VOTE_CACHE_CAPACITY,
 )
 
 
@@ -165,17 +285,34 @@ app.mount("/static", StaticFiles(directory=str(REPO_ROOT / "static")), name="sta
 
 
 def _static_version() -> str:
-    """Change asset URLs whenever local CSS or JavaScript changes."""
+    """Change asset URLs whenever local CSS, JavaScript, or data changes."""
 
-    assets = tuple((REPO_ROOT / "static").glob("*.css")) + tuple((REPO_ROOT / "static").glob("*.js"))
+    assets = (
+        tuple((REPO_ROOT / "static").rglob("*.css"))
+        + tuple((REPO_ROOT / "static").rglob("*.js"))
+        + tuple((REPO_ROOT / "static").rglob("*.json"))
+        + tuple((REPO_ROOT / "static").rglob("*.svg"))
+        + tuple((REPO_ROOT / "static").glob("og-image.png"))
+    )
     return str(max(asset.stat().st_mtime_ns for asset in assets))
 
 
 @app.get("/", response_class=HTMLResponse)
-async def index(request: Request) -> HTMLResponse:
+async def home(request: Request) -> HTMLResponse:
     response = templates.TemplateResponse(
         request=request,
-        name="index.html",
+        name="home.html",
+        context={"static_version": _static_version()},
+    )
+    _ensure_visitor_cookie(request, response)
+    return response
+
+
+@app.get("/feed", response_class=HTMLResponse)
+async def feed_page(request: Request) -> HTMLResponse:
+    response = templates.TemplateResponse(
+        request=request,
+        name="feed.html",
         context={"static_version": _static_version()},
     )
     _ensure_visitor_cookie(request, response)
@@ -198,6 +335,28 @@ async def scroll_page(request: Request) -> HTMLResponse:
     response = templates.TemplateResponse(
         request=request,
         name="scroll.html",
+        context={"static_version": _static_version()},
+    )
+    _ensure_visitor_cookie(request, response)
+    return response
+
+
+@app.get("/sorter", response_class=HTMLResponse)
+async def sorter_page(request: Request) -> HTMLResponse:
+    response = templates.TemplateResponse(
+        request=request,
+        name="sorter.html",
+        context={"static_version": _static_version()},
+    )
+    _ensure_visitor_cookie(request, response)
+    return response
+
+
+@app.get("/leaderboard", response_class=HTMLResponse)
+async def leaderboard_page(request: Request) -> HTMLResponse:
+    response = templates.TemplateResponse(
+        request=request,
+        name="leaderboard.html",
         context={"static_version": _static_version()},
     )
     _ensure_visitor_cookie(request, response)
@@ -658,6 +817,143 @@ async def report(
         action="report",
         report_reason=reason,
     )
+
+
+@app.post("/api/sorter/vote")
+async def sorter_vote(
+    request: Request,
+    response: Response,
+    payload: dict[str, Any] = Body(...),
+) -> dict[str, bool]:
+    """Record one bias-sorter matchup as an ELO vote (best-effort, always 200)."""
+
+    visitor_token = _ensure_visitor_cookie(request, response)
+    try:
+        winner_id = str(payload.get("winner_role_id", ""))
+        loser_id = str(payload.get("loser_role_id", ""))
+    except AttributeError:
+        return {"recorded": False}
+    if not winner_id or not loser_id or winner_id == loser_id:
+        return {"recorded": False}
+    if not _sorter_vote_rate_limiter.allow(visitor_token, "sorter-vote"):
+        return {"recorded": False}
+    try:
+        visitor_id = await asyncio.to_thread(get_or_create_visitor, visitor_token)
+        recorded = await asyncio.to_thread(record_sorter_vote, visitor_id, winner_id, loser_id)
+    except Exception:
+        logger.exception("Could not record sorter vote")
+        return {"recorded": False}
+    return {"recorded": recorded is not None}
+
+
+@app.get("/api/leaderboard")
+async def leaderboard(
+    request: Request,
+    response: Response,
+    scope: str = Query(default="global"),
+    kind: str = Query(default="idols"),
+) -> dict[str, Any]:
+    if scope not in {"global", "personal"}:
+        raise HTTPException(status_code=400, detail="scope must be global or personal")
+    if kind not in {"idols", "groups"}:
+        raise HTTPException(status_code=400, detail="kind must be idols or groups")
+    visitor_token = _ensure_visitor_cookie(request, response)
+    try:
+        if scope == "global":
+            if kind == "idols":
+                board = await asyncio.to_thread(
+                    get_global_leaderboard, LEADERBOARD_SNAPSHOT_LIMIT
+                )
+                return {
+                    "scope": scope,
+                    "kind": kind,
+                    "vote_count": board.vote_count,
+                    "movement_baseline_date": board.movement_baseline_date.isoformat()
+                    if board.movement_baseline_date
+                    else None,
+                    "entries": [
+                        {
+                            "rank": index + 1,
+                            "role_id": entry.role_id,
+                            "member_name": entry.member_name,
+                            "group_name": entry.group_name,
+                            "elo": entry.elo,
+                            "image_url": _board_image(entry.role_id, entry.image_url),
+                            "previous_rank": entry.previous_rank,
+                            "votes": entry.votes,
+                        }
+                        for index, entry in enumerate(board.entries)
+                    ],
+                }
+            group_board = await asyncio.to_thread(get_global_group_leaderboard, 15, 3)
+            return {
+                "scope": scope,
+                "kind": kind,
+                "vote_count": group_board.vote_count,
+                "top_n": group_board.top_n,
+                "entries": [
+                    {
+                        "group_name": entry.group_name,
+                        "elo": entry.elo,
+                        "member_count": entry.member_count,
+                        "ranked_member_count": entry.ranked_member_count,
+                        "top_members": _serialize_top_members(entry),
+                        "image_url": _group_image(entry.group_name, entry.image_url),
+                        "votes": entry.votes,
+                    }
+                    for entry in group_board.entries
+                ],
+            }
+        visitor_id = await asyncio.to_thread(get_or_create_visitor, visitor_token)
+        if kind == "idols":
+            board = await asyncio.to_thread(get_personal_leaderboard, visitor_id, LEADERBOARD_SNAPSHOT_LIMIT)
+            await asyncio.to_thread(ensure_visitor_snapshot, visitor_id)
+            return {
+                "scope": scope,
+                "kind": kind,
+                "vote_count": board.vote_count,
+                "movement_baseline_date": board.movement_baseline_date.isoformat()
+                if board.movement_baseline_date
+                else None,
+                "entries": [
+                    {
+                        "rank": index + 1,
+                        "role_id": entry.role_id,
+                        "member_name": entry.member_name,
+                        "group_name": entry.group_name,
+                        "elo": entry.elo,
+                        "image_url": _board_image(entry.role_id, entry.image_url),
+                        "previous_rank": entry.previous_rank,
+                        "votes": entry.votes,
+                    }
+                    for index, entry in enumerate(board.entries)
+                ],
+            }
+        group_board = await asyncio.to_thread(get_personal_group_leaderboard, visitor_id, 15, 3)
+        await asyncio.to_thread(ensure_visitor_snapshot, visitor_id)
+        return {
+            "scope": scope,
+            "kind": kind,
+            "vote_count": group_board.vote_count,
+            "top_n": group_board.top_n,
+            "entries": [
+                {
+                    "group_name": entry.group_name,
+                    "elo": entry.elo,
+                    "member_count": entry.member_count,
+                    "ranked_member_count": entry.ranked_member_count,
+                    "top_members": _serialize_top_members(entry),
+                    "image_url": _group_image(entry.group_name, entry.image_url),
+                    "votes": entry.votes,
+                }
+                for entry in group_board.entries
+            ],
+        }
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Could not load leaderboard")
+        raise HTTPException(status_code=503, detail="Leaderboard is catching up. Please retry shortly.")
 
 
 @app.get("/api/roles")

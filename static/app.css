@@ -33,7 +33,7 @@ button:disabled { cursor: wait; opacity: .55; }
   flex: 1 0 auto;
   width: min(920px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 56px 0 64px;
+  padding: 0 0 64px;
 }
 
 .site-credit {
@@ -45,19 +45,7 @@ button:disabled { cursor: wait; opacity: .55; }
   text-align: center;
 }
 
-.brand { margin: 0 auto 26px; text-align: center; }
-.brand-link { color: inherit; text-decoration: none; }
-.brand-link:focus-visible { outline: 3px solid var(--pink-soft); outline-offset: 5px; }
-.brand h1 {
-  margin: 0;
-  color: var(--pink-dark);
-  font-size: clamp(2.8rem, 8vw, 4.7rem);
-  font-family: Georgia, "Times New Roman", serif;
-  font-weight: 400;
-  letter-spacing: -.09em;
-  line-height: 1;
-}
-.brand h1 span { color: var(--pink); font-weight: 400; }
+
 
 .search {
   display: grid;
@@ -104,27 +92,7 @@ button:disabled { cursor: wait; opacity: .55; }
 }
 .search button:hover { background: var(--pink-dark); }
 
-.surface-nav {
-  display: flex;
-  justify-content: center;
-  gap: 18px;
-  margin: -13px auto 16px;
-  color: var(--muted);
-  font-size: .68rem;
-}
-.surface-nav a,
-.surface-nav span {
-  border-bottom: 1px solid transparent;
-  color: inherit;
-  padding: 2px 1px;
-  text-decoration: none;
-}
-.surface-nav a { transition: color 130ms ease; }
-.surface-nav a:hover { color: var(--pink-dark); }
-.surface-nav [aria-current="page"] {
-  border-bottom-color: currentColor;
-  color: var(--pink-dark);
-}
+/* (The site menu lives in nav.css and is shared across pages.) */
 
 .feed-status {
   max-width: 720px;
@@ -295,8 +263,9 @@ button:disabled { cursor: wait; opacity: .55; }
   justify-content: space-between;
   gap: 14px;
 }
-.card-title { font-size: .98rem; font-weight: 700; line-height: 1.25; }
+.card-title { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Rounded", "Segoe UI", sans-serif; letter-spacing: -.015em; overflow-wrap: anywhere; font-size: .98rem; font-weight: 700; line-height: 1.25; }
 .set-position {
+  font-variant-numeric: tabular-nums;
   flex: none;
   color: var(--muted);
   font-size: .68rem;
@@ -325,7 +294,7 @@ button:disabled { cursor: wait; opacity: .55; }
 }
 .collection-link:hover { color: var(--pink); }
 
-.card-actions { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; margin-top: 13px; }
+.card-actions { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; margin-top: 15px; padding-top: 12px; border-top: 1px solid var(--line); }
 .card-actions button {
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -342,7 +311,7 @@ button:disabled { cursor: wait; opacity: .55; }
 .card-actions .upvote:hover { border-color: var(--green); color: var(--green); }
 .card-actions .downvote:hover { border-color: var(--red); color: var(--red); }
 .card-actions .copy { margin-left: auto; padding-inline: 12px; white-space: nowrap; }
-.vote-score { color: var(--muted); font-size: .72rem; min-width: 22px; text-align: center; }
+.vote-score { font-variant-numeric: tabular-nums; color: var(--muted); font-size: .72rem; min-width: 22px; text-align: center; }
 .feedback-message { margin: 8px 0 0; color: var(--muted); font-size: .68rem; }
 .feedback-message:empty { display: none; }
 
@@ -386,7 +355,6 @@ button:disabled { cursor: wait; opacity: .55; }
 .timeline-tools button:hover,
 .timeline-tools button:focus-visible { background: var(--pink-soft); }
 button:focus-visible,
-.surface-nav a:focus-visible,
 .collection-link:focus-visible {
   outline: 2px solid var(--pink);
   outline-offset: 2px;
@@ -414,16 +382,13 @@ button:focus-visible,
 }
 
 @media (max-width: 620px) {
-  .shell { width: min(100% - 20px, 920px); padding: 36px 0 48px; }
-  .brand { margin-bottom: 22px; }
-  .brand h1 { font-size: clamp(2.7rem, 15vw, 3.7rem); }
+  .shell { width: min(100% - 20px, 920px); padding: 0 0 48px; }
   .search { grid-template-columns: minmax(0, 1fr) auto auto; }
   .search.feed-search { grid-template-columns: minmax(0, 1fr) auto auto; }
   .search.sets-search { grid-template-columns: minmax(0, 1fr) auto auto; }
   .search input, .search select, .search button { font-size: 16px; }
   .search input { grid-column: 1 / -1; }
   .search button { padding-inline: 17px; }
-  .surface-nav { margin-top: -11px; }
   .feed-status { margin-top: 14px; }
   .feed-list { width: 100%; gap: 20px; margin-top: 22px; }
   .collection-heading { width: 100%; margin-top: 18px; }
@@ -473,8 +438,7 @@ button:focus-visible,
 }
 
 @media (min-width: 621px) {
-  .surface-nav { font-size: .78rem; }
-  .card-title { font-size: 1.08rem; }
+  .card-title { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Rounded", "Segoe UI", sans-serif; letter-spacing: -.015em; overflow-wrap: anywhere; font-size: 1.08rem; }
   .card-meta { font-size: .74rem; }
   .collection-link { font-size: .73rem; }
   .card-actions button { font-size: .79rem; }
@@ -492,8 +456,16 @@ button:focus-visible,
   .card-media img,
   .card-media video,
   .search button,
-  .surface-nav a,
   .collection-link,
   .card-actions button,
   .timeline-tools button { transition: none; }
+}
+
+/* A consistent focus treatment for the compact feed and set controls. */
+.search button:focus-visible,
+.card-actions button:focus-visible,
+.set-arrow:focus-visible,
+.collection-link:focus-visible {
+  outline: 2px solid var(--pink);
+  outline-offset: 3px;
 }

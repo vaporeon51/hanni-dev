@@ -3,7 +3,7 @@
 The SQL files are the existing Hanni schema history copied into this web-only
 repository. For a fresh database, apply `create_tables.sql`, then `roles.sql`,
 then `content.sql`, followed by `table_updates.sql` and
-`table_updates2.sql` through `table_updates33.sql` in numeric order. For the
+`table_updates2.sql` through `table_updates36.sql` in numeric order. For the
 existing Heroku Postgres database, apply only migrations it does not already
 have. Do not recreate the production database.
 

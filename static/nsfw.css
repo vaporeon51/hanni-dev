@@ -1,0 +1,177 @@
+/* Dark NSFW theme — loaded last on feed, sets, and scroll only.
+   The wholesome side (home, sorter, leaderboard) stays light, so the mood
+   shift itself marks the boundary. Mostly variable overrides; anything with
+   a hardcoded light surface gets an explicit rule below. */
+body.nsfw {
+  --page: #161219;
+  --card: #211a24;
+  --text: #f2e7ee;
+  --muted: #a78fa0;
+  --line: #3a2b37;
+  --pink: #e99aba;
+  --pink-dark: #f2b1cc;
+  --pink-soft: #2d2233;
+  --green: #8fc0a4;
+  --red: #e095a3;
+  --nsfw-accent: #c39bd3;
+  color-scheme: dark;
+  background:
+    radial-gradient(circle at 20% 8%, rgba(233, 154, 186, 0.09), transparent 26rem),
+    radial-gradient(circle at 85% 12%, rgba(233, 154, 186, 0.07), transparent 22rem),
+    var(--page);
+}
+/* feed + sets surfaces with hardcoded light colors */
+body.nsfw .card-actions button { background: var(--card); }
+body.nsfw .card-media video { background: #171219; }
+body.nsfw .set-arrow {
+  border-color: rgba(58, 43, 55, 0.9);
+  background: rgba(33, 26, 36, 0.9);
+}
+body.nsfw .set-arrow:hover { background: var(--card); }
+body.nsfw .timeline-tools {
+  border-color: rgba(58, 43, 55, 0.92);
+  background: rgba(33, 26, 36, 0.9);
+}
+body.nsfw .sets-search select,
+body.nsfw .feed-search select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%23a78fa0' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+body.nsfw .search input::placeholder,
+body.nsfw .scroll-search input::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+/* scroll chrome */
+body.nsfw .scroll-topbar {
+  border-bottom-color: rgba(58, 43, 55, 0.85);
+  background: rgba(22, 18, 25, 0.88);
+}
+body.nsfw .scroll-search input {
+  border-color: var(--line);
+  background: rgba(33, 26, 36, 0.92);
+}
+body.nsfw .scroll-hint {
+  border-color: rgba(58, 43, 55, 0.92);
+  background: rgba(33, 26, 36, 0.92);
+}
+body.nsfw .autoplay-toggle { background: rgba(33, 26, 36, 0.94); }
+body.nsfw .autoplay-menu { background: rgba(33, 26, 36, 0.97); }
+body.nsfw .view-toggle { background: var(--pink-soft); }
+
+/* Compact search controls across feed, sets, and desktop scroll. */
+body.nsfw .search input,
+body.nsfw .search select,
+body.nsfw .search button { min-height: 40px; }
+body.nsfw .search input { padding: 8px 16px; }
+body.nsfw .search select { padding-block: 8px; }
+body.nsfw .search button { padding-inline: 16px; }
+@media (min-width: 701px) {
+  /* Match the normal-flow nav and search row on feed and sets exactly. */
+  body.nsfw .scroll-topbar { padding: 18px 0 12px; }
+  body.nsfw .scroll-topbar .site-nav {
+    margin: 0 auto 20px;
+    padding: 8px 16px;
+  }
+  body.nsfw .scroll-filterbar {
+    width: min(920px, calc(100% - 32px));
+    margin: 0 auto;
+  }
+  body.nsfw .scroll-search {
+    width: 100%;
+    max-width: 760px;
+  }
+  body.nsfw .search input,
+  body.nsfw .search select,
+  body.nsfw .search button,
+  body.nsfw .scroll-search input,
+  body.nsfw .scroll-search button {
+    height: 40px;
+    min-height: 40px;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  body.nsfw .scroll-search input {
+    padding: 8px 16px;
+    background: var(--card);
+  }
+  body.nsfw .scroll-filter-icon { display: none; }
+  body.nsfw .scroll-search button { padding-inline: 16px; }
+}
+@media (min-width: 701px) and (max-width: 760px) {
+  body.nsfw .scroll-topbar .site-nav { padding: 10px 12px; }
+}
+
+/* Dark surfaces use quiet depth; pink buttons keep readable dark lettering. */
+body.nsfw .card {
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .18);
+}
+body.nsfw .search button,
+body.nsfw .scroll-search button { color: #33202c; }
+@media (max-width: 700px) {
+  body.nsfw .scroll-topbar {
+    background: linear-gradient(rgba(32, 21, 27, .48), transparent);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* A soft notice over the visible page; the native dialog traps focus. */
+.age-gate-pending { overflow: hidden; }
+.age-gate {
+  width: min(490px, calc(100% - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 30px;
+  border: 1px solid #edd3df;
+  border-radius: 28px;
+  background: linear-gradient(145deg, #fffafb, #fff1f7);
+  color: #614a56;
+  color-scheme: light;
+  box-shadow: 0 24px 80px #160c2338, inset 0 1px 0 #fff;
+}
+.age-gate::backdrop {
+  background: rgba(35, 22, 34, .28);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+.age-gate-heading { display: flex; justify-content: space-between; align-items: center; }
+.age-gate-heading .icon { width: 28px; height: 28px; color: #d68aaa; }
+.age-gate-badge {
+  padding: 6px 12px;
+  border: 1px solid #efd3e0;
+  border-radius: 999px;
+  background: #fce8f1;
+  color: #a34b72;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+}
+.age-gate h1 {
+  margin: 22px 0 10px;
+  font: normal clamp(26px, 6vw, 32px)/1.2 Georgia, serif;
+  letter-spacing: -.025em;
+  color: #a34b72;
+}
+.age-gate p { margin: 0 0 20px; color: #876b79; font-size: 13px; line-height: 1.6; }
+.age-gate-notes { list-style: none; padding: 0; margin: 22px 0; }
+.age-gate-notes li { display: flex; align-items: flex-start; gap: 12px; padding: 13px 0; font-size: 13px; line-height: 1.6; }
+.age-gate-notes li + li { border-top: 1px solid #efdee6; }
+.age-gate-number { flex: none; color: #bb6d90; font-size: 11px; padding-top: 2px; }
+.age-gate-notes strong { color: #7a3d59; font-weight: 600; }
+.age-gate .age-gate-consent { font-size: 11px; margin-bottom: 0; }
+.age-gate-actions { display: flex; flex-direction: column; gap: 16px; margin-top: 22px; }
+.age-gate-actions a { order: 2; color: #876b79; font-size: 12px; text-underline-offset: 4px; }
+.age-gate button {
+  width: 100%;
+  padding: 13px 18px;
+  border: 1px solid #b6537d;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #c86b93, #ad4b76);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 5px 16px #b84d7925;
+}
+.age-gate button:hover { background: #ad4b76; }
+.age-gate :is(button, a):focus-visible { outline: 2px solid #a34b72; outline-offset: 4px; }
+.age-gate-noscript { padding: 24px; text-align: center; }
+.age-gate-noscript a { color: var(--pink-dark); }
+@media (max-width: 400px) { .age-gate { padding: 24px; } }

@@ -28,6 +28,76 @@ class DiscordEmbedProbeResult:
     embed_pending: bool = False
 
 
+@dataclass(frozen=True)
+class EmbedImageHarvest:
+    """A display-ready image URL harvested from Discord's unfurl.
+
+    Discord's crawler passes hotlink protection (e.g. Cloudflare) that blocks
+    direct fetches, and its ``images-ext`` proxy serves the same bytes with no
+    auth, no expiry params, and deterministic URLs per source.
+    """
+
+    url: str
+    proxy_url: str | None = None
+    width: int | None = None
+    height: int | None = None
+    error: str | None = None
+
+
+def _extract_embed_image(url: str, message: object) -> EmbedImageHarvest | None:
+    """Return a harvest when the message's first embed carries an image.
+
+    Returns None when there is no embed yet (keep polling), or a harvest with
+    ``error`` set when the embed has no usable image (stop polling).
+    """
+
+    if not isinstance(message, dict):
+        return None
+    embeds = message.get("embeds")
+    if not isinstance(embeds, list) or not embeds:
+        return None
+    first_embed = embeds[0]
+    if not isinstance(first_embed, dict):
+        return None
+    node = first_embed.get("thumbnail") or first_embed.get("image")
+    if not isinstance(node, dict):
+        return EmbedImageHarvest(url=url, error="Discord embed has no image")
+    proxy_url = node.get("proxy_url")
+    if not isinstance(proxy_url, str) or not proxy_url.startswith("https://images-ext-"):
+        return EmbedImageHarvest(url=url, error="Discord embed has no proxied image")
+
+    def _dimension(value: object) -> int | None:
+        return value if isinstance(value, int) and value > 0 else None
+
+    return EmbedImageHarvest(
+        url=url,
+        proxy_url=proxy_url,
+        width=_dimension(node.get("width")),
+        height=_dimension(node.get("height")),
+    )
+
+
+def _delete_webhook_message(
+    session: requests.Session,
+    webhook_url: str,
+    message_id: str,
+    *,
+    sleep: Callable[[float], None],
+    request_timeout: int,
+) -> None:
+    try:
+        response = _request(
+            session,
+            "DELETE",
+            _message_url(webhook_url, message_id),
+            sleep=sleep,
+            timeout=(10, request_timeout),
+        )
+        response.close()
+    except requests.RequestException:
+        pass  # cleanup is best-effort; the probe channel is private
+
+
 def post_discord_notice(
     content: str,
     *,
@@ -237,5 +307,92 @@ def probe_discord_embed(
     except (TypeError, ValueError, requests.JSONDecodeError) as error:
         return DiscordEmbedProbeResult(url=url, status="unknown", error=f"Invalid Discord response: {error}")
     finally:
+        if owns_session:
+            session.close()
+
+
+def harvest_embed_image(
+    url: str,
+    *,
+    webhook_url: str,
+    session: requests.Session | None = None,
+    wait_seconds: float = 12.0,
+    poll_interval_seconds: float = 1.0,
+    request_timeout: int = DEAD_LINK_REQUEST_TIMEOUT_SECONDS,
+    delete_message: bool = True,
+    monotonic: Callable[[], float] = time.monotonic,
+    sleep: Callable[[float], None] = time.sleep,
+) -> EmbedImageHarvest:
+    """Post ``url`` and harvest its Discord-proxied image URL.
+
+    Discord's unfurl crawler fetches source hosts that block direct hotlinks,
+    and the ``images-ext`` proxy serves the same bytes with no auth and no
+    expiry. The probe message is deleted afterwards to keep the private
+    channel clean. Slow by design (post + unfurl poll); use for one-time
+    backfills, never per request.
+    """
+
+    if not _valid_webhook_url(webhook_url):
+        return EmbedImageHarvest(url=url, error="invalid Discord webhook URL")
+
+    owns_session = session is None
+    session = session or requests.Session()
+    message_id: str | None = None
+    try:
+        try:
+            response = _request(
+                session,
+                "POST",
+                _with_wait(webhook_url),
+                sleep=sleep,
+                json={"content": url, "allowed_mentions": {"parse": []}},
+                timeout=(10, request_timeout),
+            )
+            try:
+                if response.status_code == 429:
+                    return EmbedImageHarvest(url=url, error="Discord webhook rate limited")
+                response.raise_for_status()
+                message = response.json()
+            finally:
+                response.close()
+        except requests.RequestException as error:
+            return EmbedImageHarvest(
+                url=url, error=f"Discord webhook request failed: {_safe_error(error, webhook_url)}"
+            )
+        if not isinstance(message, dict) or not message.get("id"):
+            return EmbedImageHarvest(url=url, error="Discord did not return a message ID")
+        message_id = str(message["id"])
+
+        harvest = _extract_embed_image(url, message)
+        message_endpoint = _message_url(webhook_url, message_id)
+        deadline = monotonic() + max(0.0, wait_seconds)
+        while harvest is None and monotonic() < deadline:
+            remaining = deadline - monotonic()
+            sleep(min(max(0.0, poll_interval_seconds), max(0.0, remaining)))
+            try:
+                response = _request(
+                    session, "GET", message_endpoint, sleep=sleep, timeout=(10, request_timeout)
+                )
+                try:
+                    if response.status_code == 429:
+                        return EmbedImageHarvest(url=url, error="Discord webhook rate limited")
+                    response.raise_for_status()
+                    message = response.json()
+                finally:
+                    response.close()
+            except requests.RequestException as error:
+                return EmbedImageHarvest(
+                    url=url, error=f"Discord webhook request failed: {_safe_error(error, webhook_url)}"
+                )
+            harvest = _extract_embed_image(url, message)
+
+        return harvest or EmbedImageHarvest(
+            url=url, error=f"Discord produced no image embed within {max(0.0, wait_seconds):g} seconds"
+        )
+    finally:
+        if message_id and delete_message:
+            _delete_webhook_message(
+                session, webhook_url, message_id, sleep=sleep, request_timeout=request_timeout
+            )
         if owns_session:
             session.close()

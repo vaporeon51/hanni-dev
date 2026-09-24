@@ -1,20 +1,19 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="age-gate-pending">
   <head>
     <meta charset="utf-8" />
+    {% include "_social_meta.html" %}
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>scroll · hanni♡</title>
+    <link rel="stylesheet" href="/static/nav.css?v={{ static_version }}" />
     <link rel="stylesheet" href="/static/app.css?v={{ static_version }}" />
     <link rel="stylesheet" href="/static/scroll.css?v={{ static_version }}" />
+    <link rel="stylesheet" href="/static/nsfw.css?v={{ static_version }}" />
   </head>
-  <body class="scroll-page">
+  <body class="scroll-page nsfw">
     <header class="scroll-topbar">
-      <a class="scroll-brand" href="/" aria-label="hanni home">hanni<span aria-hidden="true">♡</span></a>
-      <nav class="scroll-nav" aria-label="Browse style">
-        <a href="/">feed</a>
-        <a href="/sets">sets</a>
-        <span aria-current="page">scroll</span>
-      </nav>
+      {% set active = "scroll" %}{% include "_nav.html" %}
+      <div class="scroll-filterbar">
       <form id="scroll-form" class="scroll-search" role="search">
         <label class="sr-only" for="query">Filter by idol or group</label>
         <svg class="scroll-filter-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -24,7 +23,7 @@
           id="query"
           name="query"
           type="search"
-          placeholder="idol or group"
+          placeholder="search a member or group"
           autocomplete="off"
           autocapitalize="none"
           autocorrect="off"
@@ -32,13 +31,14 @@
           enterkeyhint="search"
         />
         <button type="submit" aria-label="Filter reels">
-          <span class="scroll-search-label">go</span>
+          <span class="scroll-search-label">Search</span>
           <svg class="scroll-search-icon" viewBox="0 0 24 24" aria-hidden="true">
             <circle cx="11" cy="11" r="6.5"></circle>
             <path d="m16 16 4 4"></path>
           </svg>
         </button>
       </form>
+      </div>
     </header>
 
     <main id="reel-feed" class="reel-feed" aria-live="polite" aria-label="Scrolling content feed"></main>
@@ -72,6 +72,9 @@
       </div>
     </div>
     </div>
+    <button id="scroll-hint" class="scroll-hint" type="button" hidden>
+      <svg class="scroll-hint-chev" viewBox="0 0 12 8" aria-hidden="true" focusable="false"><path d="M1 1.5 6 6.5 11 1.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> scroll for more
+    </button>
     <div id="lightbox" class="lightbox" hidden>
       <div class="lightbox-backdrop" data-lightbox-close></div>
       <figure class="lightbox-panel" role="dialog" aria-modal="true" aria-label="Expanded reel">
@@ -87,6 +90,7 @@
     </div>
 
     <script src="/static/analytics.js?v={{ static_version }}" defer></script>
-    <script src="/static/scroll.js?v={{ static_version }}" defer></script>
+    {% include "_age_gate.html" %}
+    <script src="/static/age-gate.js?v={{ static_version }}" data-page-script="/static/scroll.js?v={{ static_version }}" defer></script>
   </body>
 </html>

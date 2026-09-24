@@ -1,0 +1,17 @@
+{% set social_title = 'hanni♡ · find your bias, explore your favorites' %}
+{% set social_description = 'Duel your K-pop faves in the bias sorter, explore global and personal leaderboards, and discover the NSFW feed, sets, and scroll.' %}
+{% set social_image = request.url_for('static', path='og-image.png') | string %}
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="hanni♡" />
+<meta property="og:title" content="{{ social_title }}" />
+<meta property="og:description" content="{{ social_description }}" />
+<meta property="og:url" content="{{ request.url.replace(query='') }}" />
+<meta property="og:image" content="{{ social_image }}?v={{ static_version }}" />
+<meta property="og:image:type" content="image/png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="Hanni with aespa, IVE, BLACKPINK, and NewJeans photo cards, plus bias sorter, leaderboard, feed, sets, and scroll features." />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="{{ social_title }}" />
+<meta name="twitter:description" content="{{ social_description }}" />
+<meta name="twitter:image" content="{{ social_image }}?v={{ static_version }}" />

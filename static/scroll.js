@@ -23,6 +23,7 @@ const state = {
   seenUrls: new Set(),
   spacer: null,
   spacerHeight: 0,
+  hintDismissed: false,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -51,9 +52,9 @@ function applyViewMode(mode, { silent = false } = {}) {
   if (!silent) announce(on ? "collage mode on" : "collage mode off");
 }
 function initViewMode() {
-  let stored = "feed";
+  let stored = "collage";
   try {
-    stored = window.localStorage.getItem(VIEW_STORAGE_KEY) || "feed";
+    stored = window.localStorage.getItem(VIEW_STORAGE_KEY) || "collage";
   } catch (_) {}
   applyViewMode(stored, { silent: true });
   $("view-toggle")?.addEventListener("click", () => {
@@ -479,6 +480,10 @@ function initAutoplay() {
   state.autoplayDurationMs = reducedMotionQuery.matches ? 0 : stored;
   refreshAutoplayChrome();
   const toggle = $("autoplay-toggle");
+  if (state.autoplayDurationMs === 0 && !reducedMotionQuery.matches) {
+    toggle.classList.add("attract");
+    toggle.addEventListener("animationend", () => toggle.classList.remove("attract"), { once: true });
+  }
   const menu = $("autoplay-menu");
   const closeMenu = () => {
     menu.hidden = true;
@@ -853,6 +858,7 @@ async function loadMore({ initial = false } = {}) {
       setActiveCard(first);
       first._cells.forEach((cell) => cell._media.load());
       state.cards[1]?._cells.forEach((cell) => cell._media.load());
+      showScrollHint();
       announce("");
     } else if (initial && !state.cards.length) {
       announce("no reels found · try another search ♡", { sticky: true });
@@ -888,6 +894,9 @@ function resetFeed(query) {
   state.spacer = document.createElement("div");
   state.spacer.className = "reel-spacer";
   state.spacer.setAttribute("aria-hidden", "true");
+  state.hintDismissed = false;
+  $("scroll-hint").classList.remove("is-visible");
+  $("scroll-hint").hidden = true;
   $("reel-feed").replaceChildren(state.spacer);
   const url = new URL(window.location.href);
   if (query) url.searchParams.set("q", query);
@@ -900,8 +909,24 @@ function resetFeed(query) {
   loadMore({ initial: true });
 }
 
-function navigateBy(direction) {
-  const index = Math.max(0, state.cards.indexOf(state.activeCard));
+function showScrollHint() {
+  if (state.hintDismissed || state.cards.length < 2) return;
+  const hint = $("scroll-hint");
+  hint.hidden = false;
+  window.requestAnimationFrame(() => hint.classList.add("is-visible"));
+}
+
+function dismissScrollHint() {
+  if (state.hintDismissed) return;
+  state.hintDismissed = true;
+  const hint = $("scroll-hint");
+  hint.classList.remove("is-visible");
+  window.setTimeout(() => {
+    hint.hidden = true;
+  }, 350);
+}
+
+function navigateBy(direction) {  const index = Math.max(0, state.cards.indexOf(state.activeCard));
   const nextIndex = index + direction;
   const target = state.cards[nextIndex];
   if (!target) {
@@ -920,6 +945,19 @@ $("scroll-form").addEventListener("submit", (event) => {
   $("query").blur();
   resetFeed($("query").value.trim());
 });
+
+$("scroll-hint").addEventListener("click", () => {
+  navigateBy(1);
+  dismissScrollHint();
+});
+
+$("reel-feed").addEventListener(
+  "scroll",
+  () => {
+    if (!state.hintDismissed && $("reel-feed").scrollTop > 40) dismissScrollHint();
+  },
+  { passive: true },
+);
 
 $("reel-feed").addEventListener("click", (event) => {
   const mediaHit = event.target.closest(".reel-media");
@@ -1007,6 +1045,17 @@ if (collageQuery.addEventListener) {
     resetFeed(state.query);
   });
 }
+
+// The shared menu can wrap or resize; reserve its actual height above each reel.
+const scrollHeader = document.querySelector(".scroll-topbar");
+function syncScrollHeaderHeight() {
+  document.documentElement.style.setProperty(
+    "--scroll-header-height",
+    `${Math.ceil(scrollHeader.getBoundingClientRect().height)}px`,
+  );
+}
+syncScrollHeaderHeight();
+new ResizeObserver(syncScrollHeaderHeight).observe(scrollHeader);
 
 initViewMode();
 initAutoplay();

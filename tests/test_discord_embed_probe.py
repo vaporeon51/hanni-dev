@@ -165,3 +165,65 @@ def test_plain_notice_is_posted_without_mentions():
         "content": "marked dead\n<https://i.imgur.com/abc.mp4>",
         "allowed_mentions": {"parse": []},
     }
+
+
+def test_harvest_extracts_proxied_image_and_dimensions():
+    from src.services.discord_embed_probe import _extract_embed_image
+
+    message = {
+        "embeds": [
+            {
+                "type": "image",
+                "url": "https://legacy.kpopping.com/x/y.jpeg",
+                "thumbnail": {
+                    "url": "https://legacy.kpopping.com/x/y.jpeg",
+                    "proxy_url": "https://images-ext-1.discordapp.net/external/SIG/https/legacy.kpopping.com/x/y.jpeg",
+                    "width": 1800,
+                    "height": 2700,
+                },
+            }
+        ]
+    }
+    harvest = _extract_embed_image("https://legacy.kpopping.com/x/y.jpeg", message)
+    assert harvest is not None
+    assert harvest.proxy_url == "https://images-ext-1.discordapp.net/external/SIG/https/legacy.kpopping.com/x/y.jpeg"
+    assert (harvest.width, harvest.height) == (1800, 2700)
+    assert harvest.error is None
+
+
+def test_harvest_returns_none_while_unfurling_and_error_without_image():
+    from src.services.discord_embed_probe import _extract_embed_image
+
+    assert _extract_embed_image("https://x/y.jpeg", {"embeds": []}) is None
+    article = _extract_embed_image("https://x/y.jpeg", {"embeds": [{"type": "article"}]})
+    assert article is not None
+    assert article.proxy_url is None
+    assert article.error is not None
+
+
+def test_harvest_posts_polls_then_deletes_the_probe_message():
+    from src.services.discord_embed_probe import harvest_embed_image
+
+    proxy = "https://images-ext-1.discordapp.net/external/SIG/https/legacy.kpopping.com/x/y.jpeg"
+    posted = {"id": "999", "embeds": []}
+    unfurled = {"id": "999", "embeds": [{"type": "image", "thumbnail": {"proxy_url": proxy, "width": 10, "height": 20}}]}
+    session = FakeSession(
+        [
+            FakeResponse(200, posted),
+            FakeResponse(200, {"id": "999", "embeds": []}),
+            FakeResponse(200, unfurled),
+            FakeResponse(204, None),
+        ]
+    )
+    clock = FakeClock()
+    harvest = harvest_embed_image(
+        "https://legacy.kpopping.com/x/y.jpeg",
+        webhook_url=WEBHOOK_URL,
+        session=session,
+        monotonic=clock.monotonic,
+        sleep=clock.sleep,
+    )
+    assert harvest.proxy_url == proxy
+    methods = [call[0] for call in session.calls]
+    assert methods == ["POST", "GET", "GET", "DELETE"]
+    assert session.calls[-1][1].endswith("/messages/999")

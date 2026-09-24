@@ -582,7 +582,7 @@ def test_media_asset_proxies_range_response(monkeypatch):
     assert response.headers["content-range"] == "bytes 0-3/20"
 
 
-def test_homepage_renders():
+def test_homepage_renders_menu_with_wholesome_and_nsfw():
     async def request():
         transport = httpx.ASGITransport(app=web_app.app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
@@ -591,48 +591,86 @@ def test_homepage_renders():
     response = asyncio.run(request())
 
     assert response.status_code == 200
-    assert "hanni" in response.text
-    assert '<a class="brand-link" href="/" aria-label="hanni home">' in response.text
+    assert "<h1>hanni" in response.text
+    assert "pick your bias" not in response.text
+    assert "wholesome</h2>" in response.text
+    assert "#i-pitchfork" in response.text
+    assert "nsfw</h2>" in response.text
+    assert "nsfw 18+" not in response.text
+    assert '<a class="menu-card" href="/sorter">' in response.text
+    assert '<a class="menu-card" href="/leaderboard">' in response.text
+    assert '<a class="menu-card" href="/feed">' in response.text
+    assert '<a class="menu-card" href="/sets">' in response.text
+    assert '<a class="menu-card" href="/scroll">' in response.text
+    assert '<footer class="site-credit">made by glaceon</footer>' in response.text
+    assert '/static/home.css?v=' in response.text
+    assert '/static/nav.css?v=' in response.text
+    assert "the endless shuffle" in response.text
+    assert "royalty" not in response.text
+    home_css = (web_app.REPO_ROOT / "static" / "home.css").read_text()
+    assert ".menu-section.nsfw .menu-card" in home_css
+    for banned in ("😇", "😈", "💘", "🏆", "🎲", "🗂", "🌀"):
+        for template in ("home.html", "_nav.html", "sorter.html", "leaderboard.html"):
+            assert banned not in (web_app.REPO_ROOT / "templates" / template).read_text()
+    assert (web_app.REPO_ROOT / "static" / "icons.svg").exists()
+    assert 'use href="/static/icons.svg' in response.text
+    assert "linear-gradient(90deg, transparent" in home_css
+    assert ".menu-section.nsfw {" in home_css
+    nav_css = (web_app.REPO_ROOT / "static" / "nav.css").read_text()
+    assert "font-size: 1.35rem" in nav_css
+    assert "font-size: 0.82rem" in nav_css
+    assert "line-height: 1.4" in nav_css
+
+
+def test_nsfw_pages_use_the_dark_theme():
+    async def request(path):
+        transport = httpx.ASGITransport(app=web_app.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            return await client.get(path)
+
+    for path in ("/feed", "/sets", "/scroll"):
+        response = asyncio.run(request(path))
+        assert response.status_code == 200
+        assert "/static/nsfw.css?v=" in response.text
+    assert 'class="nsfw"' in asyncio.run(request("/feed")).text
+    assert 'class="scroll-page nsfw"' in asyncio.run(request("/scroll")).text
+    css = (web_app.REPO_ROOT / "static" / "nsfw.css").read_text()
+    assert "body.nsfw" in css
+    assert "--page: #161219" in css
+
+
+def test_wholesome_pages_stay_light():
+    async def request(path):
+        transport = httpx.ASGITransport(app=web_app.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            return await client.get(path)
+
+    for path in ("/", "/sorter", "/leaderboard"):
+        response = asyncio.run(request(path))
+        assert response.status_code == 200
+        assert "/static/nsfw.css" not in response.text
+
+
+def test_feed_page_renders():
+    async def request():
+        transport = httpx.ASGITransport(app=web_app.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            return await client.get("/feed")
+
+    response = asyncio.run(request())
+
+    assert response.status_code == 200
     assert "search a member or group" in response.text
     assert '<footer class="site-credit">made by glaceon</footer>' in response.text
-    assert '<a href="/sets">sets</a>' in response.text
-    assert '<a href="/scroll">scroll</a>' in response.text
-    assert '<span aria-current="page">feed</span>' in response.text
+    assert '<a href="/feed" aria-current="page">feed</a>' in response.text
+    assert "fonts.googleapis.com" not in response.text
     assert '/static/analytics.js?v=' in response.text
     assert 'id="collection-heading"' in response.text
     assert '/static/app.css?v=' in response.text
     assert '/static/app.js?v=' in response.text
-    assert "fonts.googleapis.com" not in response.text
-    css = (web_app.REPO_ROOT / "static" / "app.css").read_text()
-    assert 'font-family: Georgia, "Times New Roman", serif;' in css
-    assert "font-weight: 400;" in css
-    assert ".card-media video" in css
-    assert ".card-media img, .card-media video" in css
-    assert ".card-media.is-ready img, .card-media.is-ready video { opacity: 1; }" in css
-    assert "transition: opacity 180ms ease-out;" in css
-    assert "clip-path: inset(0 round 11px)" in css
-    assert "width: auto" in css
-    assert "max-width: min(100%, 520px)" in css
-    assert "width: min(560px, 100%)" in css
-    assert "max-height: min(62vh, 540px)" in css
-    assert "max-height: var(--mobile-media-max-height)" in css
-    assert ".card-actions .upvote, .card-actions .downvote { min-width: 42px; }" in css
-    assert ".collection-link" in css
     assert '<option value="random" selected>random</option>' in response.text
     assert '<option value="top">top</option>' in response.text
-    assert 'id="limit"' not in response.text
     assert 'id="feed-sentinel"' in response.text
-    assert 'id="timeline-tools"' in response.text
-    assert '<svg class="timeline-icon timeline-icon-search"' in response.text
-    assert 'id="timeline-refresh"' not in response.text
-    assert '<svg class="timeline-icon timeline-icon-top"' in response.text
-    assert "stroke-width: 2.35;" in css
-    assert "appearance: none;" in css
-    assert "background-position: right 13px center;" in css
-    assert "Loading little links" not in response.text
-    assert "a tiny corner for good links" not in response.text
-    assert "autofeed" not in response.text.lower()
-    assert response.text.index('id="feed"') < response.text.index('class="feed-status"')
 
 
 def test_sets_page_renders_separately():
@@ -648,29 +686,27 @@ def test_sets_page_renders_separately():
     assert '/static/sets.js?v=' in response.text
     assert '<option value="latest" selected>newest</option>' in response.text
     assert '<option value="oldest">oldest</option>' in response.text
-    assert '<option value="random"' not in response.text
-    assert '<option value="top"' not in response.text
-    assert 'id="limit"' not in response.text
     assert 'id="feed-sentinel"' in response.text
-    assert 'id="timeline-tools"' in response.text
-    assert '<svg class="timeline-icon timeline-icon-search"' in response.text
-    assert 'id="timeline-refresh"' not in response.text
     script = (web_app.REPO_ROOT / "static" / "sets.js").read_text()
-    assert "const BATCH_SIZE = 5;" in script
-    assert 'const MEDIA_PRELOAD_MARGIN = "550px 0px";' in script
-    assert "FIRST_MEDIA_HEAD_START_MS = 360" in script
-    assert "MEDIA_STAGGER_MS = 110" in script
-    assert "threshold: [0, 0.01]" in script
-    assert "activeVideo" not in script
-    assert "scheduleSetMediaStart" in script
-    assert "MEDIA_RETRY_DELAYS_MS" in script
-    assert "media is catching up…" in script
-    assert "new AbortController()" in script
-    assert '$("timeline-refresh")' not in script
-    assert "setEndObserver" in script
-    assert "async function loadMoreSets()" in script
-    assert "cursor: state.nextCursor" in script
-    assert not script.rstrip().endswith("loadSets();")
+    assert script.rstrip().endswith("loadSets();")
+    assert '$("sets-form").addEventListener("submit", loadSets)' in script
+
+
+def test_scroll_search_sits_at_the_same_height_as_feed_search():
+    """The menu-to-search gap must match .site-nav's bottom margin exactly,
+    and feed/sets must add no extra top padding of their own, or the scroll
+    filter drifts vertically versus feed/sets."""
+    import re
+
+    nav_css = (web_app.REPO_ROOT / "static" / "nav.css").read_text()
+    scroll_css = (web_app.REPO_ROOT / "static" / "scroll.css").read_text()
+    app_css = (web_app.REPO_ROOT / "static" / "app.css").read_text()
+    nav_margin = re.search(r"\.site-nav \{[^}]*margin:\s*0 auto (\d+)px;", nav_css)
+    filter_margin = re.search(r"\.scroll-filterbar \{[^}]*margin-top:\s*(\d+)px;", scroll_css)
+    shell_padding = re.search(r"\.shell \{[^}]*padding:\s*0(?:px)? 0 64px;", app_css)
+    assert nav_margin is not None and filter_margin is not None
+    assert filter_margin.group(1) == nav_margin.group(1)
+    assert shell_padding is not None
 
 
 def test_scroll_page_renders_as_a_separate_reel_surface():
@@ -688,6 +724,36 @@ def test_scroll_page_renders_as_a_separate_reel_surface():
     assert '/static/scroll.js?v=' in response.text
     assert 'placeholder="idol or group"' in response.text
     assert 'id="scroll-filter-hint"' not in response.text
+    assert 'id="scroll-hint"' in response.text
+    assert "scroll for more" in response.text
+
+
+def test_scroll_defaults_to_collage_and_nudges_autoplay():
+    script = (web_app.REPO_ROOT / "static" / "scroll.js").read_text()
+    assert 'window.localStorage.getItem(VIEW_STORAGE_KEY) || "collage"' in script
+    assert 'toggle.classList.add("attract")' in script
+    css = (web_app.REPO_ROOT / "static" / "scroll.css").read_text()
+    assert "autoplay-nudge" in css
+    assert ".autoplay-toggle.attract" in css
+
+
+def test_scroll_mobile_keeps_logo_and_search_on_one_row():
+    css = (web_app.REPO_ROOT / "static" / "scroll.css").read_text()
+    mobile = css.split("@media (max-width: 700px)")[1]
+    assert "grid-template-columns: auto minmax(0, 1fr)" in mobile
+    assert ".scroll-topbar .nav-home" in mobile
+    assert ".scroll-filterbar { margin-top: 0;" in mobile
+
+
+def test_scroll_hint_offers_next_reel_then_dismisses():
+    script = (web_app.REPO_ROOT / "static" / "scroll.js").read_text()
+    assert "showScrollHint()" in script
+    assert "dismissScrollHint()" in script
+    assert "state.hintDismissed" in script
+    assert "navigateBy(1)" in script
+    css = (web_app.REPO_ROOT / "static" / "scroll.css").read_text()
+    assert ".scroll-hint.is-visible" in css
+    assert "hint-bob" in css
 
 
 def test_plain_link_endpoint_avoids_recent_urls_and_returns_source(monkeypatch):
@@ -771,141 +837,26 @@ def test_plain_link_endpoint_records_no_result_without_query_text(monkeypatch):
     assert analytics == [{"found": False, "cycle_reset": False}]
 
 
-def test_scroll_client_is_bounded_and_supports_desktop_paging():
+def test_scroll_client_boots_unfiltered_and_pages_by_offset():
     script = (web_app.REPO_ROOT / "static" / "scroll.js").read_text()
-    css = (web_app.REPO_ROOT / "static" / "scroll.css").read_text()
 
-    assert "MAX_MOUNTED_ROWS = 12" in script
-    assert "CLIENT_HISTORY_CAPACITY = 100" in script
-    assert "function trimMountedCards()" in script
-    assert "function scheduleMountedCardTrim()" in script
-    assert 'addEventListener("wheel"' in script
-    assert 'addEventListener("keydown"' in script
-    assert "gestureAlreadyHandled" in script
-    wheel_handler = script[script.index('$("reel-feed").addEventListener("wheel"'):]
-    assert wheel_handler.index("event.preventDefault();") < wheel_handler.index("Math.abs(event.deltaY) < 12")
-    assert "}, 720);" in script
-    assert "state.spacerHeight += removedHeight" in script
+    assert script.rstrip().endswith("resetFeed(initialQuery);")
+    assert '$("scroll-form").addEventListener("submit"' in script
+    assert "function navigateBy(direction)" in script
     assert "top: target.offsetTop" in script
     assert "target.scrollIntoView" not in script
-    assert '{ showLabel: false }' in script
-    assert "scroll-snap-type: y mandatory" in css
-    assert "@media (hover: hover) and (pointer: fine)" in css
-    assert "overscroll-behavior-y: none" in css
-    assert "scroll-snap-type: none" in css
-    assert "object-fit: contain" in css
-    assert "max-width: 100%" in css
-    assert "max-height: 100%" in css
-    assert "--reel-stage-fill:" in css
-    assert "background: var(--reel-stage-fill);" in css
-    assert "const fitInsideStage = () =>" in script
-    assert "availableWidth / intrinsicWidth" in script
-    assert "availableHeight / intrinsicHeight" in script
-    assert "new ResizeObserver(fitInsideStage)" in script
-    assert "MEDIA_RETRY_DELAYS_MS" in script
-    assert 'media.preload = wantsPlayback ? "auto" : "metadata"' in script
-    assert "cell._media.unload()" in script
-    assert 'thumbIcon("up")' in script
-    assert 'thumbIcon("down")' in script
-    assert '"Upvote this link"' in script
-    assert '"Downvote this link"' in script
-    assert "function itemFilterQuery(item)" in script
-    assert 'button[data-filter-query]' in script
-    assert "resetFeed(query)" in script
-    assert 'window.addEventListener("pageshow"' in script
-    assert "function restoredQuery()" in script
-    assert "scrollQuery: query" in script
-    assert "window.requestAnimationFrame(restoreInput)" in script
-    assert ".scroll-filter-icon" in css
-    assert ".scroll-filter-hint" not in css
-    assert "view set (${count}) →" in script
-    assert "payload.collection_count" in script
-    assert ".reel-collection-link" in css
-    assert "const BATCH_SIZE = 9;" in script
-    assert "function collageColumns()" in script
-    assert "function createReelCell(item)" in script
-    assert "function createReelRow(cells)" in script
-    assert "reel-grid" in script
-    assert "row._cells" in script
-    assert ".reel-grid" in css
-    assert "@media (min-width: 1024px)" in css
-    assert "object-fit: cover" in css
-    assert "object-position: 50% 20%" in css
-    assert ".lightbox-stage" in css
-    assert "function openLightbox" in script
-    assert "function closeLightbox" in script
-    assert 'id="lightbox"' in (web_app.REPO_ROOT / "templates" / "scroll.html").read_text()
-    assert "data-scroll-mode" in css
-    assert ".view-toggle" in css
-    assert "gap: 0" in css
     assert "function applyViewMode" in script
     assert "VIEW_STORAGE_KEY" in script
-    assert 'id="view-toggle"' in (web_app.REPO_ROOT / "templates" / "scroll.html").read_text()
-    assert "reel-row-progress" in script
-    assert "reel-row-progress" in css
 
 
-def test_client_loads_timeline_batches_and_autoplays_video():
+def test_feed_client_boots_unfiltered_and_pages_continuations():
     script = (web_app.REPO_ROOT / "static" / "app.js").read_text()
 
-    assert script.rstrip().endswith("else clearFeed();")
-    assert "const BATCH_SIZE = 5;" in script
-    assert 'sort: state.sort' in script
-    assert '$("sort").value' in script
-    assert 'state.sort !== "random"' in script
-    assert '$("limit")' not in script
-    assert "media.autoplay = true" in script
-    assert "videoPlaybackObserver" in script
-    assert "threshold: [0, 0.01]" in script
-    assert "activeVideo" not in script
-    assert "FIRST_MEDIA_HEAD_START_MS = 360" in script
-    assert "MEDIA_STAGGER_MS = 110" in script
-    assert "scheduleMediaStart" in script
-    assert "MEDIA_RETRY_DELAYS_MS" in script
-    assert "media is catching up…" in script
-    assert "new AbortController()" in script
-    assert "refreshTimeline" not in script
-    assert '$("timeline-refresh")' not in script
-    assert "mediaWindowObserver" in script
-    assert "feedEndObserver" in script
+    assert script.rstrip().endswith("else loadFeed();")
+    assert '$("feed-form").addEventListener("submit", loadFeed)' in script
     assert "async function loadMoreFeed()" in script
-    assert "CONTINUATION_GAP_MS = 1100" in script
-    assert "state.continuationTimer" in script
-    assert "state.retryContinuation" in script
-    assert "const initialCollectionId = initializeHistory();" in script
-    assert "else loadFeed();" not in script
-    assert "function lockMobileMediaHeight()" in script
-    assert 'window.addEventListener("orientationchange"' in script
-    assert "scrollIntoView" in script
-    assert '$("query").blur()' in script
-    assert 'search.scrollIntoView' in script
-    assert 'query").focus({ preventScroll: true })' in script
-    assert 'feedbackButton("upvote", "upvote", "↑", "Upvote this link")' in script
-    assert 'feedbackButton("downvote", "downvote", "↓", "Downvote this link")' in script
-    assert 'feedbackButton("report", "report", "report", "Report wrong idol")' in script
-    assert 'data-count="upvotes"' not in script
-    assert 'data-count="downvotes"' not in script
-    assert 'const reportReason = action === "report" ? "wrong_idol" : "";' in script
-    assert 'select[data-action="report"]' not in script
-    assert '["dead_link", "dead link"]' not in script
-    assert "dead link report ${payload.dead_link_reports} of 3" not in script
-    assert "state.visibleCount" not in script
-    assert "REVEAL_DELAY_MS" not in script
-    assert "function disposeView(snapshot)" in script
-    assert 'media.removeAttribute("src")' in script
-    assert "dataset.mediaSrc" not in script
-    assert "mediaCandidates" not in script
-    assert "if (copied) await recordImplicitUpvote(card, id);" in script
-    assert "async function recordImplicitUpvote(card, id)" in script
-    assert "async function loadCollection(contentLinkId)" in script
-    assert "function navigateToCollection(contentLinkId, href)" in script
     assert 'window.addEventListener("popstate"' in script
-    assert "VIEW_CACHE_CAPACITY = 1" in script
-    assert script.index("const scrollY = window.scrollY;") < script.index(
-        "nodes.forEach((node) => node.remove());"
-    )
-    assert "view set (${count}) →" in script
-    assert "?collection=${item.content_link_id}" in script
+    assert "async function loadCollection(contentLinkId)" in script
 
 
 def test_collections_by_url_returns_matching_sets(monkeypatch):

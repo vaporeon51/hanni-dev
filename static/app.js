@@ -904,4 +904,4 @@ $("feed").addEventListener("click", (event) => {
 
 const initialCollectionId = initializeHistory();
 if (initialCollectionId) loadCollection(initialCollectionId);
-else clearFeed();
+else loadFeed();

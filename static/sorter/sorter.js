@@ -69,6 +69,15 @@
     }
   }
 
+  const savedStateLifetime = 2 * 60 * 60 * 1000;
+  function readSavedState(key) {
+    const value = read(key);
+    const age = Date.now() - value?.savedAt;
+    if (Number.isFinite(value?.savedAt) && age >= 0 && age < savedStateLifetime) return value;
+    try { localStorage.removeItem(key); } catch {}
+    return null;
+  }
+
   // Drifting heart burst on each pick — the cute payoff for voting.
   function burst(button) {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -157,7 +166,10 @@
           photoByLabel.get(g.name) ||
           catalog.find((i) => i.kind === "idol" && (i.groups || []).includes(g.key)),
       }))
-      .filter((g) => g.members.length);
+      // The source catalog also lists solo artists as one-member groups.
+      // Group definitions carry generation tags; soloist pseudo-groups do not.
+      .filter((g) => g.members.length && g.gen?.length);
+    const groupSortIds = new Set(groups.map((g) => g.photo?.id).filter(Number.isInteger));
     const favoriteOrder = [
       "NewJeans", "aespa", "IVE", "LE SSERAFIM", "TWICE",
       "BLACKPINK", "Red Velvet", "ITZY", "NMIXX", "ILLIT",
@@ -376,7 +388,12 @@
       $("start").disabled = n < 2;
       $("clear").hidden = !n;
       $("start-hint").textContent = n < 2 ? `Choose at least 2 ${mode} to start` : "Autosaves on this device";
-      write(lineupKey, { mode, ids: [...selected] });
+      const ids = [...selected];
+      const previous = read(lineupKey);
+      // Rendering or reopening the page must not extend the saved selection.
+      if (previous?.mode !== mode || JSON.stringify(previous?.ids) !== JSON.stringify(ids)) {
+        write(lineupKey, { mode, ids, savedAt: Date.now() });
+      }
     }
     function refresh() {
       renderGroups();
@@ -508,6 +525,7 @@
       if (next !== "setup") $(next).focus({ preventScroll: true });
     }
     function save() {
+      session.savedAt = Date.now();
       write(key, session);
     }
     function validSession(value) {
@@ -519,7 +537,10 @@
         value.ids.length >= 2 &&
         value.ids.length <= catalog.length &&
         new Set(value.ids).size === value.ids.length &&
-        value.ids.every((id) => Number.isInteger(id) && byId.has(id)) &&
+        value.ids.every((id) =>
+          Number.isInteger(id) && byId.has(id) &&
+          (value.mode !== "groups" || groupSortIds.has(id))
+        ) &&
         Array.isArray(value.choices) &&
         value.choices.length <= BiasSorter.bound(value.ids.length) &&
         value.choices.every((c) => ["left", "right", "tie"].includes(c))
@@ -619,7 +640,11 @@
       $("resume-banner").hidden = false;
       setView("setup");
     };
-    $("resume").onclick = () => resume(read(key));
+    $("resume").onclick = () => {
+      const saved = readSavedState(key);
+      $("resume-banner").hidden = !validSession(saved);
+      resume(saved);
+    };
     let ranked = [];
     function renderResults() {
       ranked = [];
@@ -761,20 +786,18 @@
         $("search").focus();
       }
     });
-    const previous = read(lineupKey);
+    const previous = readSavedState(lineupKey);
     if (previous && ["idols", "groups"].includes(previous.mode) && Array.isArray(previous.ids)) {
       mode = previous.mode;
       selected = new Set(
         previous.ids.filter(
-          (id) =>
-            Number.isInteger(id) &&
-            byId.has(id) &&
-            (mode === "idols" ? byId.get(id).kind === "idol" : byId.get(id).kind === "group"),
+          (id) => Number.isInteger(id) && byId.has(id) &&
+            (mode === "idols" ? byId.get(id).kind === "idol" : groupSortIds.has(id)),
         ),
       );
     }
     document.querySelectorAll("[data-mode]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.mode === mode));
-    $("resume-banner").hidden = !validSession(read(key));
+    $("resume-banner").hidden = !validSession(readSavedState(key));
     refresh();
     if (location.hash.startsWith("#ranking=")) {
       try {

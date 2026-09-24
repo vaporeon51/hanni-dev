@@ -262,7 +262,10 @@ h2 {
   font-size: 11px;
   color: var(--muted);
   padding: 22px 2px 12px;
+  flex-wrap: wrap;
+  gap: 8px 16px;
 }
+.selection-actions { display: flex; flex-wrap: wrap; gap: 8px 16px; }
 .group-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

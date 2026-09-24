@@ -1,5 +1,10 @@
 {% set social_title = 'hanni♡' %}
 {% set social_description = 'Sort your biases and explore your favorites.' %}
+{% set social_image_alt = 'Hanni with aespa, IVE, BLACKPINK, and NewJeans photo cards, plus bias sorter, leaderboard, feed, sets, and scroll features.' %}
+{% if clean %}
+{% set social_description = 'Duel your faves in the bias sorter and crown your ult on the leaderboard.' %}
+{% set social_image_alt = 'Hanni with aespa, IVE, BLACKPINK, and NewJeans photo cards, plus bias sorter and leaderboard features.' %}
+{% endif %}
 {% set social_image = request.url_for('static', path='og-image.png') | string %}
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="hanni♡" />
@@ -10,7 +15,7 @@
 <meta property="og:image:type" content="image/png" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
-<meta property="og:image:alt" content="Hanni with aespa, IVE, BLACKPINK, and NewJeans photo cards, plus bias sorter, leaderboard, feed, sets, and scroll features." />
+<meta property="og:image:alt" content="{{ social_image_alt }}" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="{{ social_title }}" />
 <meta name="twitter:description" content="{{ social_description }}" />

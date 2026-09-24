@@ -16,7 +16,7 @@ from typing import Any, Literal
 
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, Body, FastAPI, HTTPException, Query, Request, Response
-from fastapi.responses import HTMLResponse, PlainTextResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -57,6 +57,27 @@ def _norm_group_name(value: str | None) -> str:
 
 
 _GROUP_ALIASES = {"idle": "gidle", "ohmygirl": "omg"}
+
+
+# Clean host (e.g. bias.hannibee.art): same app, wholesome only. Pages and
+# APIs that serve 18+ content don't exist there — pages bounce to the clean
+# home, content APIs 404. Override with CLEAN_HOST="" to disable.
+CLEAN_HOST = os.getenv("CLEAN_HOST", "bias.hannibee.art").strip().lower()
+
+_CLEAN_PAGE_PATHS = {"/feed", "/sets", "/scroll"}
+_CLEAN_BLOCKED_API_PREFIXES = (
+    "/api/feed",
+    "/api/sets",
+    "/api/scroll",
+    "/api/collections",
+    "/api/link",
+    "/api/roles",
+)
+
+
+def _is_clean_host(request: Request) -> bool:
+    host = request.headers.get("host", "").split(":")[0].strip().lower()
+    return bool(CLEAN_HOST) and host == CLEAN_HOST
 
 
 def _resolve_group_name(value: str | None) -> str:
@@ -280,6 +301,17 @@ app = FastAPI(title="Hanni", description="A web feed for ingested and recovered 
 app.mount("/static", StaticFiles(directory=str(REPO_ROOT / "static")), name="static")
 
 
+@app.middleware("http")
+async def clean_host_gate(request: Request, call_next):
+    request.state.clean = _is_clean_host(request)
+    if request.state.clean:
+        if request.url.path in _CLEAN_PAGE_PATHS:
+            return RedirectResponse(url="/", status_code=307)
+        if request.url.path.startswith(_CLEAN_BLOCKED_API_PREFIXES):
+            return JSONResponse(status_code=404, content={"detail": "Not found"})
+    return await call_next(request)
+
+
 def _static_version() -> str:
     """Change asset URLs whenever local CSS, JavaScript, or data changes."""
 
@@ -295,10 +327,11 @@ def _static_version() -> str:
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request) -> HTMLResponse:
+    clean = bool(getattr(request.state, "clean", False))
     response = templates.TemplateResponse(
         request=request,
-        name="home.html",
-        context={"static_version": _static_version()},
+        name="home_clean.html" if clean else "home.html",
+        context={"static_version": _static_version(), "clean": clean},
     )
     _ensure_visitor_cookie(request, response)
     return response
@@ -342,7 +375,10 @@ async def sorter_page(request: Request) -> HTMLResponse:
     response = templates.TemplateResponse(
         request=request,
         name="sorter.html",
-        context={"static_version": _static_version()},
+        context={
+            "static_version": _static_version(),
+            "clean": bool(getattr(request.state, "clean", False)),
+        },
     )
     _ensure_visitor_cookie(request, response)
     return response
@@ -353,7 +389,10 @@ async def leaderboard_page(request: Request) -> HTMLResponse:
     response = templates.TemplateResponse(
         request=request,
         name="leaderboard.html",
-        context={"static_version": _static_version()},
+        context={
+            "static_version": _static_version(),
+            "clean": bool(getattr(request.state, "clean", False)),
+        },
     )
     _ensure_visitor_cookie(request, response)
     return response

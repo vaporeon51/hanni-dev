@@ -1,5 +1,7 @@
 <nav class="site-nav" aria-label="Site sections">
   <a class="nav-home" href="/">hanni♡</a>
   <span class="nav-cluster"><span class="nav-label"><svg class="icon" aria-hidden="true" focusable="false"><use href="/static/icons.svg?v={{ static_version }}#i-angel"/></svg> wholesome</span><a href="/sorter"{% if active == "sorter" %} aria-current="page"{% endif %}>sorter</a><a href="/leaderboard"{% if active == "leaderboard" %} aria-current="page"{% endif %}>leaderboard</a></span>
+{% if not clean %}
   <span class="nav-cluster nsfw-cluster"><span class="nav-label"><svg class="icon" aria-hidden="true" focusable="false"><use href="/static/icons.svg?v={{ static_version }}#i-flame"/></svg> nsfw</span><a href="/feed"{% if active == "feed" %} aria-current="page"{% endif %}>feed</a><a href="/sets"{% if active == "sets" %} aria-current="page"{% endif %}>sets</a><a href="/scroll"{% if active == "scroll" %} aria-current="page"{% endif %}>scroll</a></span>
+{% endif %}
 </nav>

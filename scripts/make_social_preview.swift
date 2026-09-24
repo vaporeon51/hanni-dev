@@ -47,36 +47,33 @@ func rounded(_ rect: NSRect, radius: CGFloat) -> NSBezierPath {
   NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
 }
 
-// Keep the photo-card frame while introducing the full hanni feature set.
-let titlePanel = NSRect(x: 247, y: 80, width: 706, height: 470)
+// A simple brand and feature line framed by the original photo cards.
+let titlePanel = NSRect(x: 247, y: 140, width: 706, height: 350)
 paper.setFill(); rounded(titlePanel, radius: 32).fill()
 NSColor(calibratedRed: 0.95, green: 0.84, blue: 0.87, alpha: 1).setStroke()
 let panelOutline = rounded(titlePanel, radius: 32); panelOutline.lineWidth = 2; panelOutline.stroke()
-centerText("YOUR FAVES, ALL IN ONE PLACE", y: 495, font: .monospacedSystemFont(ofSize: 13, weight: .medium), color: pink)
-centerText("hanni♡", y: 377, font: NSFont(name: "Georgia", size: 94) ?? .systemFont(ofSize: 94), color: berry)
-centerText("Find your bias. Explore your favorites.", y: 341, font: NSFont(name: "Georgia", size: 23) ?? .systemFont(ofSize: 23), color: muted)
-centerText("wholesome", y: 294, font: .monospacedSystemFont(ofSize: 12, weight: .medium), color: pink)
-func feature(_ title: String, _ subtitle: String, x: CGFloat, y: CGFloat, width: CGFloat, dark: Bool) {
-  let rect = NSRect(x: x, y: y, width: width, height: 70)
-  let fill = dark ? NSColor(calibratedRed: 0.17, green: 0.13, blue: 0.19, alpha: 1) : NSColor(calibratedRed: 0.99, green: 0.91, blue: 0.94, alpha: 1)
-  fill.setFill(); rounded(rect, radius: 16).fill()
-  let titleColor = dark ? NSColor(calibratedRed: 0.95, green: 0.70, blue: 0.80, alpha: 1) : berry
-  let subtitleColor = dark ? NSColor(calibratedRed: 0.75, green: 0.65, blue: 0.73, alpha: 1) : muted
-  for (text, offset, font, color) in [
-    (title, CGFloat(36), NSFont(name: "Georgia", size: 23) ?? .systemFont(ofSize: 23), titleColor),
-    (subtitle, CGFloat(14), NSFont.monospacedSystemFont(ofSize: 11, weight: .regular), subtitleColor)
-  ] {
-    let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: color]
-    let textWidth = (text as NSString).size(withAttributes: attributes).width
-    text.draw(at: NSPoint(x: x + (width - textWidth) / 2, y: y + offset), withAttributes: attributes)
+centerText("YOUR FAVES, ALL IN ONE PLACE", y: 416, font: .monospacedSystemFont(ofSize: 15, weight: .medium), color: pink)
+centerText("hanni♡", y: 295, font: NSFont(name: "Georgia", size: 108) ?? .systemFont(ofSize: 108), color: berry)
+// Render the same SVG symbols used by the site, so the preview stays in sync.
+let iconDocument = try XMLDocument(contentsOf: root.appendingPathComponent("static/icons.svg"))
+let features = [("bias sorter", "i-heart"), ("leaderboard", "i-crown"), ("feed", "i-dice"), ("sets", "i-folder"), ("scroll", "i-swirl")]
+for (index, feature) in features.enumerated() {
+  let centerX = CGFloat(332 + index * 134)
+  let badge = NSRect(x: centerX - 25, y: 218, width: 50, height: 50)
+  NSColor(calibratedRed: 0.98, green: 0.89, blue: 0.93, alpha: 1).setFill()
+  rounded(badge, radius: 17).fill()
+  guard let symbol = try iconDocument.nodes(forXPath: "//*[@id='\(feature.1)']").first?.copy() as? XMLElement else { fatalError("Missing icon: \(feature.1)") }
+  symbol.name = "svg"
+  symbol.addNamespace(XMLNode.namespace(withName: "", stringValue: "http://www.w3.org/2000/svg") as! XMLNode)
+  for (key, value) in [("width", "96"), ("height", "96"), ("color", "#bb638b")] {
+    symbol.addAttribute(XMLNode.attribute(withName: key, stringValue: value) as! XMLNode)
   }
+  guard let icon = NSImage(data: symbol.xmlString.data(using: .utf8)!) else { fatalError("Cannot render SVG: \(feature.1)") }
+  icon.draw(in: NSRect(x: centerX - 17, y: 226, width: 34, height: 34))
+  let font = NSFont(name: "Georgia", size: 20) ?? .systemFont(ofSize: 20)
+  let width = (feature.0 as NSString).size(withAttributes: [.font: font]).width
+  drawText(feature.0, at: NSPoint(x: centerX - width / 2, y: 184), font: font, color: muted)
 }
-feature("bias sorter", "duel your faves", x: 279, y: 212, width: 314, dark: false)
-feature("leaderboard", "global + personal rankings", x: 605, y: 212, width: 314, dark: false)
-centerText("nsfw", y: 179, font: .monospacedSystemFont(ofSize: 12, weight: .medium), color: muted)
-feature("feed", "endless shuffle", x: 279, y: 98, width: 205, dark: true)
-feature("sets", "every drop, grouped", x: 496, y: 98, width: 206, dark: true)
-feature("scroll", "keep discovering", x: 714, y: 98, width: 205, dark: true)
 
 func drawPhotoCard(name: String, file: String, x: CGFloat, y: CGFloat, angle: CGFloat) {
   let cardSize = NSSize(width: 146, height: 174)

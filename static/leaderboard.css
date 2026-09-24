@@ -122,9 +122,11 @@ body {
 #toast[hidden] { display: none; }
 @media (max-width: 640px) {
   .shell { padding: 14px 14px 36px; }
-  .podium { gap: 8px; }
-  .podium-card { padding: 8px 8px 12px; }
-  .podium-card strong { font-size: 13px; }
+  .podium { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .podium-card { padding: 12px 12px 16px; }
+  .podium-card.first { order: -1; }
+  .podium-photo img { aspect-ratio: 1 / 1; }
+  .podium-card strong { font-size: 18px; }
   .podium-votes { font-size: 11px; }
   .row { gap: 9px; padding: 8px 12px 8px 8px; }
   .row-thumb { width: 38px; height: 42px; }

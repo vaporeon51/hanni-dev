@@ -688,8 +688,10 @@
       session = value;
       session.verifyRounds = session.verifyRounds || [];
       sorter = BiasSorter.replay(session.ids, session.choices, session.algorithm, session.matchups);
+      save();
       setView(sorter.result ? "results" : "sorting");
       renderBattle();
+      return true;
     }
     $("start").onclick = () => {
       if (selected.size < 2) return;
@@ -878,7 +880,7 @@
         const fresh = buildVerifyPairs();
         $("verify").hidden = fresh.length === 0;
         if (fresh.length) $("verify").textContent = session.algorithm
-          ? "Refine favorites (up to 10) ♡" : `Double-check (${fresh.length}) ♡`;
+          ? "Refine favorites ♡" : `Double-check (${fresh.length}) ♡`;
       }
       const limit = Number($("result-images").value);
       const visibleRanking = ranked.slice(0, 50);
@@ -1090,17 +1092,19 @@
         ),
         "my-bias-list.txt",
       );
-    $("share").onclick = async () => {
-      const url = `${location.origin}${location.pathname}#ranking=${LZString.compressToEncodedURIComponent(
+    async function copySessionLink(inProgress = false) {
+      const url = `${location.origin}${location.pathname}#${inProgress ? "continue" : "ranking"}=${LZString.compressToEncodedURIComponent(
         JSON.stringify(session),
       )}`;
       try {
         await navigator.clipboard.writeText(url);
-        toast("Result link copied ♡");
+        toast(inProgress ? "Progress link copied · resume from this point anytime." : "Result link copied ♡");
       } catch {
-        window.prompt("Copy your result link:", url);
+        window.prompt(inProgress ? "Copy your progress link:" : "Copy your result link:", url);
       }
-    };
+    }
+    $("share").onclick = () => copySessionLink();
+    $("continue-link").onclick = () => copySessionLink(true);
     $("download").onclick = async () => {
       $("download").disabled = true;
       $("download").textContent = "Saving image…";
@@ -1180,11 +1184,15 @@
       await fetchEloOrder(1500);
       refresh();
     }
-    if (location.hash.startsWith("#ranking=")) {
+    const sessionLink = location.hash.match(/^#(ranking|continue)=(.*)$/);
+    if (sessionLink) {
       try {
-        resume(JSON.parse(LZString.decompressFromEncodedURIComponent(location.hash.slice(9))));
+        if (resume(JSON.parse(LZString.decompressFromEncodedURIComponent(sessionLink[2]))) && sessionLink[1] === "continue") {
+          // Refresh must keep newer local choices instead of importing the snapshot again.
+          history.replaceState(null, "", location.pathname + location.search);
+        }
       } catch {
-        toast("That result link could not be read. Your lineup is ready below.");
+        toast("That session link could not be read. Your lineup is ready below.");
       }
     }
   }

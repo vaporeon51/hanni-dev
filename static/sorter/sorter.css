@@ -728,10 +728,32 @@ progress::-moz-progress-bar {
 .battle-actions button, .result-actions button {
   font-size: 14px;
 }
+.battle-actions {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+}
+.battle-actions #undo {
+  justify-self: end;
+}
+.battle-actions #pause, .battle-actions #verify-back {
+  justify-self: start;
+}
 #tie {
   background: var(--light);
   border-color: #ecc7d7;
   color: var(--pink);
+}
+#verify {
+  background: var(--light);
+  border-color: var(--pink);
+  color: var(--pink);
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgb(184 77 121 / 12%);
+}
+@media (hover: hover) and (pointer: fine) {
+  #verify:hover {
+    background: #f5d4e2;
+  }
 }
 .ranking {
   max-width: 1000px;

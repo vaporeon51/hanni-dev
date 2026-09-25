@@ -153,7 +153,7 @@ Deno.test("focus dial improves top precision at fixed effort in reproducible noi
   assert.ok(metrics[1].exposure > metrics[0].exposure * 1.5);
 });
 
-async function browserFixture(saved = null, boardFails = false) {
+async function browserFixture(saved = null, boardFails = false, hash = "") {
   const catalog = JSON.parse(readFileSync(new URL("../static/sorter/catalog.json", import.meta.url), "utf8"));
   const ids = catalog.entries.filter((item) => item.kind === "idol").slice(0, 16).map((item) => item.id);
   const elements = new Map();
@@ -178,10 +178,10 @@ async function browserFixture(saved = null, boardFails = false) {
   const context = vm.createContext({
     document, console, URL, Blob, AbortController,
     localStorage: { getItem: (key) => storage.get(key) || null, setItem: (key, value) => storage.set(key, value), removeItem: (key) => storage.delete(key) },
-    location: { hash: "", pathname: "/sorter", origin: "https://example.test" },
-    history: { replaceState() {} },
+    location: { hash, search: "", pathname: "/sorter", origin: "https://example.test" },
+    history: { replaceState() { context.location.hash = ""; } },
     window: { scrollTo() {}, matchMedia: () => ({ matches: true }) },
-    navigator: { sendBeacon() { return true; }, clipboard: { async writeText() {} } },
+    navigator: { sendBeacon() { return true; }, clipboard: { async writeText(url) { context.copiedURL = url; } } },
     Image: class {}, setTimeout() { return 0; }, clearTimeout() {},
     fetch: async (url) => {
       if (url.includes("leaderboard")) {
@@ -192,11 +192,38 @@ async function browserFixture(saved = null, boardFails = false) {
     },
   });
   vm.runInContext(engineSource, context);
+  vm.runInContext(readFileSync(new URL("../static/sorter/lz-string.min.js", import.meta.url), "utf8"), context);
   vm.runInContext(readFileSync(new URL("../static/sorter/sorter.js", import.meta.url), "utf8"), context);
   for (let i = 0; i < 30; i++) await Promise.resolve();
   return { element, storage, ids, context, document, catalog,
     session: () => JSON.parse(storage.get("bias-club-session-v1")) };
 }
+
+Deno.test("progress links transfer choices and persist on the receiving device; result links still open", async () => {
+  const source = await browserFixture();
+  source.element("start").click();
+  source.element("pick-left").click();
+  source.element("pick-right").click();
+  await source.element("continue-link").onclick();
+  const hash = new URL(source.context.copiedURL).hash;
+  assert.ok(hash.startsWith("#continue="));
+  const target = await browserFixture(null, false, hash);
+  assert.deepEqual(target.session().choices, source.session().choices);
+  assert.deepEqual(target.session().matchups, source.session().matchups);
+  assert.equal(target.element("pick-left").innerHTML, source.element("pick-left").innerHTML);
+  assert.equal(target.context.location.hash, "");
+  target.element("pick-left").click();
+  const refreshed = await browserFixture(target.session(), false, target.context.location.hash);
+  refreshed.element("resume").click();
+  assert.deepEqual(refreshed.session().choices, target.session().choices);
+  while (!target.session().finished) target.element("pick-left").click();
+  await target.element("share").onclick();
+  const resultHash = new URL(target.context.copiedURL).hash;
+  assert.ok(resultHash.startsWith("#ranking="));
+  const result = await browserFixture(null, false, resultHash);
+  assert.equal(result.element("results").hidden, false);
+  assert.deepEqual(result.session().choices, target.session().choices);
+});
 
 Deno.test("browser flow supports offline seeding, sort undo, adaptive review undo/resume, and results", async () => {
   let ui = await browserFixture(null, true);

@@ -7,6 +7,11 @@ Completed sessions persist in local storage until a new sort replaces them.
 Unfinished sessions and lineup drafts expire after two hours. Returning to
 lineup selection does not replace a completed ranking; pressing Start does.
 
+“Copy progress link” copies a compressed session snapshot in a
+`#continue=` link. Opening it restores and saves progress locally, then removes
+the fragment so refreshing keeps subsequent choices. Devices do not sync;
+copy a fresh link to transfer newer progress. Final `#ranking=` links remain supported.
+
 ## Controls
 
 In `sorter.js`, `adaptiveDefaults.focus` is the proportion of follow-up choices

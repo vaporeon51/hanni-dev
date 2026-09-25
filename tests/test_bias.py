@@ -230,6 +230,25 @@ def test_global_group_board_resolves_photos_and_members(monkeypatch):
     assert entry["top_members"][2] == {"name": "NingNing", "image_url": None}
 
 
+def test_sorter_catalog_manual_idols_present():
+    import json
+
+    catalog = json.loads(
+        (web_app.REPO_ROOT / "static" / "sorter" / "catalog.json").read_text()
+    )
+    ids = [entry["id"] for entry in catalog["entries"]]
+    assert len(set(ids)) == len(ids)
+    hyunjin = [e for e in catalog["entries"] if e.get("name") == "LOOSSEMBLE Hyunjin"]
+    assert len(hyunjin) == 1
+    assert hyunjin[0]["role_id"] == "779826921613426708"
+    assert "LOOSSEMBLE" in hyunjin[0]["groups"]
+    loossemble = [
+        e for e in catalog["entries"]
+        if e.get("kind") == "idol" and "LOOSSEMBLE" in (e.get("groups") or [])
+    ]
+    assert len(loossemble) == 5
+
+
 def test_sorter_page_renders():
     async def request():
         transport = httpx.ASGITransport(app=web_app.app)

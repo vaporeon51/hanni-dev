@@ -859,6 +859,14 @@ def test_feed_client_boots_unfiltered_and_pages_continuations():
     assert "async function loadCollection(contentLinkId)" in script
 
 
+def test_sorter_group_order_is_unpinned_elo():
+    script = (web_app.REPO_ROOT / "static" / "sorter" / "sorter.js").read_text()
+
+    assert "favoriteOrder" not in script
+    assert "groups.sort((a, b) => a.name.localeCompare(b.name));" in script
+    assert "selected.size === 0) renderGroups" not in script
+
+
 def test_collection_links_point_at_feed_collection_view():
     for name in ("app.js", "scroll.js"):
         script = (web_app.REPO_ROOT / "static" / name).read_text()

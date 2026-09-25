@@ -66,6 +66,19 @@ GROUP_COVER_OVERRIDES = {
 }
 
 
+# Members missing from the upstream dataset, kept here so rebuilds don't drop
+# them again. They are appended AFTER group cards so existing numeric ids
+# (saved sessions, shared result links) never shift.
+MANUAL_IDOLS = [
+    {
+        "name": "LOOSSEMBLE Hyunjin",
+        "img": "",
+        "groups": ["LOOSSEMBLE"],
+        "gen": ["gen4"],
+    },
+]
+
+
 def _parse_dataset(path: Path) -> tuple[str, list[dict], list[dict], list[dict]]:
     """Return (version, group_defs, idol_entries, group_cards)."""
     src = path.read_text()
@@ -222,10 +235,7 @@ def main() -> int:
     def resolve_group_key(key: str) -> str:
         return GROUP_ALIASES.get(_norm(key), _norm(key))
 
-    entries: list[dict] = []
-    matched_idols = 0
-    matched_photos = 0
-    for index, item in enumerate(idol_entries):
+    def build_idol_entry(index: int, item: dict) -> tuple[dict, bool, bool]:
         short = _short_name(item["name"], item["groups"])
         role_id: str | None = None
         photo: str | None = None
@@ -234,11 +244,8 @@ def main() -> int:
             if hit:
                 role_id, photo = hit
                 break
-        if role_id:
-            matched_idols += 1
-        if photo:
-            matched_photos += 1
-        entries.append(
+        img = item["img"]
+        return (
             {
                 "id": index,
                 "kind": "idol",
@@ -247,15 +254,28 @@ def main() -> int:
                 "group": item["groups"][0] if item["groups"] else "",
                 "groups": item["groups"],
                 "gen": item["gen"],
-                "img": item["img"],
-                "fallback": item["img"]
-                if item["img"].startswith("http")
-                else IMAGE_ROOT + item["img"],
-                "local": _local_photo(local_photos, item["img"]),
+                "img": img,
+                "fallback": img
+                if img.startswith("http")
+                else (IMAGE_ROOT + img if img else None),
+                "local": _local_photo(local_photos, img) if img else None,
                 "photo": photo,
                 "role_id": role_id,
-            }
+            },
+            role_id is not None,
+            photo is not None,
         )
+
+    entries: list[dict] = []
+    matched_idols = 0
+    matched_photos = 0
+    for index, item in enumerate(idol_entries):
+        entry, has_role, has_photo = build_idol_entry(index, item)
+        if has_role:
+            matched_idols += 1
+        if has_photo:
+            matched_photos += 1
+        entries.append(entry)
 
     base = len(entries)
     matched_groups = 0
@@ -290,6 +310,17 @@ def main() -> int:
             }
         )
 
+    manual_count = 0
+    for item in MANUAL_IDOLS:
+        entry, has_role, has_photo = build_idol_entry(len(entries), item)
+        if has_role:
+            matched_idols += 1
+        if has_photo:
+            matched_photos += 1
+        entries.append(entry)
+        manual_count += 1
+    print(f"manual idols appended: {manual_count}")
+
     role_photos = {
         entry["role_id"]: entry["local"]
         for entry in entries
@@ -313,6 +344,7 @@ def main() -> int:
         "image_note": "photo is the kpopping overwrite from role_info.image_url; fallback is the original sorter Imgur asset",
         "stats": {
             "idols": len(idol_entries),
+            "manual_idols": manual_count,
             "group_cards": len(group_cards),
             "matched_idols": matched_idols,
             "matched_photos": matched_photos,

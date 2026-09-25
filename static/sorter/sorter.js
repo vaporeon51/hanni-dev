@@ -170,21 +170,12 @@
       // Group definitions carry generation tags; soloist pseudo-groups do not.
       .filter((g) => g.members.length && g.gen?.length);
     const groupSortIds = new Set(groups.map((g) => g.photo?.id).filter(Number.isInteger));
-    const favoriteOrder = [
-      "NewJeans", "aespa", "IVE", "LE SSERAFIM", "TWICE",
-      "BLACKPINK", "Red Velvet", "ITZY", "NMIXX", "ILLIT",
-    ];
-    groups.sort((a, b) => {
-      const priority = (g) => {
-        const i = favoriteOrder.findIndex((n) => n.toLowerCase() === g.key.toLowerCase());
-        return i < 0 ? 99 : i;
-      };
-      return priority(a) - priority(b) || a.name.localeCompare(b.name);
-    });
+    // Unpinned alphabetical order until the live board resolves — the ELO
+    // reorder below always applies, even with a restored selection.
+    groups.sort((a, b) => a.name.localeCompare(b.name));
     // Live touch: reorder groups by their current global average-member ELO
-    // (same numbers as the Groups leaderboard). Best-effort — the favorite
-    // order above stays until this resolves, and we never reshuffle under
-    // an active selection.
+    // (same numbers as the Groups leaderboard). Best-effort — the
+    // alphabetical order above stays only until this resolves.
     applyEloOrder();
 
     function normName(value) {
@@ -214,7 +205,16 @@
           return Infinity;
         };
         groups.sort((a, b) => rankOf(a) - rankOf(b) || a.name.localeCompare(b.name));
-        if (view === "setup" && selected.size === 0) renderGroups();
+        if (view === "setup") {
+          // Indices shift under the reorder, so drop expanded state and
+          // re-render — checkbox state survives via the selection set. Skip
+          // only if the user is mid-interaction inside the list.
+          const interacting = document.activeElement && $("groups").contains(document.activeElement);
+          if (!interacting) {
+            expanded.clear();
+            renderGroups();
+          }
+        }
       } catch {
         /* favorite order stands */
       }

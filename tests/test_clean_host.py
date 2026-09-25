@@ -22,21 +22,11 @@ def _get(path: str, host: str | None = None, method: str = "GET"):
     return asyncio.run(request())
 
 
-def test_clean_home_has_no_nsfw():
+def test_clean_root_goes_straight_to_sorter():
     response = _get("/", host=CLEAN_HOST)
 
-    assert response.status_code == 200
-    assert '<a class="menu-card" href="/sorter">' in response.text
-    assert '<a class="menu-card" href="/leaderboard">' in response.text
-    assert "nsfw-cluster" not in response.text
-    assert 'href="/feed"' not in response.text
-    assert 'href="/sets"' not in response.text
-    assert 'href="/scroll"' not in response.text
-    assert "age-gate" not in response.text
-    assert "#i-flame" not in response.text
-    assert "18+" not in response.text
-    assert "unwholesomely" not in response.text
-    assert "feed, sets, and scroll" not in response.text
+    assert response.status_code == 307
+    assert response.headers["location"] == "/sorter"
 
 
 def test_main_home_still_full():
@@ -44,6 +34,8 @@ def test_main_home_still_full():
 
     assert response.status_code == 200
     assert "nsfw-cluster" in response.text
+    assert "wholesome</span>" in response.text
+    assert '<a class="nav-home" href="/">hanni♡</a>' in response.text
     assert 'href="/feed"' in response.text
 
 
@@ -81,10 +73,13 @@ def test_clean_wholesome_still_served(monkeypatch):
     sorter = _get("/sorter", host=CLEAN_HOST)
     assert sorter.status_code == 200
     assert "nsfw-cluster" not in sorter.text
+    assert "wholesome</span>" not in sorter.text
+    assert '<a class="nav-home" href="/sorter">' in sorter.text
 
     leaderboard = _get("/leaderboard", host=CLEAN_HOST)
     assert leaderboard.status_code == 200
     assert "nsfw-cluster" not in leaderboard.text
+    assert "wholesome</span>" not in leaderboard.text
 
     api = _get("/api/leaderboard?kind=idols", host=CLEAN_HOST)
     assert api.status_code == 200
@@ -120,8 +115,8 @@ def test_clean_sorter_votes_still_count(monkeypatch):
 
 def test_clean_host_match_ignores_port():
     response = _get("/", host="bias.hannibee.art:8000")
-    assert response.status_code == 200
-    assert "nsfw-cluster" not in response.text
+    assert response.status_code == 307
+    assert response.headers["location"] == "/sorter"
 
     response = _get("/", host="hannibee.art:8000")
     assert response.status_code == 200

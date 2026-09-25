@@ -326,11 +326,14 @@ def _static_version() -> str:
 
 
 @app.get("/", response_class=HTMLResponse)
-async def home(request: Request) -> HTMLResponse:
+async def home(request: Request) -> Response:
     clean = bool(getattr(request.state, "clean", False))
+    if clean:
+        # The clean host has no home page — it opens straight into the sorter.
+        return RedirectResponse(url="/sorter", status_code=307)
     response = templates.TemplateResponse(
         request=request,
-        name="home_clean.html" if clean else "home.html",
+        name="home.html",
         context={"static_version": _static_version(), "clean": clean},
     )
     _ensure_visitor_cookie(request, response)

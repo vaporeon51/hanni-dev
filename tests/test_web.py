@@ -865,6 +865,10 @@ def test_sorter_group_order_is_unpinned_elo():
     assert "favoriteOrder" not in script
     assert "groups.sort((a, b) => a.name.localeCompare(b.name));" in script
     assert "selected.size === 0) renderGroups" not in script
+    assert 'mode === "groups" ? b.elo - a.elo : (b.peak_elo ?? b.elo) - (a.peak_elo ?? a.elo)' in script
+    assert "bias-club-group-order-v1" in script
+    assert "groupsSignature()" in script
+    assert "renderGroupsLoading()" in script
 
 
 def test_collection_links_point_at_feed_collection_view():

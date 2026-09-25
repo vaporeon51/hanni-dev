@@ -927,6 +927,7 @@ async def leaderboard(
                 {
                     "group_name": entry.group_name,
                     "elo": entry.elo,
+                    "peak_elo": entry.peak_elo,
                     "member_count": entry.member_count,
                     "ranked_member_count": entry.ranked_member_count,
                     "top_members": _serialize_top_members(entry),

@@ -198,6 +198,7 @@ def test_global_group_board_resolves_photos_and_members(monkeypatch):
                 "aespa", 1495, 4, 3, ["Karina", "Winter", "NingNing"],
                 "https://legacy.kpopping.com/top.jpg", 3844,
                 ["https://legacy.kpopping.com/k.jpg", "https://legacy.kpopping.com/w.jpg", None],
+                1520,
             ),
         ],
         vote_count=74712,
@@ -223,11 +224,23 @@ def test_global_group_board_resolves_photos_and_members(monkeypatch):
     entry = response.json()["entries"][0]
     assert entry["image_url"] == "/static/sorter/idols/group-aespa.jpg"
     assert entry["votes"] == 3844
+    assert entry["peak_elo"] == 1520
     assert entry["top_members"][0] == {
         "name": "Karina",
         "image_url": "https://images-ext-1.discordapp.net/external/K/x",
     }
     assert entry["top_members"][2] == {"name": "NingNing", "image_url": None}
+
+
+def test_group_board_maps_peak_elo():
+    board = bias._build_group_leaderboard(
+        [("aespa", 1495, 4, 3, ["Karina"], "img", ["img"], 100, 1520)],
+        50,
+        3,
+    )
+
+    assert board.entries[0].peak_elo == 1520
+    assert board.entries[0].elo == 1495
 
 
 def test_sorter_catalog_manual_idols_present():
@@ -260,6 +273,21 @@ def test_sorter_page_renders():
     assert "/static/sorter/sorter.js?v=" in response.text
     assert 'id="pick-left"' in response.text
     assert 'id="help"' in response.text
+    assert 'id="verify"' in response.text
+    assert 'id="verify-back"' in response.text
+
+
+def test_sorter_verify_round_is_wired():
+    script = (web_app.REPO_ROOT / "static" / "sorter" / "sorter.js").read_text()
+    engine = (web_app.REPO_ROOT / "static" / "sorter" / "engine.js").read_text()
+
+    assert "applyVerifySwaps" in engine
+    assert "facedPairs" in engine
+    assert "verifyRounds" in script
+    assert "buildVerifyPairs" in script
+    assert "finishVerify" in script
+    assert "facedPairKeys" in script
+    assert "CHALLENGE_TOP" in script
 
 
 def test_leaderboard_page_renders():

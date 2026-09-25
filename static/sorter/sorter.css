@@ -286,6 +286,36 @@ h2 {
 .group-card:active {
   transform: scale(0.985);
 }
+.group-card.is-loading {
+  cursor: default;
+  pointer-events: none;
+}
+.group-card.is-loading .group-cover,
+.shimmer-bar {
+  background: linear-gradient(100deg, #f6e3ec 30%, #fbdff0 50%, #f6e3ec 70%);
+  background-size: 200% 100%;
+  animation: group-shimmer 1.3s linear infinite;
+}
+.shimmer-bar {
+  height: 13px;
+  border-radius: 7px;
+  margin-bottom: 8px;
+}
+.shimmer-bar.short {
+  width: 55%;
+  margin-bottom: 2px;
+}
+@keyframes group-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .group-card.is-loading .group-cover,
+  .shimmer-bar {
+    animation: none;
+  }
+}
 .group-card.has-selection {
   border-color: #dfa8bf;
   box-shadow: 0 1px 8px #b84d7918;

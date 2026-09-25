@@ -1,8 +1,8 @@
 /* Leaderboard ♡ — global ELO board plus your own sorter ranking.
  *
  * Global tabs fetch the server ELO board. The Mine tab renders your last
- * sorter session straight from localStorage (same merge-sort output as the
- * sorter results page), so the two can never disagree.
+ * sorter session straight from localStorage, using its versioned engine and
+ * completed refinement rounds to match the sorter results page.
  */
 (() => {
   "use strict";
@@ -276,8 +276,17 @@
       ["idols", "groups"].includes(session.mode) &&
       Array.isArray(session.ids) &&
       session.ids.length >= 2 &&
+      session.ids.length <= 2000 &&
+      new Set(session.ids).size === session.ids.length &&
+      BiasSorter.validAlgorithm(session.algorithm, session.ids) &&
       Array.isArray(session.choices) &&
-      session.choices.every((c) => ["left", "right", "tie"].includes(c))
+      session.choices.length <= BiasSorter.bound(session.ids.length, session.algorithm) &&
+      session.choices.every((c) => ["left", "right", "tie"].includes(c)) &&
+      (session.verifyRounds === undefined || (Array.isArray(session.verifyRounds) &&
+        session.verifyRounds.length <= 25 && session.verifyRounds.every((round) =>
+          Array.isArray(round) && round.length <= 40 && round.every((p) =>
+            p && p.a !== p.b && session.ids.includes(p.a) && session.ids.includes(p.b) &&
+            (p.winner === "tie" || p.winner === p.a || p.winner === p.b)))))
     );
   }
 
@@ -326,7 +335,7 @@
     }
     let sorter = null;
     try {
-      sorter = BiasSorter.replay(session.ids, session.choices);
+      sorter = BiasSorter.replay(session.ids, session.choices, session.algorithm, session.matchups);
     } catch {
       board.innerHTML = renderEmpty();
       return;
@@ -339,7 +348,7 @@
       (item.role_id && embeds[item.role_id]) || item.local || item.fallback;
     const ranked = [];
     let rank = 1;
-    sorter.result.forEach((bucket) => {
+    BiasSorter.ranking(sorter, session.verifyRounds).forEach((bucket) => {
       bucket.forEach((id) => {
         const item = byId.get(id);
         ranked.push({

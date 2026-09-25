@@ -73,6 +73,9 @@ class GroupLeaderboardEntry:
     image_url: str | None
     votes: int = 0
     top_member_images: list[str] | None = None
+    # Highest member ELO in the group. The sorter lineup orders groups by
+    # this; the Groups board itself ranks by the top-3 average (elo).
+    peak_elo: int = 0
 
 
 @dataclass(frozen=True)
@@ -127,6 +130,7 @@ def _build_group_leaderboard(rows, vote_count: int, top_n: int) -> GroupLeaderbo
                 image_url=row[5],
                 votes=int(row[7] or 0) if len(row) > 7 else 0,
                 top_member_images=list(row[6] or []) if len(row) > 6 else [],
+                peak_elo=int(row[8]) if len(row) > 8 and row[8] is not None else 0,
             )
             for row in rows
         ],
@@ -255,7 +259,8 @@ def get_global_group_leaderboard(limit: int = 15, top_n: int = 3) -> GroupLeader
                        ARRAY_AGG(member_name ORDER BY elo DESC, member_name) AS top_members,
                        (ARRAY_AGG(image_url ORDER BY elo DESC, member_name))[1] AS image_url,
                        ARRAY_AGG(image_url ORDER BY elo DESC, member_name) AS member_images,
-                       SUM(CASE WHEN member_rank <= %s THEN matches ELSE 0 END)::int AS votes
+                       SUM(CASE WHEN member_rank <= %s THEN matches ELSE 0 END)::int AS votes,
+                       MAX(elo)::int AS peak_elo
                 FROM idol_scores
                 WHERE member_rank <= %s
                 GROUP BY group_name

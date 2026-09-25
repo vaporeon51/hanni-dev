@@ -5,10 +5,12 @@
  *   baked in at build time) instead of inline data.js + photo-cache.js
  * - every non-tie matchup with two known idols is beaconed to
  *   POST /api/sorter/vote so the global/personal ELO boards stay live
+ * - adaptive sessions give everyone coverage, then focus on favorites
+ * - lightly seeded opening pairs use consensus only to choose opponents
+ * - double-check rounds adapt to new answers and refit the personal ranking
  * - next-pair images are preloaded after each render for instant cards
  *
- * Everything else (merge-sort engine, autosave, undo, share links, keyboard)
- * behaves exactly like the original.
+ * Legacy merge-sort sessions retain their original replay behavior.
  */
 (() => {
   "use strict";
@@ -70,8 +72,11 @@
   }
 
   const savedStateLifetime = 2 * 60 * 60 * 1000;
-  function readSavedState(key) {
+  function readSavedState(key, keepCompleted = false) {
     const value = read(key);
+    // Finished rankings remain on this device until another sort replaces
+    // them. Lineup drafts and unfinished sessions still expire normally.
+    if (keepCompleted && Number.isFinite(value?.finished) && value.finished > 0) return value;
     const age = Date.now() - value?.savedAt;
     if (Number.isFinite(value?.savedAt) && age >= 0 && age < savedStateLifetime) return value;
     try { localStorage.removeItem(key); } catch {}
@@ -170,54 +175,144 @@
       // Group definitions carry generation tags; soloist pseudo-groups do not.
       .filter((g) => g.members.length && g.gen?.length);
     const groupSortIds = new Set(groups.map((g) => g.photo?.id).filter(Number.isInteger));
-    // Unpinned alphabetical order until the live board resolves — the ELO
-    // reorder below always applies, even with a restored selection.
+    // Unpinned alphabetical order until the live board resolves. The boot
+    // tail paints from a cached order instantly when one exists (no flicker);
+    // a cold start shows a skeleton until the board resolves (bounded wait).
     groups.sort((a, b) => a.name.localeCompare(b.name));
-    // Live touch: reorder groups by their current global average-member ELO
-    // (same numbers as the Groups leaderboard). Best-effort — the
-    // alphabetical order above stays only until this resolves.
-    applyEloOrder();
 
     function normName(value) {
       return (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
     }
-    async function applyEloOrder() {
-      try {
-        const response = await fetch("/api/leaderboard?scope=global&kind=groups", {
-          credentials: "same-origin",
+    const aliases = { idle: "gidle", ohmygirl: "omg" };
+    aliases[normName("Girls' Generation")] = normName("SNSD");
+    const resolve = (value) => aliases[normName(value)] || normName(value);
+    let eloBoard = null;
+    let idolSeedBoard = null;
+    // Best effort and bounded: starting a sort never waits for consensus.
+    const seedController = new AbortController();
+    const seedTimeout = setTimeout(() => seedController.abort(), 1500);
+    fetch("/api/leaderboard?kind=idols", { credentials: "same-origin", signal: seedController.signal })
+      .then((response) => response.ok ? response.json() : null)
+      .then((board) => { if (Array.isArray(board?.entries)) idolSeedBoard = board; })
+      .catch(() => {}).finally(() => clearTimeout(seedTimeout));
+    const adaptiveDefaults = { name: "adaptive-v1", focus: 0.6, top: 10 };
+    const seedStrength = 0.25;
+    function newAlgorithm(ids) {
+      const ratings = new Map();
+      if (mode === "idols") {
+        const roles = new Map((idolSeedBoard?.entries || []).map((e) => [e.role_id, e.elo]));
+        ids.forEach((id) => {
+          const value = roles.get(byId.get(id).role_id);
+          if (Number.isFinite(value)) ratings.set(id, value);
         });
-        if (!response.ok) return;
-        const board = await response.json();
-        if (!board || !Array.isArray(board.entries)) return;
-        const aliases = { idle: "gidle", ohmygirl: "omg" };
-        aliases[normName("Girls' Generation")] = normName("SNSD");
-        const resolve = (value) => aliases[normName(value)] || normName(value);
-        const order = new Map();
-        board.entries.forEach((entry, index) => {
-          const key = resolve(entry.group_name);
-          if (!order.has(key)) order.set(key, index);
+      } else {
+        const names = new Map((eloBoard?.entries || []).map((e) => [resolve(e.group_name), e.elo]));
+        ids.forEach((id) => {
+          const item = byId.get(id);
+          const labels = [...(item.group_labels || []), item.group, item.name];
+          const value = labels.map((label) => names.get(resolve(label))).find(Number.isFinite);
+          if (Number.isFinite(value)) ratings.set(id, value);
         });
-        const rankOf = (g) => {
-          for (const candidate of [g.key, g.name]) {
-            const key = resolve(candidate);
-            if (order.has(key)) return order.get(key);
-          }
-          return Infinity;
-        };
-        groups.sort((a, b) => rankOf(a) - rankOf(b) || a.name.localeCompare(b.name));
-        if (view === "setup") {
-          // Indices shift under the reorder, so drop expanded state and
-          // re-render — checkbox state survives via the selection set. Skip
-          // only if the user is mid-interaction inside the list.
-          const interacting = document.activeElement && $("groups").contains(document.activeElement);
-          if (!interacting) {
-            expanded.clear();
-            renderGroups();
-          }
-        }
-      } catch {
-        /* favorite order stands */
       }
+      const values = [...ratings.values()];
+      const seeded = ids.map((id) => {
+        const rating = ratings.get(id);
+        // Missing leaderboard entries are unknown, never assumed to be last.
+        // Equal ratings receive equal percentile hints.
+        const hint = ratings.has(id) && values.length > 1
+          ? (values.filter((v) => v > rating).length +
+              (values.filter((v) => v === rating).length - 1) / 2) / (values.length - 1)
+          : Math.random();
+        return { id, key: seedStrength * hint + (1 - seedStrength) * Math.random() };
+      });
+      seeded.sort((a, b) => a.key - b.key);
+      return { ...adaptiveDefaults, seedOrder: seeded.map((entry) => entry.id) };
+    }
+    // Lineup order follows the mode: idols mode ranks groups by their peak
+    // member ELO; groups mode mirrors the Groups leaderboard tab (top-3
+    // average) so the two orders deliberately differ.
+    function orderGroups() {
+      if (!eloBoard) return;
+      const byScore = [...eloBoard.entries].sort((a, b) =>
+        mode === "groups" ? b.elo - a.elo : (b.peak_elo ?? b.elo) - (a.peak_elo ?? a.elo),
+      );
+      const order = new Map();
+      byScore.forEach((entry, index) => {
+        const key = resolve(entry.group_name);
+        if (!order.has(key)) order.set(key, index);
+      });
+      const rankOf = (g) => {
+        for (const candidate of [g.key, g.name]) {
+          const key = resolve(candidate);
+          if (order.has(key)) return order.get(key);
+        }
+        return Infinity;
+      };
+      groups.sort((a, b) => rankOf(a) - rankOf(b) || a.name.localeCompare(b.name));
+    }
+    const orderKey = "bias-club-group-order-v1";
+    const orderCacheLifetime = 7 * 24 * 60 * 60 * 1000;
+    function groupsSignature() {
+      return groups.map((g) => g.key).join("|");
+    }
+    function readOrderCache() {
+      const value = read(orderKey);
+      if (!value || value.mode !== mode || !Array.isArray(value.keys)) return null;
+      const age = Date.now() - value.savedAt;
+      if (!Number.isFinite(value.savedAt) || age < 0 || age >= orderCacheLifetime) return null;
+      if (!value.keys.length || !value.keys.every((k) => typeof k === "string")) return null;
+      return value.keys;
+    }
+    function writeOrderCache() {
+      write(orderKey, { mode, keys: groups.map((g) => g.key), savedAt: Date.now() });
+    }
+    // Applies the cached order when it still covers the catalog (rebuilds
+    // add groups). Returns true when the first paint can go out immediately.
+    function applyCachedOrder() {
+      const keys = readOrderCache();
+      if (!keys) return false;
+      const position = new Map(keys.map((k, i) => [k, i]));
+      if (!groups.every((g) => position.has(g.key))) return false;
+      groups.sort((a, b) => position.get(a.key) - position.get(b.key));
+      return true;
+    }
+    async function fetchEloOrder(timeoutMs) {
+      try {
+        const response = await Promise.race([
+          fetch("/api/leaderboard?kind=groups", { credentials: "same-origin" }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("order timeout")), timeoutMs)),
+        ]);
+        if (!response.ok) return false;
+        const board = await response.json();
+        if (!board || !Array.isArray(board.entries)) return false;
+        eloBoard = board;
+        orderGroups();
+        writeOrderCache();
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    // Background refresh for the warm path: re-renders only when the live
+    // order actually moved, so repeat visits never flicker.
+    async function refreshEloOrder() {
+      const before = groupsSignature();
+      const ok = await fetchEloOrder(10000);
+      if (!ok || view !== "setup") return;
+      if (groupsSignature() === before) return;
+      const interacting = document.activeElement && $("groups").contains(document.activeElement);
+      if (!interacting) {
+        expanded.clear();
+        renderGroups();
+      }
+    }
+    function renderGroupsLoading() {
+      $("group-count").textContent = "gathering groups…";
+      $("empty").hidden = true;
+      $("select-visible").disabled = true;
+      $("groups").innerHTML = Array.from({ length: 6 }, () =>
+        '<article class="group-card is-loading" aria-hidden="true"><div class="group-cover"></div><div class="group-content"><div class="shimmer-bar"></div><div class="shimmer-bar short"></div></div></article>',
+      ).join("");
     }
 
     let selected = new Set(),
@@ -373,7 +468,7 @@
     }
     function updateSelection() {
       const n = selected.size,
-        bound = BiasSorter.bound(n);
+        bound = BiasSorter.bound(n, adaptiveDefaults);
       $("selection-count").textContent = n;
       $("selection-unit").textContent = mode;
       $("selected-groups").innerHTML = groups
@@ -492,6 +587,11 @@
           mode = button.dataset.mode;
           selected = new Set(active.flatMap(idsFor));
           document.querySelectorAll("[data-mode]").forEach((b) => b.setAttribute("aria-pressed", b === button));
+          // The two modes order differently (peak vs average), so re-sort.
+          // Indices shift, so drop expanded state before re-rendering.
+          orderGroups();
+          expanded.clear();
+          writeOrderCache();
           refresh();
         }),
     );
@@ -515,18 +615,32 @@
     };
     function setView(next) {
       view = next;
-      ["setup", "sorting", "results"].forEach((id) => ($(id).hidden = id !== next));
+      const shown = next === "verifying" ? "sorting" : next;
+      ["setup", "sorting", "results"].forEach((id) => ($(id).hidden = id !== shown));
       ["setup", "sort", "results"].forEach((id) => {
-        const active = id === (next === "sorting" ? "sort" : next);
+        const active = id === (shown === "sorting" ? "sort" : shown);
         if (active) $("step-" + id).setAttribute("aria-current", "step");
         else $("step-" + id).removeAttribute("aria-current");
       });
+      const verifying = next === "verifying";
+      $("pause").hidden = verifying;
+      $("verify-back").hidden = !verifying;
       window.scrollTo({ top: 0, behavior: "instant" });
-      if (next !== "setup") $(next).focus({ preventScroll: true });
+      if (next !== "setup") $(shown).focus({ preventScroll: true });
     }
     function save() {
       session.savedAt = Date.now();
       write(key, session);
+    }
+    function updateResumeBanner(value = readSavedState(key, true)) {
+      const valid = validSession(value);
+      $("resume-banner").hidden = !valid;
+      if (!valid) return;
+      const completed = Number.isFinite(value.finished) && value.finished > 0;
+      $("resume-message").textContent = completed
+        ? `Your ranking is ready ♡ · ${value.ids.length} ${value.mode} ranked`
+        : `Your ranking is in progress · ${value.choices.length} choices made`;
+      $("resume").textContent = completed ? "View results →" : "Continue ranking →";
     }
     function validSession(value) {
       return (
@@ -542,8 +656,28 @@
           (value.mode !== "groups" || groupSortIds.has(id))
         ) &&
         Array.isArray(value.choices) &&
-        value.choices.length <= BiasSorter.bound(value.ids.length) &&
-        value.choices.every((c) => ["left", "right", "tie"].includes(c))
+        BiasSorter.validAlgorithm(value.algorithm, value.ids) &&
+        value.choices.length <= BiasSorter.bound(value.ids.length, value.algorithm) &&
+        value.choices.every((c) => ["left", "right", "tie"].includes(c)) &&
+        (!value.algorithm || (Array.isArray(value.matchups) &&
+          value.matchups.length === value.choices.length &&
+          value.matchups.every((pair) => Array.isArray(pair) && pair.length === 2 &&
+            pair[0] !== pair[1] && pair.every((id) => value.ids.includes(id))))) &&
+        (value.verifyRounds === undefined || (
+          Array.isArray(value.verifyRounds) &&
+          value.verifyRounds.length <= 25 &&
+          value.verifyRounds.every((round) =>
+            Array.isArray(round) &&
+            round.length <= 40 &&
+            round.every((p) =>
+              p && Number.isInteger(p.a) && Number.isInteger(p.b) &&
+              value.ids.includes(p.a) && value.ids.includes(p.b) &&
+              (p.winner === "tie" || p.winner === p.a || p.winner === p.b)
+            )
+          )
+        )) &&
+        (value.verify === undefined || value.verify === null ||
+          validVerifyState(value.verify, value.ids))
       );
     }
     function resume(value) {
@@ -552,7 +686,8 @@
         return;
       }
       session = value;
-      sorter = BiasSorter.replay(session.ids, session.choices);
+      session.verifyRounds = session.verifyRounds || [];
+      sorter = BiasSorter.replay(session.ids, session.choices, session.algorithm, session.matchups);
       setView(sorter.result ? "results" : "sorting");
       renderBattle();
     }
@@ -563,8 +698,8 @@
         const j = Math.floor(Math.random() * (i + 1));
         [ids[i], ids[j]] = [ids[j], ids[i]];
       }
-      session = { version: dataSetVersion, mode, ids, choices: [], counted: 0, started: Date.now() };
-      sorter = new BiasSorter(ids);
+      session = { version: dataSetVersion, mode, ids, algorithm: newAlgorithm(ids), matchups: [], choices: [], verifyRounds: [], verify: null, counted: 0, started: Date.now() };
+      sorter = BiasSorter.create(ids, session.algorithm);
       save();
       setView("sorting");
       renderBattle();
@@ -592,7 +727,7 @@
         }${photo(item)}<strong>${escape(shortName(item))}</strong><small>${escape(groupName(item))}</small>`;
         button.setAttribute("aria-label", `Choose ${item.name}`);
       });
-      const bound = BiasSorter.bound(session.ids.length);
+      const bound = BiasSorter.bound(session.ids.length, session.algorithm);
       $("battle-label").textContent = `MATCHUP ${session.choices.length + 1} · ${session.ids.length} ${session.mode.toUpperCase()}`;
       $("progress-label").textContent = `${session.choices.length} choices made · at most ${Math.max(
         0,
@@ -604,14 +739,24 @@
       // Snappy next round: warm the cache for whatever pair comes next.
       // Both branches are cheap (deduped by URL) since only one can occur.
       try {
-        const probe = BiasSorter.replay(session.ids, [...session.choices, "left"]);
-        const next = probe.result ? null : probe.pair();
-        if (next) {
-          preload(byId.get(next[0]));
-          preload(byId.get(next[1]));
+        if (session.algorithm) {
+          const next = sorter.coverage[sorter.comparisons + 1] ||
+            sorter.selectPair(true) || [];
+          next.forEach((id) => preload(byId.get(id)));
+        } else {
+          const probe = BiasSorter.replay(session.ids, [...session.choices, "left"]);
+          const next = probe.result ? null : probe.pair();
+          if (next) next.forEach((id) => preload(byId.get(id)));
         }
       } catch {
         /* preview is best-effort */
+      }
+    }
+    function clearVerifyRounds(reason) {
+      if (session.verifyRounds?.length || session.verify) {
+        session.verifyRounds = [];
+        session.verify = null;
+        if (reason) toast(reason);
       }
     }
     function choose(choice, button) {
@@ -619,44 +764,122 @@
       const pair = sorter.pair();
       if (button) burst(button);
       logVote(byId.get(pair[0]), byId.get(pair[1]), choice, session);
+      if (session.algorithm) session.matchups.push(pair);
       session.choices.push(choice);
       sorter.choose(choice);
       save();
       renderBattle();
     }
-    $("pick-left").onclick = (event) => choose("left", event.currentTarget);
-    $("pick-right").onclick = (event) => choose("right", event.currentTarget);
-    $("tie").onclick = () => choose("tie");
+    $("pick-left").onclick = (event) =>
+      (view === "verifying" ? verifyChoose : choose)("left", event.currentTarget);
+    $("pick-right").onclick = (event) =>
+      (view === "verifying" ? verifyChoose : choose)("right", event.currentTarget);
+    $("tie").onclick = () => (view === "verifying" ? verifyChoose("tie") : choose("tie"));
     $("undo").onclick = () => {
+      if (view === "verifying") return verifyUndo();
+      if (view !== "sorting") return;
       if (!session.choices.length) return;
+      clearVerifyRounds();
       session.choices.pop();
+      if (session.algorithm) session.matchups.pop();
       delete session.finished;
-      sorter = BiasSorter.replay(session.ids, session.choices);
+      sorter = BiasSorter.replay(session.ids, session.choices, session.algorithm, session.matchups);
       save();
       renderBattle();
     };
     $("pause").onclick = () => {
       save();
-      $("resume-banner").hidden = false;
+      updateResumeBanner();
       setView("setup");
     };
     $("resume").onclick = () => {
-      const saved = readSavedState(key);
-      $("resume-banner").hidden = !validSession(saved);
+      const saved = readSavedState(key, true);
+      updateResumeBanner(saved);
       resume(saved);
     };
     let ranked = [];
+    let buckets = [];
+    const VERIFY_SLICE = 10;
+    const CHALLENGE_TOP = 8;
+    function baseBuckets() {
+      return BiasSorter.ranking(sorter, session.verifyRounds);
+    }
+    function pairKey(a, b) {
+      return a < b ? `${a}:${b}` : `${b}:${a}`;
+    }
+    // Every pair that already met: the main sort (replayed) plus all banked
+    // verify picks. Ties count as faced too.
+    function facedPairKeys() {
+      const seen = BiasSorter.facedPairs(session.ids, session.choices);
+      for (const round of session.verifyRounds || []) {
+        for (const p of round || []) seen.add(pairKey(p.a, p.b));
+      }
+      return seen;
+    }
+    // One combined round: neighbouring ranks that never met directly first,
+    // then unseen round-robin pairs inside the current top 8. Either half
+    // can catch a misplaced idol; together the top 8 ends up fully compared.
+    function buildVerifyPairs() {
+      if (!sorter || !sorter.result || !buckets.length || session.verifyRounds.length >= 25) return [];
+      if (session.algorithm) {
+        const pair = sorter.withReviews(session.verifyRounds).selectPair(true, true);
+        return pair ? [pair] : [];
+      }
+      const rankOf = new Map();
+      buckets.forEach((bucket, index) => bucket.forEach((id) => rankOf.set(id, index)));
+      const flat = [];
+      buckets.forEach((bucket) => bucket.forEach((id) => flat.push(id)));
+      const slice = flat.slice(0, VERIFY_SLICE);
+      const pairs = [];
+      const seen = new Set();
+      let i = 0;
+      while (i + 1 < slice.length) {
+        if (rankOf.get(slice[i]) === rankOf.get(slice[i + 1])) {
+          i += 1;
+          continue;
+        }
+        pairs.push([slice[i], slice[i + 1]]);
+        seen.add(pairKey(slice[i], slice[i + 1]));
+        i += 2;
+      }
+      const faced = facedPairKeys();
+      const top = flat.slice(0, CHALLENGE_TOP);
+      const extra = [];
+      for (let a = 0; a < top.length; a++) {
+        for (let b = a + 1; b < top.length; b++) {
+          const key = pairKey(top[a], top[b]);
+          if (faced.has(key) || seen.has(key)) continue;
+          seen.add(key);
+          extra.push([top[a], top[b]]);
+        }
+      }
+      // Shuffle the deep pairs so rank order can't cue answers.
+      for (let k = extra.length - 1; k > 0; k--) {
+        const j = Math.floor(Math.random() * (k + 1));
+        [extra[k], extra[j]] = [extra[j], extra[k]];
+      }
+      return pairs.concat(extra);
+    }
     function renderResults() {
       ranked = [];
+      buckets = baseBuckets();
       let rank = 1;
-      sorter.result.forEach((bucket) => {
+      buckets.forEach((bucket) => {
         bucket.forEach((id) => ranked.push({ id, rank }));
         rank += bucket.length;
       });
       const counted = session.counted || 0;
-      $("result-meta").textContent =
-        `${session.ids.length} ${session.mode} · ${session.choices.length} matchups` +
-        (counted ? ` · ♡ ${counted} picks counted toward the leaderboard` : "");
+      const pending = session.verify?.picks?.length || 0;
+      if (pending) {
+        $("verify").hidden = false;
+        $("verify").textContent =
+          `Resume check (${(session.verify.limit || session.verify.pairs.length) - pending} left) ♡`;
+      } else {
+        const fresh = buildVerifyPairs();
+        $("verify").hidden = fresh.length === 0;
+        if (fresh.length) $("verify").textContent = session.algorithm
+          ? "Refine favorites (up to 10) ♡" : `Double-check (${fresh.length}) ♡`;
+      }
       const limit = Number($("result-images").value);
       const featured = ranked.slice(0, limit);
       const remaining = ranked.slice(limit);
@@ -690,15 +913,163 @@
     $("result-images").onchange = renderResults;
     $("undo-final").onclick = () => {
       if (!session.choices.length) return;
+      clearVerifyRounds("Verification cleared — ranking changed.");
       setView("sorting");
       $("undo").click();
+    };
+    let verify = null;
+    function validVerifyState(value, ids) {
+      return (
+        !!value &&
+        Array.isArray(value.pairs) && value.pairs.length && value.pairs.length <= 40 &&
+        Array.isArray(value.shown) && value.shown.length === value.pairs.length &&
+        Array.isArray(value.picks) && value.picks.length <= value.pairs.length &&
+        value.pairs.every((pair) =>
+          Array.isArray(pair) && pair.length === 2 && pair[0] !== pair[1] &&
+          pair.every((id) => Number.isInteger(id) && ids.includes(id))
+        ) &&
+        value.shown.every((s) =>
+          Array.isArray(s) && s.length === 2 && s[0] !== s[1] &&
+          (s[0] === 0 || s[0] === 1) && (s[1] === 0 || s[1] === 1)
+        ) &&
+        value.picks.every((p, i) =>
+          p && value.pairs[i][0] === p.a && value.pairs[i][1] === p.b &&
+          (p.winner === "tie" || p.winner === p.a || p.winner === p.b)
+        ) &&
+        (value.limit === undefined || (value.limit === 10 &&
+          value.pairs.length <= value.limit &&
+          value.pairs.length === value.picks.length + 1))
+      );
+    }
+    function startVerify() {
+      if (view !== "results" || !sorter?.result) return;
+      buckets = baseBuckets();
+      if (validVerifyState(session.verify, session.ids)) {
+        verify = {
+          pairs: session.verify.pairs,
+          shown: session.verify.shown,
+          picks: [...session.verify.picks],
+          limit: session.verify.limit,
+        };
+      } else {
+        const pairs = buildVerifyPairs();
+        if (!pairs.length) return;
+        verify = {
+          pairs,
+          shown: pairs.map(() => (Math.random() < 0.5 ? [0, 1] : [1, 0])),
+          picks: [],
+          ...(session.algorithm ? { limit: 10 } : {}),
+        };
+        session.verify = null;
+      }
+      setView("verifying");
+      renderVerifyBattle();
+    }
+    function renderVerifyBattle() {
+      const pos = verify.picks.length;
+      const total = verify.limit || verify.pairs.length;
+      const [aId, bId] = verify.pairs[pos];
+      const ids = verify.shown[pos][0] === 0 ? [aId, bId] : [bId, aId];
+      ["left", "right"].forEach((side, index) => {
+        const item = byId.get(ids[index]);
+        const button = $("pick-" + side);
+        const duel = session.mode === "groups";
+        button.classList.toggle("group-duel", duel);
+        button.innerHTML = `${
+          duel
+            ? `<span class="card-backdrop" aria-hidden="true" style="background-image:url(&quot;${escape(
+                imageURL(item),
+              )}&quot;)"></span>`
+            : ""
+        }${photo(item)}<strong>${escape(shortName(item))}</strong><small>${escape(groupName(item))}</small>`;
+        button.setAttribute("aria-label", `Double-check: choose ${item.name}`);
+      });
+      $("battle-label").textContent =
+        `DOUBLE-CHECK ${pos + 1}/${total} · ${session.algorithm ? "FAVORITES & CHALLENGERS" : `TOP ${Math.min(VERIFY_SLICE, ranked.length)}`}`;
+      $("progress-label").textContent = `${pos} of ${total} re-checks`;
+      $("progress").value = (pos / total) * 100;
+      $("undo").disabled = pos === 0;
+      if (pos + 1 < verify.pairs.length) {
+        preload(byId.get(verify.pairs[pos + 1][0]));
+        preload(byId.get(verify.pairs[pos + 1][1]));
+      }
+    }
+    function verifyChoose(choice, button) {
+      if (view !== "verifying" || !verify) return;
+      const pos = verify.picks.length;
+      if (pos >= verify.pairs.length) return;
+      const [aId, bId] = verify.pairs[pos];
+      const leftId = verify.shown[pos][0] === 0 ? aId : bId;
+      const rightId = verify.shown[pos][0] === 0 ? bId : aId;
+      if (button) burst(button);
+      logVote(byId.get(leftId), byId.get(rightId), choice, session);
+      verify.picks.push({
+        a: aId,
+        b: bId,
+        winner: choice === "tie" ? "tie" : choice === "left" ? leftId : rightId,
+      });
+      if (verify.limit && verify.picks.length < verify.limit) {
+        const model = sorter.withReviews([...(session.verifyRounds || []), verify.picks]);
+        const next = model.selectPair(true, true);
+        if (next) {
+          verify.pairs.push(next);
+          verify.shown.push(Math.random() < 0.5 ? [0, 1] : [1, 0]);
+        }
+      }
+      if (verify.picks.length >= verify.pairs.length) finishVerify();
+      else {
+        session.verify = { pairs: verify.pairs, shown: verify.shown, picks: verify.picks,
+          ...(verify.limit ? { limit: verify.limit } : {}) };
+        save();
+        renderVerifyBattle();
+      }
+    }
+    function verifyUndo() {
+      if (view !== "verifying" || !verify || !verify.picks.length) return;
+      verify.picks.pop();
+      if (verify.limit) {
+        verify.pairs = verify.pairs.slice(0, verify.picks.length + 1);
+        verify.shown = verify.shown.slice(0, verify.picks.length + 1);
+      }
+      session.verify = { ...verify };
+      save();
+      renderVerifyBattle();
+    }
+    function finishVerify() {
+      const round = verify.picks;
+      verify = null;
+      session.verify = null;
+      let moved = 0;
+      if (round.length) {
+        const before = new Map(ranked.map((r) => [r.id, r.rank]));
+        session.verifyRounds = [...(session.verifyRounds || []), round];
+        save();
+        setView("results");
+        renderResults();
+        const after = new Map(ranked.map((r) => [r.id, r.rank]));
+        moved = round.filter(
+          (p) => p.winner !== "tie" && before.get(p.winner) !== after.get(p.winner),
+        ).length;
+      } else {
+        setView("results");
+        renderResults();
+      }
+      toast(moved ? `${moved} favorite${moved === 1 ? "" : "s"} moved ♡` : "Ranking checked ♡");
+    }
+    $("verify").onclick = startVerify;
+    $("verify-back").onclick = () => {
+      // Progress stays saved — tapping the button resumes where you left off.
+      if (verify && !verify.picks.length) session.verify = null;
+      verify = null;
+      setView("results");
+      renderResults();
     };
     $("new-lineup").onclick = () => {
       mode = session.mode;
       selected = new Set(session.ids);
       document.querySelectorAll("[data-mode]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.mode === mode));
       history.replaceState(null, "", location.pathname);
-      $("resume-banner").hidden = false;
+      updateResumeBanner();
       refresh();
       setView("setup");
     };
@@ -766,16 +1137,18 @@
         event.repeat
       )
         return;
-      if (view === "sorting") {
+      if (view === "sorting" || view === "verifying") {
+        const pick = view === "sorting" ? choose : verifyChoose;
         const actions = {
-          ArrowLeft: () => choose("left", $("pick-left")),
-          h: () => choose("left", $("pick-left")),
-          ArrowRight: () => choose("right", $("pick-right")),
-          l: () => choose("right", $("pick-right")),
-          ArrowUp: () => choose("tie"),
-          k: () => choose("tie"),
-          ArrowDown: () => $("undo").click(),
-          j: () => $("undo").click(),
+          ArrowLeft: () => pick("left", $("pick-left")),
+          h: () => pick("left", $("pick-left")),
+          ArrowRight: () => pick("right", $("pick-right")),
+          l: () => pick("right", $("pick-right")),
+          ArrowUp: () => pick("tie"),
+          k: () => pick("tie"),
+          ArrowDown: () =>
+            view === "sorting" ? $("undo").click() : verifyUndo(),
+          j: () => (view === "sorting" ? $("undo").click() : verifyUndo()),
         };
         if (actions[event.key]) {
           event.preventDefault();
@@ -797,8 +1170,15 @@
       );
     }
     document.querySelectorAll("[data-mode]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.mode === mode));
-    $("resume-banner").hidden = !validSession(readSavedState(key));
-    refresh();
+    updateResumeBanner();
+    if (applyCachedOrder()) {
+      refresh();
+      refreshEloOrder();
+    } else {
+      renderGroupsLoading();
+      await fetchEloOrder(1500);
+      refresh();
+    }
     if (location.hash.startsWith("#ranking=")) {
       try {
         resume(JSON.parse(LZString.decompressFromEncodedURIComponent(location.hash.slice(9))));

@@ -881,17 +881,18 @@
           ? "Refine favorites (up to 10) ♡" : `Double-check (${fresh.length}) ♡`;
       }
       const limit = Number($("result-images").value);
-      const featured = ranked.slice(0, limit);
-      const remaining = ranked.slice(limit);
+      const visibleRanking = ranked.slice(0, 50);
+      const featured = visibleRanking.slice(0, limit);
+      const remaining = visibleRanking.slice(limit);
       $("ranking").innerHTML =
-        `<header class="ranking-heading"><h2>My ranking <span>♡</span></h2><span>${ranked.length} ${escape(
+        `<header class="ranking-heading"><h2>My ranking <span>♡</span></h2><span>${ranked.length > 50 ? "Showing top 50 of " : ""}${ranked.length} ${escape(
           session.mode,
         )}</span></header>` +
         (featured.length
           ? `<div class="rank-highlights">${featured
               .map(({ id, rank }) => {
                 const item = byId.get(id);
-                return `<div class="rank-highlight"><div class="rank-photo">${photo(item)}<span class="rank-badge">${rank}</span></div><strong>${escape(
+                return `<div class="rank-highlight"><div class="rank-photo">${photo(item)}<span class="rank-badge${rank <= 3 ? " rank-badge-top" : ""}">${rank}</span></div><strong>${escape(
                   shortName(item),
                 )}</strong><small>${escape(groupName(item))}</small></div>`;
               })
@@ -901,7 +902,7 @@
           ? `<div class="rank-list">${remaining
               .map(({ id, rank }) => {
                 const item = byId.get(id);
-                return `<div class="rank-row"><span class="rank-number">${rank}</span><div><strong>${escape(
+                return `<div class="rank-row"><span class="rank-number${rank <= 3 ? " rank-number-top" : ""}">${rank}</span>${photo(item, "rank-thumbnail")}<div><strong>${escape(
                   shortName(item),
                 )}</strong><small>${escape(groupName(item))}</small></div></div>`;
               })

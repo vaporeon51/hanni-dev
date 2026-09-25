@@ -226,7 +226,8 @@ h2 {
   background: none;
   color: var(--ink);
   outline-offset: 0;
-  font-size: 14px;
+  /* Keep iOS from zooming the page when the search field receives focus. */
+  font-size: 16px;
 }
 .search kbd {
   color: var(--muted);
@@ -792,6 +793,22 @@ progress::-moz-progress-bar {
   font: bold 14px Arial, sans-serif;
   text-align: center;
 }
+.rank-badge-top {
+  background: #fbe8f0;
+  box-shadow: 0 0 0 1px #dfa8bf, 0 2px 8px #49343e18;
+}
+.rank-number-top {
+  font-weight: bold;
+}
+.rank-thumbnail {
+  width: 44px;
+  height: 52px;
+  flex: none;
+  object-fit: cover;
+  object-position: center 20%;
+  border-radius: 8px;
+  background: var(--light);
+}
 .rank-highlight strong {
   display: block;
   font-size: 15px;
@@ -823,7 +840,7 @@ progress::-moz-progress-bar {
   align-items: center;
   gap: 12px;
   padding: 10px 0;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid #ecdde480;
 }
 .rank-row > div {
   min-width: 0;
@@ -1154,6 +1171,10 @@ dialog p {
   }
   .rank-row {
     gap: 8px;
+  }
+  .rank-thumbnail {
+    width: 36px;
+    height: 44px;
   }
   .rank-number {
     font-size: 18px;

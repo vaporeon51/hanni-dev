@@ -128,6 +128,13 @@ def _parse_dataset(path: Path) -> tuple[str, list[dict], list[dict], list[dict]]
                     "group_labels": re.findall(r'"([^"]+)"', label_match.group(1)),
                 }
             )
+    # Keep the sorter classification consistent across groups and members.
+    for group in group_defs:
+        if group["key"] == "tripleS":
+            group["gen"] = ["gen5"]
+    for idol in idol_entries:
+        if "tripleS" in idol["groups"]:
+            idol["gen"] = ["gen5"]
     return version, group_defs, idol_entries, group_cards
 
 

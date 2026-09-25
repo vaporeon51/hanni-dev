@@ -323,7 +323,7 @@ def _static_version() -> str:
         + tuple((REPO_ROOT / "static").rglob("*.js"))
         + tuple((REPO_ROOT / "static").rglob("*.json"))
         + tuple((REPO_ROOT / "static").rglob("*.svg"))
-        + tuple((REPO_ROOT / "static").glob("og-image.png"))
+        + tuple((REPO_ROOT / "static").glob("og-image*.png"))
     )
     return str(max(asset.stat().st_mtime_ns for asset in assets))
 

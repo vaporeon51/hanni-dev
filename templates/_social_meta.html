@@ -2,10 +2,10 @@
 {% set social_description = 'Sort your biases and explore your favorites.' %}
 {% set social_image_alt = 'Hanni with aespa, IVE, BLACKPINK, and NewJeans photo cards, plus bias sorter, leaderboard, feed, sets, and scroll features.' %}
 {% if clean %}
-{% set social_description = 'Duel your faves in the bias sorter and crown your ult on the leaderboard.' %}
+{% set social_description = 'Rank your favorite K-pop idols, share your bias list, and explore the community leaderboard.' %}
 {% set social_image_alt = 'Hanni with aespa, IVE, BLACKPINK, and NewJeans photo cards, plus bias sorter and leaderboard features.' %}
 {% endif %}
-{% set social_image = request.url_for('static', path='og-image.png') | string %}
+{% set social_image = request.url_for('static', path='og-image-bias.png' if clean else 'og-image.png') | string %}
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="hanni♡" />
 <meta property="og:title" content="{{ social_title }}" />

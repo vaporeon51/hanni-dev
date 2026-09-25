@@ -2,7 +2,8 @@ import AppKit
 import Foundation
 
 let root = URL(fileURLWithPath: CommandLine.arguments[1])
-let outputURL = root.appendingPathComponent("static/og-image.png")
+let clean = CommandLine.arguments.contains("--clean")
+let outputURL = root.appendingPathComponent(clean ? "static/og-image-bias.png" : "static/og-image.png")
 let photoPaths = [
   ("aespa", "0aa5560b78cc12cc.jpg"),
   ("IVE", "2bab0db9fb7f28dd.jpg"),
@@ -52,13 +53,15 @@ let titlePanel = NSRect(x: 247, y: 140, width: 706, height: 350)
 paper.setFill(); rounded(titlePanel, radius: 32).fill()
 NSColor(calibratedRed: 0.95, green: 0.84, blue: 0.87, alpha: 1).setStroke()
 let panelOutline = rounded(titlePanel, radius: 32); panelOutline.lineWidth = 2; panelOutline.stroke()
-centerText("YOUR FAVES, ALL IN ONE PLACE", y: 416, font: .monospacedSystemFont(ofSize: 15, weight: .medium), color: pink)
+centerText(clean ? "RANK YOUR FAVES, FIND YOUR ULT" : "YOUR FAVES, ALL IN ONE PLACE", y: 416, font: .monospacedSystemFont(ofSize: 15, weight: .medium), color: pink)
 centerText("hanni♡", y: 295, font: NSFont(name: "Georgia", size: 108) ?? .systemFont(ofSize: 108), color: berry)
 // Render the same SVG symbols used by the site, so the preview stays in sync.
 let iconDocument = try XMLDocument(contentsOf: root.appendingPathComponent("static/icons.svg"))
-let features = [("bias sorter", "i-heart"), ("leaderboard", "i-crown"), ("feed", "i-dice"), ("sets", "i-folder"), ("scroll", "i-swirl")]
+let features = clean
+  ? [("bias sorter", "i-heart"), ("leaderboard", "i-crown")]
+  : [("bias sorter", "i-heart"), ("leaderboard", "i-crown"), ("feed", "i-dice"), ("sets", "i-folder"), ("scroll", "i-swirl")]
 for (index, feature) in features.enumerated() {
-  let centerX = CGFloat(332 + index * 134)
+  let centerX = clean ? CGFloat(500 + index * 200) : CGFloat(332 + index * 134)
   let badge = NSRect(x: centerX - 25, y: 218, width: 50, height: 50)
   NSColor(calibratedRed: 0.98, green: 0.89, blue: 0.93, alpha: 1).setFill()
   rounded(badge, radius: 17).fill()

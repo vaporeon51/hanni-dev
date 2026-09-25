@@ -124,3 +124,34 @@ def test_clean_host_match_ignores_port():
     response = _get("/", host="hannibee.art:8000")
     assert response.status_code == 200
     assert "nsfw-cluster" in response.text
+
+
+def test_clean_social_preview_has_its_own_image_and_description():
+    from html.parser import HTMLParser
+
+    class MetaParser(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.tags = {}
+
+        def handle_starttag(self, tag, attrs):
+            if tag == "meta":
+                attrs = dict(attrs)
+                self.tags[attrs.get("property") or attrs.get("name")] = attrs.get("content", "")
+
+    for host, image in [(CLEAN_HOST, "og-image-bias.png"), ("hannibee.art", "og-image.png")]:
+        for path in ("/sorter", "/leaderboard"):
+            response = _get(path, host=host)
+            assert response.status_code == 200
+            parser = MetaParser()
+            parser.feed(response.text)
+            for key in ("og:image", "twitter:image"):
+                assert parser.tags[key].startswith(f"http://{host}/static/{image}?v=")
+            if host == CLEAN_HOST:
+                for key in ("og:description", "twitter:description"):
+                    assert parser.tags[key] == "Rank your favorite K-pop idols, share your bias list, and explore the community leaderboard."
+                assert "feed" not in parser.tags["og:image:alt"]
+    image = _get("/static/og-image-bias.png", host=CLEAN_HOST)
+    assert image.status_code == 200
+    assert image.headers["content-type"] == "image/png"
+    assert image.content[:8] == b"\x89PNG\r\n\x1a\n"

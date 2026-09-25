@@ -145,10 +145,67 @@ def _pool():
     return POOL
 
 
-def record_sorter_vote(winner_id: str, loser_id: str) -> dict[str, int] | None:
+# Distinct pairings per visitor-day at which the global K-factor halves.
+DAILY_DECAY_TAU = 250
+
+
+def scaled_global_k(distinct_pairs: int) -> int:
+    """Global K for a visitor's next new pairing after `distinct_pairs` today.
+
+    K halves every DAILY_DECAY_TAU fresh pairings (8 → 4 → 2 → floor 1) so
+    marathon sessions keep full local effect while their marginal global
+    weight fades. Variable K is sound ELO: each matchup stays zero-sum.
+    """
+    if distinct_pairs < 0:
+        distinct_pairs = 0
+    return max(1, round(GLOBAL_ELO_K * DAILY_DECAY_TAU / (DAILY_DECAY_TAU + distinct_pairs)))
+
+
+def pair_key_for(winner_id: str, loser_id: str) -> str:
+    """Order-independent key for a matchup pair."""
+    return f"{winner_id}/{loser_id}" if winner_id < loser_id else f"{loser_id}/{winner_id}"
+
+
+def register_pair_vote(
+    visitor_token: str, day: datetime.date, pair_key: str
+) -> tuple[int, bool]:
+    """Record one matchup meeting. Returns (distinct pairs today, is first meeting).
+
+    A pair's first meeting each day moves ELO; rematches are weightless
+    (still logged in win/match counts by the caller). Single round trip.
+    """
+    with _pool().connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                WITH ins AS (
+                    INSERT INTO visitor_pair_votes (visitor_token, day, pair_key)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT DO NOTHING
+                    RETURNING 1
+                )
+                -- NOTE: the outer COUNT uses the statement snapshot, which
+                -- excludes ins's own insert, so add it back explicitly.
+                SELECT
+                    (SELECT COUNT(*) FROM visitor_pair_votes
+                     WHERE visitor_token = %s AND day = %s)
+                    + (SELECT COUNT(*) FROM ins),
+                    EXISTS (SELECT 1 FROM ins);
+                """,
+                (visitor_token, day, pair_key, visitor_token, day),
+            )
+            row = cur.fetchone()
+            assert row is not None
+            return int(row[0]), bool(row[1])
+
+
+def record_sorter_vote(
+    winner_id: str, loser_id: str, k: int = GLOBAL_ELO_K
+) -> dict[str, int] | None:
     """Record one sorter matchup as a global vote. Returns ELO deltas, or None for bad ids."""
     if not winner_id or not loser_id or winner_id == loser_id:
         return None
+    k = max(0, int(k))
     with _pool().connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -164,7 +221,7 @@ def record_sorter_vote(winner_id: str, loser_id: str) -> dict[str, int] | None:
                 (winner_id, loser_id),
             )
             elos = {row[0]: row[1] for row in cur.fetchall()}
-            winner_delta, loser_delta = calculate_elo_delta(elos[winner_id], elos[loser_id], GLOBAL_ELO_K)
+            winner_delta, loser_delta = calculate_elo_delta(elos[winner_id], elos[loser_id], k)
 
             cur.execute(
                 "UPDATE role_info SET global_elo = global_elo + %s WHERE role_id = %s;",

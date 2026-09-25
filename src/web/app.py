@@ -30,7 +30,10 @@ from src.db.bias import (  # noqa: E402
     LEADERBOARD_SNAPSHOT_LIMIT,
     get_global_group_leaderboard,
     get_global_leaderboard,
+    pair_key_for,
     record_sorter_vote,
+    register_pair_vote,
+    scaled_global_k,
 )
 from src.db.feedback import ContentFeedback, add_content_report, add_content_vote  # noqa: E402
 from src.db.media import get_live_content_url  # noqa: E402
@@ -862,8 +865,14 @@ async def sorter_vote(
     request: Request,
     response: Response,
     payload: dict[str, Any] = Body(...),
-) -> dict[str, bool]:
-    """Record one bias-sorter matchup as an ELO vote (best-effort, always 200)."""
+) -> dict[str, Any]:
+    """Record one bias-sorter matchup as an ELO vote (best-effort, always 200).
+
+    One person, one vote per pair per day: a matchup's first meeting moves
+    ELO (fading with daily volume); rematches are logged but weightless.
+    Neither a marathon nor a farmed pair can move the shared boards by
+    itself. The sorter itself never blocks.
+    """
 
     visitor_token = _ensure_visitor_cookie(request, response)
     try:
@@ -876,11 +885,22 @@ async def sorter_vote(
     if not _sorter_vote_rate_limiter.allow(visitor_token, "sorter-vote"):
         return {"recorded": False}
     try:
-        recorded = await asyncio.to_thread(record_sorter_vote, winner_id, loser_id)
+        distinct, is_new = await asyncio.to_thread(
+            register_pair_vote,
+            visitor_token,
+            datetime.now(timezone.utc).date(),
+            pair_key_for(winner_id, loser_id),
+        )
+    except Exception:
+        logger.exception("Could not register pair vote")
+        distinct, is_new = 1, True
+    k = scaled_global_k(distinct - 1) if is_new else 0
+    try:
+        recorded = await asyncio.to_thread(record_sorter_vote, winner_id, loser_id, k)
     except Exception:
         logger.exception("Could not record sorter vote")
         return {"recorded": False}
-    return {"recorded": recorded is not None}
+    return {"recorded": recorded is not None, "global_k": k}
 
 
 @app.get("/api/leaderboard")

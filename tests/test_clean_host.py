@@ -91,8 +91,11 @@ def test_clean_wholesome_still_served(monkeypatch):
 def test_clean_sorter_votes_still_count(monkeypatch):
     recorded = {}
     monkeypatch.setattr(
+        web_app, "register_pair_vote", lambda token, day, pair: (1, True)
+    )
+    monkeypatch.setattr(
         web_app, "record_sorter_vote",
-        lambda winner_id, loser_id: recorded.setdefault("args", (winner_id, loser_id)) or {"winner_delta": 4, "loser_delta": -4},
+        lambda winner_id, loser_id, k: recorded.setdefault("args", (winner_id, loser_id, k)) or {"winner_delta": 4, "loser_delta": -4},
     )
 
     async def request():
@@ -109,8 +112,8 @@ def test_clean_sorter_votes_still_count(monkeypatch):
 
     response = asyncio.run(request())
     assert response.status_code == 200
-    assert response.json() == {"recorded": True}
-    assert recorded["args"] == ("role-a", "role-b")
+    assert response.json() == {"recorded": True, "global_k": 8}
+    assert recorded["args"] == ("role-a", "role-b", 8)
 
 
 def test_clean_host_match_ignores_port():

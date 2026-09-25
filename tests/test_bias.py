@@ -35,14 +35,17 @@ def test_record_sorter_vote_rejects_bad_ids():
     assert bias.record_sorter_vote("", "") is None
 
 
-def _post_vote(monkeypatch, payload):
+def _post_vote(monkeypatch, payload, distinct=1, is_new=True):
     recorded = {}
 
-    def fake_record(winner_id, loser_id):
-        recorded["args"] = (winner_id, loser_id)
+    def fake_record(winner_id, loser_id, k):
+        recorded["args"] = (winner_id, loser_id, k)
         return {"winner_delta": 4, "loser_delta": -4}
 
     monkeypatch.setattr(web_app, "record_sorter_vote", fake_record)
+    monkeypatch.setattr(
+        web_app, "register_pair_vote", lambda token, day, pair: (distinct, is_new)
+    )
 
     async def request():
         transport = httpx.ASGITransport(app=web_app.app)
@@ -57,8 +60,43 @@ def test_sorter_vote_records_matchup(monkeypatch):
         monkeypatch, {"winner_role_id": "role-a", "loser_role_id": "role-b"}
     )
     assert response.status_code == 200
-    assert response.json() == {"recorded": True}
-    assert recorded["args"] == ("role-a", "role-b")
+    assert response.json() == {"recorded": True, "global_k": 8}
+    assert recorded["args"] == ("role-a", "role-b", 8)
+
+
+def test_sorter_vote_damps_k_after_marathon(monkeypatch):
+    response, recorded = _post_vote(
+        monkeypatch, {"winner_role_id": "role-a", "loser_role_id": "role-b"},
+        distinct=1001,
+    )
+    assert response.status_code == 200
+    assert response.json() == {"recorded": True, "global_k": 2}
+    assert recorded["args"] == ("role-a", "role-b", 2)
+
+
+def test_sorter_vote_stops_farmed_rematches(monkeypatch):
+    response, recorded = _post_vote(
+        monkeypatch, {"winner_role_id": "role-a", "loser_role_id": "role-b"},
+        distinct=1, is_new=False,
+    )
+    assert response.status_code == 200
+    assert response.json() == {"recorded": True, "global_k": 0}
+    assert recorded["args"] == ("role-a", "role-b", 0)
+
+
+def test_pair_key_is_order_independent():
+    assert bias.pair_key_for("role-b", "role-a") == bias.pair_key_for("role-a", "role-b")
+
+
+def test_scaled_global_k_decays_to_floor():
+    assert bias.scaled_global_k(0) == 8
+    assert bias.scaled_global_k(-5) == 8
+    assert bias.scaled_global_k(250) == 4
+    assert bias.scaled_global_k(750) == 2
+    assert bias.scaled_global_k(100000) == 1
+    assert all(
+        bias.scaled_global_k(n + 1) <= bias.scaled_global_k(n) for n in range(0, 3000)
+    )
 
 
 def test_sorter_vote_rejects_same_idol(monkeypatch):
@@ -85,8 +123,11 @@ def test_sorter_vote_rate_limits_rapid_beacons(monkeypatch):
             return first, second
 
     monkeypatch.setattr(
+        web_app, "register_pair_vote", lambda token, day, pair: (1, True)
+    )
+    monkeypatch.setattr(
         web_app, "record_sorter_vote",
-        lambda winner_id, loser_id: {"ok": True},
+        lambda winner_id, loser_id, k: {"ok": True},
     )
     first, second = asyncio.run(request())
     assert first.status_code == 200

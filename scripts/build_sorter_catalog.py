@@ -65,6 +65,13 @@ GROUP_COVER_OVERRIDES = {
     "BABYMONSTER": "/static/sorter/idols/2ea62874969fbb70.jpg",  # Vogue SG banner, Sep 2024
 }
 
+IDOL_PHOTO_OVERRIDES = {
+    # https://pbs.twimg.com/media/HJ-PgnfbUAANeNF?format=jpg&name=large
+    "Hyewon": "/static/sorter/idols/kang-hyewon-HJ-PgnfbUAANeNF.jpg",
+    # https://wimg.heraldcorp.com/news/cms/2026/03/31/news-p.v1.20260331.93dd06d29c144fb2988bd39cd3c1923c_P1.jpg
+    "Kwon Eunbi": "/static/sorter/idols/kwon-eunbi-herald-20260331.jpg",
+}
+
 
 # Members missing from the upstream dataset, kept here so rebuilds don't drop
 # them again. They are appended AFTER group cards so existing numeric ids
@@ -265,7 +272,7 @@ def main() -> int:
                 "fallback": img
                 if img.startswith("http")
                 else (IMAGE_ROOT + img if img else None),
-                "local": _local_photo(local_photos, img) if img else None,
+                "local": IDOL_PHOTO_OVERRIDES.get(item["name"]) or (_local_photo(local_photos, img) if img else None),
                 "photo": photo,
                 "role_id": role_id,
             },

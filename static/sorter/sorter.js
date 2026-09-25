@@ -171,10 +171,10 @@
           photoByLabel.get(g.name) ||
           catalog.find((i) => i.kind === "idol" && (i.groups || []).includes(g.key)),
       }))
-      // The source catalog also lists solo artists as one-member groups.
-      // Group definitions carry generation tags; soloist pseudo-groups do not.
-      .filter((g) => g.members.length && g.gen?.length);
-    const groupSortIds = new Set(groups.map((g) => g.photo?.id).filter(Number.isInteger));
+      .filter((g) => g.members.length);
+    // Soloist definitions have no generation tags. Keep them in idol selection,
+    // but exclude them from group rankings.
+    const groupSortIds = new Set(groups.filter((g) => g.gen?.length).map((g) => g.photo?.id).filter(Number.isInteger));
     // Unpinned alphabetical order until the live board resolves. The boot
     // tail paints from a cached order instantly when one exists (no flicker);
     // a cold start shows a skeleton until the board resolves (bounded wait).
@@ -328,7 +328,7 @@
       `<img src="${escape(imageURL(item))}" alt="${escape(item.name)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" class="${cls}">`;
 
     function idsFor(g) {
-      return mode === "idols" ? g.members.map((i) => i.id) : g.photo ? [g.photo.id] : [];
+      return mode === "idols" ? g.members.map((i) => i.id) : g.gen?.length && g.photo ? [g.photo.id] : [];
     }
     function visibleGroups() {
       const query = $("search").value.trim().toLowerCase();

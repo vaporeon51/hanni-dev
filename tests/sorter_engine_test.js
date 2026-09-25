@@ -170,9 +170,14 @@ async function browserFixture(saved = null, boardFails = false, hash = "") {
   };
   const storage = new Map([["bias-club-lineup-v1", JSON.stringify({ ids, mode: "idols", savedAt: Date.now() })]]);
   if (saved) storage.set("bias-club-session-v1", JSON.stringify(saved));
+  const modeButtons = ["idols", "groups"].map((mode) => {
+    const button = element(`mode-${mode}`);
+    button.dataset.mode = mode;
+    return button;
+  });
   const document = {
     body: { dataset: {} }, readyState: "complete", activeElement: null,
-    getElementById: element, querySelectorAll() { return []; }, querySelector() { return null; }, addEventListener() {},
+    getElementById: element, querySelectorAll(selector) { return selector === "[data-mode]" ? modeButtons : []; }, querySelector() { return null; }, addEventListener() {},
     createElement() { return element("created"); },
   };
   const context = vm.createContext({
@@ -198,6 +203,22 @@ async function browserFixture(saved = null, boardFails = false, hash = "") {
   return { element, storage, ids, context, document, catalog,
     session: () => JSON.parse(storage.get("bias-club-session-v1")) };
 }
+
+Deno.test("soloists appear in idol selection but stay excluded from group rankings", async () => {
+  const ui = await browserFixture();
+  for (const name of ["Kwon Eunbi", "Somi"]) assert.ok(ui.element("groups").innerHTML.includes(`<strong>${name}</strong>`));
+  ui.element("select-visible").click();
+  const lineup = () => JSON.parse(ui.storage.get("bias-club-lineup-v1"));
+  const soloists = ui.catalog.entries.filter((e) => ["Kwon Eunbi", "Somi"].includes(e.name));
+  for (const idol of soloists) assert.ok(lineup().ids.includes(idol.id));
+  ui.element("mode-groups").click();
+  for (const idol of soloists) {
+    assert.ok(!ui.element("groups").innerHTML.includes(`<strong>${idol.name}</strong>`));
+    assert.ok(!lineup().ids.includes(idol.id));
+  }
+  ui.element("mode-idols").click();
+  for (const idol of soloists) assert.ok(ui.element("groups").innerHTML.includes(`<strong>${idol.name}</strong>`));
+});
 
 Deno.test("progress links transfer choices and persist on the receiving device; result links still open", async () => {
   const source = await browserFixture();

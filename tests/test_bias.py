@@ -473,6 +473,10 @@ def test_sorter_catalog_hand_picked_portrait():
          "/static/sorter/idols/tripleS-kim-yooyeon.jpg"),
         ("tripleS Kim Chaeyeon", "1000867801420009502",
          "/static/sorter/idols/tripleS-kim-chaeyeon.jpg"),
+        ("tripleS Yoon Seoyeon", "1141805269978980452",
+         "/static/sorter/idols/tripleS-yoon-seoyeon.webp"),
+        ("tripleS Hayeon", "1313202769938878514",
+         "/static/sorter/idols/tripleS-hayeon.jpg"),
     )
     for name, role_id, local in handpicked:
         # Sorter serves the vendored file (catalog has no role_id to embed).

@@ -34,6 +34,8 @@ sys.path.insert(0, str(REPO_ROOT))
 BACKFILL_EXCLUDE = frozenset({
     "1079677939878219826",  # Yooyeon, tripleS
     "1000867801420009502",  # Chaeyeon, tripleS
+    "1141805269978980452",  # Seoyeon, tripleS
+    "1313202769938878514",  # Hayeon, tripleS
 })
 
 from dotenv import load_dotenv

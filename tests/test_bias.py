@@ -189,17 +189,17 @@ def test_global_idol_leaderboard_serializes_movement(monkeypatch):
     assert payload["entries"][1]["votes"] == 380
 
 
-def test_leaderboard_image_priority_is_embed_then_vendored_then_database(monkeypatch):
+def test_leaderboard_image_priority_is_vendored_then_embed_then_database(monkeypatch):
     import datetime
 
     board = bias.Leaderboard(
         entries=[
             bias.LeaderboardEntry(
-                "role-embed", "Karina", "aespa",
+                "role-both", "Karina", "aespa",
                 1522, "https://legacy.kpopping.com/blocked.jpg", None,
             ),
             bias.LeaderboardEntry(
-                "role-local", "Hanni", "NewJeans",
+                "role-embed", "Hanni", "NewJeans",
                 1284, "https://legacy.kpopping.com/blocked.jpg", None,
             ),
             bias.LeaderboardEntry(
@@ -212,12 +212,14 @@ def test_leaderboard_image_priority_is_embed_then_vendored_then_database(monkeyp
     )
     monkeypatch.setattr(web_app, "get_global_leaderboard", lambda limit: board)
     monkeypatch.setattr(
-        web_app, "EMBED_PHOTOS", {"role-embed": "https://images-ext-1.discordapp.net/external/SIG/x"}
+        web_app, "EMBED_PHOTOS", {
+            "role-both": "https://images-ext-1.discordapp.net/external/SIG/x",
+            "role-embed": "https://images-ext-1.discordapp.net/external/SIG/y",
+        }
     )
     monkeypatch.setattr(
         web_app, "ROLE_PHOTOS", {
-            "role-embed": "/static/sorter/idols/abc123.jpg",
-            "role-local": "/static/sorter/idols/def456.jpg",
+            "role-both": "/static/sorter/idols/abc123.jpg",
         }
     )
 
@@ -229,8 +231,8 @@ def test_leaderboard_image_priority_is_embed_then_vendored_then_database(monkeyp
     response = asyncio.run(request())
     assert response.status_code == 200
     entries = response.json()["entries"]
-    assert entries[0]["image_url"] == "https://images-ext-1.discordapp.net/external/SIG/x"
-    assert entries[1]["image_url"] == "/static/sorter/idols/def456.jpg"
+    assert entries[0]["image_url"] == "/static/sorter/idols/abc123.jpg"
+    assert entries[1]["image_url"] == "https://images-ext-1.discordapp.net/external/SIG/y"
     assert entries[2]["image_url"] == "https://cdn.example.com/fallback.jpg"
 
 
@@ -405,6 +407,31 @@ def test_sorter_catalog_fifty_fifty_second_generation_split():
         assert entry["gen"] == (["gen4"] if entry["short"] == "Keena" else ["gen5"])
     group_def = next(g for g in catalog["groups"] if g["key"] == "FIFTY FIFTY")
     assert group_def["gen"] == ["gen5"]
+
+
+def test_sorter_catalog_hand_picked_portrait():
+    import json
+
+    catalog = json.loads(
+        (web_app.REPO_ROOT / "static" / "sorter" / "catalog.json").read_text()
+    )
+    by_name = {e.get("name"): e for e in catalog["entries"]}
+    role_photos = json.loads(
+        (web_app.REPO_ROOT / "static" / "sorter" / "role-photos.json").read_text()
+    )
+    handpicked = (
+        ("tripleS Kim Yooyeon", "1079677939878219826",
+         "/static/sorter/idols/tripleS-kim-yooyeon.jpg"),
+        ("tripleS Kim Chaeyeon", "1000867801420009502",
+         "/static/sorter/idols/tripleS-kim-chaeyeon.jpg"),
+    )
+    for name, role_id, local in handpicked:
+        # Sorter serves the vendored file (catalog has no role_id to embed).
+        assert by_name[name]["local"] == local
+        assert (web_app.REPO_ROOT / local.lstrip("/")).exists()
+        # Board prefers ROLE_PHOTOS to embeds.
+        assert role_photos[role_id] == local
+        assert web_app._board_image(role_id, "https://cdn.example.com/db.jpg") == local
 
 
 def test_sorter_page_renders():

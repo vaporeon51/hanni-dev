@@ -66,10 +66,24 @@ GROUP_COVER_OVERRIDES = {
 }
 
 IDOL_PHOTO_OVERRIDES = {
+    # Hand-picked sorter portraits (vendored under static/sorter/idols/).
+    # These win over the photo-cache mapping and survive rebuilds.
+    "tripleS Kim Yooyeon": "/static/sorter/idols/tripleS-kim-yooyeon.jpg",
+    "tripleS Kim Chaeyeon": "/static/sorter/idols/tripleS-kim-chaeyeon.jpg",
     # https://pbs.twimg.com/media/HJ-PgnfbUAANeNF?format=jpg&name=large
     "Hyewon": "/static/sorter/idols/kang-hyewon-HJ-PgnfbUAANeNF.jpg",
     # https://wimg.heraldcorp.com/news/cms/2026/03/31/news-p.v1.20260331.93dd06d29c144fb2988bd39cd3c1923c_P1.jpg
     "Kwon Eunbi": "/static/sorter/idols/kwon-eunbi-herald-20260331.jpg",
+}
+
+
+# role_id -> vendored portrait, merged into role-photos.json at build time.
+# For catalog entries without role_id (name mismatch with role_info), so the
+# builder can't link them itself. Boards serve vendored portraits first, so
+# these win everywhere for these idols.
+ROLE_PHOTO_OVERRIDES = {
+    "1079677939878219826": "/static/sorter/idols/tripleS-kim-yooyeon.jpg",  # Yooyeon, tripleS
+    "1000867801420009502": "/static/sorter/idols/tripleS-kim-chaeyeon.jpg",  # Chaeyeon, tripleS
 }
 
 
@@ -349,6 +363,12 @@ def main() -> int:
         for entry in entries
         if entry["role_id"] and entry["local"]
     }
+    # Hand-picked board portraits for idols whose catalog entries carry no
+    # role_id (name mismatch with role_info), so the builder can't link them.
+    # These win over generated mappings and over Discord embeds (the board
+    # prefers ROLE_PHOTOS to EMBED_PHOTOS). Keep BACKFILL_EXCLUDE in
+    # backfill_embed_photos.py in sync so reruns don't resurrect embeds.
+    role_photos.update(ROLE_PHOTO_OVERRIDES)
     role_photos_path = (
         Path(args.role_photos)
         if args.role_photos

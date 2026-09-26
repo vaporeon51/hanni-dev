@@ -44,11 +44,11 @@
 
   const shortName = (item) => item.short || item.name;
   const groupName = (item) => item.group || "Group";
-  // Vendored same-origin portraits first (kpopping/legacy hosts block hotlinks
-  // behind Cloudflare; Imgur originals are the last resort). Discord-proxied
-  // kpopping portraits win when harvested.
+  // Vendored same-origin portraits first (they're ours: no hotlink roulette,
+  // no dependency). Discord-proxied kpopping portraits cover entries without
+  // a vendored file; remote originals are the last resort.
   const imageURL = (item) =>
-    (item.role_id && embedPhotos[item.role_id]) || item.local || item.fallback;
+    item.local || (item.role_id && embedPhotos[item.role_id]) || item.fallback;
 
   function toast(message) {
     $("toast").textContent = message;

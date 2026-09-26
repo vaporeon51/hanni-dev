@@ -9,8 +9,9 @@ private dead-link webhook, harvests the proxy URL, and writes
 
     {"by_role": {role_id: proxy_url}, "by_source": {source_url: proxy_url}}
 
-Boards prefer these over the vendored sorter portraits. Probe messages are
-deleted as we go. Reruns skip role_ids already harvested.
+Boards serve vendored portraits first; these are the fallback for entries
+without one. Probe messages are deleted as we go. Reruns skip role_ids
+already harvested.
 
 Usage:
     python scripts/backfill_embed_photos.py [--limit 5] [--gap 2.0]

@@ -9,8 +9,9 @@ private dead-link webhook, harvests the proxy URL, and writes
 
     {"by_role": {role_id: proxy_url}, "by_source": {source_url: proxy_url}}
 
-Boards prefer these over the vendored sorter portraits. Probe messages are
-deleted as we go. Reruns skip role_ids already harvested.
+Boards serve vendored portraits first; these are the fallback for entries
+without one. Probe messages are deleted as we go. Reruns skip role_ids
+already harvested.
 
 Usage:
     python scripts/backfill_embed_photos.py [--limit 5] [--gap 2.0]
@@ -27,16 +28,6 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
-
-# Hand-picked portraits (ROLE_PHOTO_OVERRIDES in build_sorter_catalog.py).
-# Never harvest these: with no embed entry the board serves the vendored
-# file, and reruns must not resurrect the harvested URLs.
-BACKFILL_EXCLUDE = frozenset({
-    "1079677939878219826",  # Yooyeon, tripleS
-    "1000867801420009502",  # Chaeyeon, tripleS
-    "1141805269978980452",  # Seoyeon, tripleS
-    "1313202769938878514",  # Hayeon, tripleS
-})
 
 from dotenv import load_dotenv
 
@@ -79,17 +70,11 @@ def main() -> int:
     existing: dict = {"by_role": {}, "by_source": {}}
     if output_path.exists():
         existing = json.loads(output_path.read_text())
-    by_role: dict[str, str] = {
-        role_id: url for role_id, url in existing.get("by_role", {}).items()
-        if role_id not in BACKFILL_EXCLUDE
-    }
+    by_role: dict[str, str] = dict(existing.get("by_role", {}))
     by_source: dict[str, str] = dict(existing.get("by_source", {}))
 
     roles = _load_roles()
-    pending = [
-        (role_id, url) for role_id, url in roles
-        if role_id not in by_role and role_id not in BACKFILL_EXCLUDE
-    ]
+    pending = [(role_id, url) for role_id, url in roles if role_id not in by_role]
     if args.limit > 0:
         pending = pending[: args.limit]
     print(f"{len(roles)} kpopping portraits, {len(by_role)} already harvested, {len(pending)} pending")

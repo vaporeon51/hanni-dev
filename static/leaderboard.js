@@ -372,7 +372,7 @@
       return;
     }
     const imageURL = (item) =>
-      (item.role_id && embeds[item.role_id]) || item.local || item.fallback;
+      item.local || (item.role_id && embeds[item.role_id]) || item.fallback;
     const ranked = [];
     let rank = 1;
     BiasSorter.ranking(sorter, session.verifyRounds).forEach((bucket) => {

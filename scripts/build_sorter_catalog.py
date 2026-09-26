@@ -74,6 +74,8 @@ IDOL_PHOTO_OVERRIDES = {
     "tripleS Hayeon": "/static/sorter/idols/tripleS-hayeon.jpg",
     "UNCHILD Tina": "/static/sorter/idols/unchild-tina.jpg",
     "VVS Brittney": "/static/sorter/idols/vvs-brittney.jpg",
+    "IVE Liz": "/static/sorter/idols/ive-liz.jpg",
+    "NewJeans Danielle": "/static/sorter/idols/newjeans-danielle.jpg",
     # https://pbs.twimg.com/media/HJ-PgnfbUAANeNF?format=jpg&name=large
     "Hyewon": "/static/sorter/idols/kang-hyewon-HJ-PgnfbUAANeNF.jpg",
     # https://wimg.heraldcorp.com/news/cms/2026/03/31/news-p.v1.20260331.93dd06d29c144fb2988bd39cd3c1923c_P1.jpg
@@ -83,13 +85,15 @@ IDOL_PHOTO_OVERRIDES = {
 
 # role_id -> vendored portrait, merged into role-photos.json at build time.
 # For catalog entries without role_id (name mismatch with role_info), so the
-# builder can't link them itself. They take effect on the board because
-# BACKFILL_EXCLUDE keeps the same roles out of embed-photos.json.
+# builder can't link them itself. Boards serve vendored portraits first, so
+# these win outright for these idols.
 ROLE_PHOTO_OVERRIDES = {
     "1079677939878219826": "/static/sorter/idols/tripleS-kim-yooyeon.jpg",  # Yooyeon, tripleS
     "1000867801420009502": "/static/sorter/idols/tripleS-kim-chaeyeon.jpg",  # Chaeyeon, tripleS
     "1141805269978980452": "/static/sorter/idols/tripleS-yoon-seoyeon.jpg",  # Seoyeon, tripleS
     "1313202769938878514": "/static/sorter/idols/tripleS-hayeon.jpg",  # Hayeon, tripleS
+    "916036552327594005": "/static/sorter/idols/ive-liz.jpg",  # Liz, IVE
+    "1000865551020740629": "/static/sorter/idols/newjeans-danielle.jpg",  # Danielle, NewJeans
 }
 
 

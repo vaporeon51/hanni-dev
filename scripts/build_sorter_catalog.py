@@ -72,6 +72,7 @@ IDOL_PHOTO_OVERRIDES = {
     "tripleS Kim Chaeyeon": "/static/sorter/idols/tripleS-kim-chaeyeon.jpg",
     "tripleS Yoon Seoyeon": "/static/sorter/idols/tripleS-yoon-seoyeon.webp",
     "tripleS Hayeon": "/static/sorter/idols/tripleS-hayeon.jpg",
+    "UNCHILD Tina": "/static/sorter/idols/unchild-tina.webp",
     # https://pbs.twimg.com/media/HJ-PgnfbUAANeNF?format=jpg&name=large
     "Hyewon": "/static/sorter/idols/kang-hyewon-HJ-PgnfbUAANeNF.jpg",
     # https://wimg.heraldcorp.com/news/cms/2026/03/31/news-p.v1.20260331.93dd06d29c144fb2988bd39cd3c1923c_P1.jpg

@@ -485,6 +485,13 @@ def test_sorter_catalog_hand_picked_portrait():
         # Board: no embed harvested (see BACKFILL_EXCLUDE), so ROLE_PHOTOS wins.
         assert role_photos[role_id] == local
         assert web_app._board_image(role_id, "https://cdn.example.com/db.jpg") == local
+    # Sorter-only idols (no board entry): vendored file wins by default.
+    sorter_only = (
+        ("UNCHILD Tina", "/static/sorter/idols/unchild-tina.webp"),
+    )
+    for name, local in sorter_only:
+        assert by_name[name]["local"] == local
+        assert (web_app.REPO_ROOT / local.lstrip("/")).exists()
 
 
 def test_sorter_page_renders():

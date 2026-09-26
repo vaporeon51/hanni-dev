@@ -460,6 +460,21 @@ def test_sorter_catalog_fifty_fifty_second_generation_split():
     assert group_def["gen"] == ["gen5"]
 
 
+def test_sorter_catalog_stripped_names_stay_linked():
+    import json
+
+    catalog = json.loads(
+        (web_app.REPO_ROOT / "static" / "sorter" / "catalog.json").read_text()
+    )
+    by_name = {e.get("name"): e for e in catalog["entries"]}
+    # Display strips must still link: sorter votes count under these roles.
+    assert by_name["tripleS Kim Yooyeon"]["role_id"] == "1079677939878219826"
+    assert by_name["tripleS Kim Nakyoung"]["role_id"] == "1221925113029464094"
+    # Full-display names link to their own group's row on real collisions.
+    assert by_name["tripleS Kim Chaeyeon"]["role_id"] == "1000867801420009502"
+    assert by_name["tripleS Yoon Seoyeon"]["role_id"] == "1141805269978980452"
+
+
 def test_sorter_catalog_hand_picked_portrait():
     import json
 
@@ -483,6 +498,12 @@ def test_sorter_catalog_hand_picked_portrait():
          "/static/sorter/idols/ive-liz.jpg"),
         ("NewJeans Danielle", "1000865551020740629",
          "/static/sorter/idols/newjeans-danielle.jpg"),
+        ("tripleS Dahyun", "1313202074607157268",
+         "/static/sorter/idols/tripleS-dahyun.jpg"),
+        ("tripleS Yeonji", "1234942669751455846",
+         "/static/sorter/idols/tripleS-yeonji.jpg"),
+        ("ILLIT Moka", "1147390143980908584",
+         "/static/sorter/idols/illit-moka.jpg"),
     )
     for name, role_id, local in handpicked:
         # Sorter serves the vendored file (catalog has no role_id to embed).

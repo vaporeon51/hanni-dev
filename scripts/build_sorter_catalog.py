@@ -76,6 +76,9 @@ IDOL_PHOTO_OVERRIDES = {
     "VVS Brittney": "/static/sorter/idols/vvs-brittney.jpg",
     "IVE Liz": "/static/sorter/idols/ive-liz.jpg",
     "NewJeans Danielle": "/static/sorter/idols/newjeans-danielle.jpg",
+    "tripleS Dahyun": "/static/sorter/idols/tripleS-dahyun.jpg",
+    "tripleS Yeonji": "/static/sorter/idols/tripleS-yeonji.jpg",
+    "ILLIT Moka": "/static/sorter/idols/illit-moka.jpg",
     # https://pbs.twimg.com/media/HJ-PgnfbUAANeNF?format=jpg&name=large
     "Hyewon": "/static/sorter/idols/kang-hyewon-HJ-PgnfbUAANeNF.jpg",
     # https://wimg.heraldcorp.com/news/cms/2026/03/31/news-p.v1.20260331.93dd06d29c144fb2988bd39cd3c1923c_P1.jpg
@@ -94,6 +97,9 @@ ROLE_PHOTO_OVERRIDES = {
     "1313202769938878514": "/static/sorter/idols/tripleS-hayeon.jpg",  # Hayeon, tripleS
     "916036552327594005": "/static/sorter/idols/ive-liz.jpg",  # Liz, IVE
     "1000865551020740629": "/static/sorter/idols/newjeans-danielle.jpg",  # Danielle, NewJeans
+    "1313202074607157268": "/static/sorter/idols/tripleS-dahyun.jpg",  # Dahyun, tripleS
+    "1234942669751455846": "/static/sorter/idols/tripleS-yeonji.jpg",  # Yeonji, tripleS
+    "1147390143980908584": "/static/sorter/idols/illit-moka.jpg",  # Moka, ILLIT
 }
 
 
@@ -222,6 +228,41 @@ def _short_name(name: str, groups: list[str]) -> str:
     return name
 
 
+# Full names that ARE the stage name — never strip these, even when the
+# given name is unambiguous. (Soloists and full-name duos perform under
+# both names; "Hi" or "Bom" alone would be unrecognizable.)
+KEEP_FULL_NAMES = frozenset({
+    "Lee Hi",
+    "Kwon Eunbi",
+    "Park Bom",
+    "Goo Hara",
+    "Lee Haeri",
+    "Lee Suhyun",
+    "Jo Hyunah",
+    "Cheng Xiao",
+    "Kim Lip",
+})
+# Lowercased copy: upstream renames must not silently drop stage-name cover.
+KEEP_FULL_LOWER = frozenset(name.lower() for name in KEEP_FULL_NAMES)
+
+
+# Family names (Korean plus common Chinese) for display cleanup. A
+# two-token short whose FIRST token is one of these is "Family Given" and
+# can shed the family name when the given name is unambiguous
+# ("Kim Yooyeon" -> "Yooyeon"). Anything else ("Nicole Jung", "Moong
+# Myang") is left untouched — guessing order there strips the wrong end.
+FAMILY_NAMES = frozenset({
+    "kim", "lee", "park", "choi", "jung", "chung", "kang", "cho", "yoon",
+    "jang", "chang", "shin", "han", "oh", "seo", "kwon", "hwang", "ahn",
+    "an", "song", "ryu", "yu", "hong", "jeon", "chun", "moon", "yang",
+    "bae", "jo", "noh", "roh", "ha", "nam", "cha", "goo", "koo", "lim",
+    "yim", "bang", "jeong", "yoo", "joo", "wang", "zhang", "liu", "chen", "huang", "zhao", "wu",
+    "zhou", "xu", "sun", "ma", "zhu", "hu", "guo", "he", "luo", "zheng",
+    "liang", "xie", "tang", "deng", "feng", "cao", "cheng", "lin",
+    "jiang", "cai", "yuan", "dong", "cui", "lu", "xiao",
+})
+
+
 def _load_roles() -> list[tuple[str, str, str, str | None, int]]:
     import psycopg
 
@@ -270,6 +311,18 @@ def main() -> int:
         for role_id, member, group, image, _ in roles
         if member.strip()
     }
+    # Family names survive only on true collisions (see given_counts).
+    # (given name, group) frequencies live beside it: lets "Kim Chaeyeon"
+    # link to the tripleS Chaeyeon row even though the display keeps the
+    # family name.
+    given_counts: dict[str, int] = {}
+    group_given_counts: dict[tuple[str, str], int] = {}
+    for item in idol_entries:
+        given = _short_name(item["name"], item["groups"]).split()[-1]
+        given_counts[given] = given_counts.get(given, 0) + 1
+        for group in item["groups"]:
+            key = (_norm(given), GROUP_ALIASES.get(_norm(group), _norm(group)))
+            group_given_counts[key] = group_given_counts.get(key, 0) + 1
     # Best portrait per db group (highest ELO with an image) for group cards.
     best_group_photo: dict[str, tuple[str, str]] = {}
     for role_id, member, group, image, elo in roles:
@@ -283,11 +336,32 @@ def main() -> int:
         return GROUP_ALIASES.get(_norm(key), _norm(key))
 
     def build_idol_entry(index: int, item: dict) -> tuple[dict, bool, bool]:
-        short = _short_name(item["name"], item["groups"])
+        full_short = _short_name(item["name"], item["groups"])
+        short = full_short
+        parts = short.split()
+        if (
+            len(parts) == 2
+            and short.lower() not in KEEP_FULL_LOWER
+            and parts[0].lower() in FAMILY_NAMES
+            and given_counts.get(parts[1], 0) == 1
+        ):
+            short = parts[1]
         role_id: str | None = None
         photo: str | None = None
         for group in item["groups"]:
-            hit = by_member_group.get((_norm(short), resolve_group_key(group)))
+            # Try the cleaned name first, then the full one: display strips
+            # must still link ("Kim Yooyeon" votes count as Yooyeon). Last,
+            # the bare given name when it's unique inside this group, so
+            # full-display names on real collisions still link to their own
+            # group's row ("Kim Chaeyeon" -> tripleS Chaeyeon).
+            gkey = resolve_group_key(group)
+            hit = by_member_group.get((_norm(short), gkey))
+            if hit is None and short != full_short:
+                hit = by_member_group.get((_norm(full_short), gkey))
+            if hit is None:
+                given = full_short.split()[-1]
+                if given != short and given != full_short and group_given_counts.get((_norm(given), gkey), 0) == 1:
+                    hit = by_member_group.get((_norm(given), gkey))
             if hit:
                 role_id, photo = hit
                 break

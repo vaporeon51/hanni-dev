@@ -70,9 +70,10 @@ IDOL_PHOTO_OVERRIDES = {
     # These win over the photo-cache mapping and survive rebuilds.
     "tripleS Kim Yooyeon": "/static/sorter/idols/tripleS-kim-yooyeon.jpg",
     "tripleS Kim Chaeyeon": "/static/sorter/idols/tripleS-kim-chaeyeon.jpg",
-    "tripleS Yoon Seoyeon": "/static/sorter/idols/tripleS-yoon-seoyeon.webp",
+    "tripleS Yoon Seoyeon": "/static/sorter/idols/tripleS-yoon-seoyeon.jpg",
     "tripleS Hayeon": "/static/sorter/idols/tripleS-hayeon.jpg",
-    "UNCHILD Tina": "/static/sorter/idols/unchild-tina.webp",
+    "UNCHILD Tina": "/static/sorter/idols/unchild-tina.jpg",
+    "VVS Brittney": "/static/sorter/idols/vvs-brittney.jpg",
     # https://pbs.twimg.com/media/HJ-PgnfbUAANeNF?format=jpg&name=large
     "Hyewon": "/static/sorter/idols/kang-hyewon-HJ-PgnfbUAANeNF.jpg",
     # https://wimg.heraldcorp.com/news/cms/2026/03/31/news-p.v1.20260331.93dd06d29c144fb2988bd39cd3c1923c_P1.jpg
@@ -87,7 +88,7 @@ IDOL_PHOTO_OVERRIDES = {
 ROLE_PHOTO_OVERRIDES = {
     "1079677939878219826": "/static/sorter/idols/tripleS-kim-yooyeon.jpg",  # Yooyeon, tripleS
     "1000867801420009502": "/static/sorter/idols/tripleS-kim-chaeyeon.jpg",  # Chaeyeon, tripleS
-    "1141805269978980452": "/static/sorter/idols/tripleS-yoon-seoyeon.webp",  # Seoyeon, tripleS
+    "1141805269978980452": "/static/sorter/idols/tripleS-yoon-seoyeon.jpg",  # Seoyeon, tripleS
     "1313202769938878514": "/static/sorter/idols/tripleS-hayeon.jpg",  # Hayeon, tripleS
 }
 

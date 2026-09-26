@@ -474,7 +474,7 @@ def test_sorter_catalog_hand_picked_portrait():
         ("tripleS Kim Chaeyeon", "1000867801420009502",
          "/static/sorter/idols/tripleS-kim-chaeyeon.jpg"),
         ("tripleS Yoon Seoyeon", "1141805269978980452",
-         "/static/sorter/idols/tripleS-yoon-seoyeon.webp"),
+         "/static/sorter/idols/tripleS-yoon-seoyeon.jpg"),
         ("tripleS Hayeon", "1313202769938878514",
          "/static/sorter/idols/tripleS-hayeon.jpg"),
     )
@@ -487,7 +487,8 @@ def test_sorter_catalog_hand_picked_portrait():
         assert web_app._board_image(role_id, "https://cdn.example.com/db.jpg") == local
     # Sorter-only idols (no board entry): vendored file wins by default.
     sorter_only = (
-        ("UNCHILD Tina", "/static/sorter/idols/unchild-tina.webp"),
+        ("UNCHILD Tina", "/static/sorter/idols/unchild-tina.jpg"),
+        ("VVS Brittney", "/static/sorter/idols/vvs-brittney.jpg"),
     )
     for name, local in sorter_only:
         assert by_name[name]["local"] == local

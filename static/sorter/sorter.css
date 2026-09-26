@@ -750,6 +750,22 @@ progress::-moz-progress-bar {
   font-weight: 700;
   box-shadow: 0 2px 8px rgb(184 77 121 / 12%);
 }
+@media (prefers-reduced-motion: no-preference) {
+  #verify:not([hidden]) {
+    animation: continue-sorting-pulse 5s ease-out infinite;
+  }
+}
+@keyframes continue-sorting-pulse {
+  0%, 80%, 100% {
+    box-shadow: 0 2px 8px rgb(184 77 121 / 12%), 0 0 0 0 rgb(184 77 121 / 0%);
+  }
+  86% {
+    box-shadow: 0 2px 8px rgb(184 77 121 / 12%), 0 0 0 3px rgb(184 77 121 / 45%);
+  }
+  96% {
+    box-shadow: 0 2px 8px rgb(184 77 121 / 12%), 0 0 0 7px rgb(184 77 121 / 0%);
+  }
+}
 @media (hover: hover) and (pointer: fine) {
   #verify:hover {
     background: #f5d4e2;
@@ -848,8 +864,8 @@ progress::-moz-progress-bar {
 }
 .rank-list {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  column-gap: 24px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  column-gap: 20px;
 }
 .rank-highlights + .rank-list {
   margin-top: 28px;
@@ -860,7 +876,7 @@ progress::-moz-progress-bar {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   padding: 10px 0;
   border-bottom: 1px solid #ecdde480;
 }
@@ -869,7 +885,7 @@ progress::-moz-progress-bar {
 }
 .rank-number {
   font: 20px Georgia, serif;
-  min-width: 30px;
+  min-width: 24px;
   color: var(--pink);
   flex: none;
 }

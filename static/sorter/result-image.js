@@ -13,7 +13,7 @@ async function createRankingImage(
   const listTop = 110 + photoRows * (cardHeight + 16) +
     (featured.length && remaining.length ? 20 : 0);
   const listRowHeight = 72;
-  const height = listTop + Math.ceil(remaining.length / 3) * listRowHeight + 66;
+  const height = listTop + Math.ceil(remaining.length / 4) * listRowHeight + 66;
   // Keep large lineups within browser canvas dimensions and a 16 MP budget.
   const scale = Math.min(
     2,
@@ -60,7 +60,7 @@ async function createRankingImage(
   text("My ranking ♡", margin, 61, "32px Georgia", colors.pink);
   ctx.textAlign = "right";
   text(
-    `${entries.length > 50 ? "Showing top 50 of " : ""}${entries.length} ${mode}`,
+    entries.length > 50 ? `Top 50 of ${entries.length}` : `${entries.length} ${mode}`,
     width - margin,
     59,
     "14px Arial",
@@ -153,43 +153,43 @@ async function createRankingImage(
       );
     });
   }
-  const columnWidth = (width - margin * 2 - 24 * 2) / 3;
+  const columnWidth = (width - margin * 2 - 20 * 3) / 4;
   for (let start = 0; start < remaining.length; start += 10) {
     const batch = remaining.slice(start, start + 10);
     const images = await Promise.all(batch.map((entry) => loadImage(entry.image)));
     batch.forEach((entry, offset) => {
       const index = start + offset, image = images[offset];
-      const x = margin + (index % 3) * (columnWidth + 24);
-      const y = listTop + Math.floor(index / 3) * listRowHeight;
+      const x = margin + (index % 4) * (columnWidth + 20);
+      const y = listTop + Math.floor(index / 4) * listRowHeight;
       text(entry.rank, x, y + 33, "18px Georgia", colors.pink);
       ctx.save();
-      rounded(x + 40, y + 4, 44, 52, 8);
+      rounded(x + 30, y + 4, 44, 52, 8);
       ctx.clip();
       ctx.fillStyle = colors.light;
-      ctx.fillRect(x + 40, y + 4, 44, 52);
+      ctx.fillRect(x + 30, y + 4, 44, 52);
       if (image) {
         const factor = Math.max(44 / image.width, 52 / image.height);
         const w = image.width * factor, h = image.height * factor;
-        ctx.drawImage(image, x + 40 - (w - 44) / 2, y + 4 - (h - 52) * .2, w, h);
+        ctx.drawImage(image, x + 30 - (w - 44) / 2, y + 4 - (h - 52) * .2, w, h);
       } else {
-        text("♡", x + 51, y + 38, "24px Georgia", colors.pink);
+        text("♡", x + 41, y + 38, "24px Georgia", colors.pink);
       }
       ctx.restore();
       text(
         entry.name,
-        x + 96,
+        x + 84,
         y + 25,
         "bold 14px Arial",
         colors.ink,
-        columnWidth - 98,
+        columnWidth - 84,
       );
       text(
         entry.group,
-        x + 96,
+        x + 84,
         y + 43,
         "11px Arial",
         colors.muted,
-        columnWidth - 98,
+        columnWidth - 84,
       );
       ctx.strokeStyle = "#ecdde480";
       ctx.beginPath();

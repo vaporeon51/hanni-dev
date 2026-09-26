@@ -875,21 +875,18 @@
       if (pending) {
         $("verify").hidden = false;
         $("verify").textContent =
-          `Resume check (${(session.verify.limit || session.verify.pairs.length) - pending} left) ♡`;
+          `Continue Sorting (${(session.verify.limit || session.verify.pairs.length) - pending} left) ♡`;
       } else {
         const fresh = buildVerifyPairs();
         $("verify").hidden = fresh.length === 0;
-        if (fresh.length) $("verify").textContent = session.algorithm
-          ? "Refine favorites ♡" : `Double-check (${fresh.length}) ♡`;
+        if (fresh.length) $("verify").textContent = "Continue Sorting ♡";
       }
       const limit = Number($("result-images").value);
       const visibleRanking = ranked.slice(0, 50);
       const featured = visibleRanking.slice(0, limit);
       const remaining = visibleRanking.slice(limit);
       $("ranking").innerHTML =
-        `<header class="ranking-heading"><h2>My ranking <span>♡</span></h2><span>${ranked.length > 50 ? "Showing top 50 of " : ""}${ranked.length} ${escape(
-          session.mode,
-        )}</span></header>` +
+        `<header class="ranking-heading"><h2>My ranking <span>♡</span></h2><span>${ranked.length > 50 ? `Top 50 of ${ranked.length}` : `${ranked.length} ${escape(session.mode)}`}</span></header>` +
         (featured.length
           ? `<div class="rank-highlights">${featured
               .map(({ id, rank }) => {

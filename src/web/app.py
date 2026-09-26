@@ -139,25 +139,26 @@ EMBED_PHOTOS, ROLE_PHOTOS, EMBED_SOURCES, SOURCE_PHOTOS, GROUP_PHOTOS = _load_so
 
 
 def _board_image(entry_role_id: str, image_url: str | None) -> str | None:
-    """Vendored portraits first; Discord-proxied portraits cover the gaps."""
-    if entry_role_id and entry_role_id in ROLE_PHOTOS:
-        return ROLE_PHOTOS[entry_role_id]
-    if image_url and image_url in SOURCE_PHOTOS:
-        return SOURCE_PHOTOS[image_url]
+    """Discord-proxied portraits first (they track the freshest kpopping
+    shots); vendored portraits cover the gaps."""
     if entry_role_id and entry_role_id in EMBED_PHOTOS:
         return EMBED_PHOTOS[entry_role_id]
+    if entry_role_id and entry_role_id in ROLE_PHOTOS:
+        return ROLE_PHOTOS[entry_role_id]
     if image_url and image_url in EMBED_SOURCES:
         return EMBED_SOURCES[image_url]
+    if image_url and image_url in SOURCE_PHOTOS:
+        return SOURCE_PHOTOS[image_url]
     return image_url
 
 
 def _member_image(image_url: str | None) -> str | None:
     """Resolve one top-member portrait to something hotlinkable."""
 
-    if image_url and image_url in SOURCE_PHOTOS:
-        return SOURCE_PHOTOS[image_url]
     if image_url and image_url in EMBED_SOURCES:
         return EMBED_SOURCES[image_url]
+    if image_url and image_url in SOURCE_PHOTOS:
+        return SOURCE_PHOTOS[image_url]
     return image_url
 
 

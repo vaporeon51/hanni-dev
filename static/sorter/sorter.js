@@ -44,11 +44,11 @@
 
   const shortName = (item) => item.short || item.name;
   const groupName = (item) => item.group || "Group";
-  // Vendored same-origin portraits first (they're ours: no hotlink roulette,
-  // no dependency). Discord-proxied kpopping portraits cover entries without
-  // a vendored file; remote originals are the last resort.
+  // Discord-proxied kpopping portraits win when harvested (they track the
+  // freshest shots). Vendored same-origin portraits cover the gaps;
+  // remote originals are the last resort.
   const imageURL = (item) =>
-    item.local || (item.role_id && embedPhotos[item.role_id]) || item.fallback;
+    (item.role_id && embedPhotos[item.role_id]) || item.local || item.fallback;
 
   function toast(message) {
     $("toast").textContent = message;

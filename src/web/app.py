@@ -925,7 +925,7 @@ async def leaderboard(
                 else None,
                 "entries": [
                     {
-                        "rank": index + 1,
+                        "rank": entry.rank,
                         "role_id": entry.role_id,
                         "member_name": entry.member_name,
                         "group_name": entry.group_name,
@@ -933,8 +933,9 @@ async def leaderboard(
                         "image_url": _board_image(entry.role_id, entry.image_url),
                         "previous_rank": entry.previous_rank,
                         "votes": entry.votes,
+                        "provisional": entry.provisional,
                     }
-                    for index, entry in enumerate(board.entries)
+                    for entry in board.entries
                 ],
             }
         group_board = await asyncio.to_thread(get_global_group_leaderboard, 15, 3)
@@ -943,19 +944,21 @@ async def leaderboard(
             "kind": kind,
             "vote_count": group_board.vote_count,
             "top_n": group_board.top_n,
-            "entries": [
-                {
-                    "group_name": entry.group_name,
-                    "elo": entry.elo,
-                    "peak_elo": entry.peak_elo,
-                    "member_count": entry.member_count,
-                    "ranked_member_count": entry.ranked_member_count,
-                    "top_members": _serialize_top_members(entry),
-                    "image_url": _group_image(entry.group_name, entry.image_url),
-                    "votes": entry.votes,
-                }
-                for entry in group_board.entries
-            ],
+                "entries": [
+                    {
+                        "rank": entry.rank,
+                        "group_name": entry.group_name,
+                        "elo": entry.elo,
+                        "peak_elo": entry.peak_elo,
+                        "member_count": entry.member_count,
+                        "ranked_member_count": entry.ranked_member_count,
+                        "top_members": _serialize_top_members(entry),
+                        "image_url": _group_image(entry.group_name, entry.image_url),
+                        "votes": entry.votes,
+                        "provisional": entry.provisional,
+                    }
+                    for entry in group_board.entries
+                ],
         }
     except HTTPException:
         raise

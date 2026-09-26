@@ -2,7 +2,9 @@
 
 Port of the tsuki-bot ``bias_rater`` logic, minus the Discord guild scope.
 Every sorter matchup logs one global vote: the winner gains ELO (K=8) and both
-idols gain ``match_count`` (winner also gains ``win_count``).
+idols gain ``match_count`` (winner also gains ``win_count``). Boards rank the
+evidence-weighted score (raw ELO pulled toward the 1200 prior by matchup
+count), so thin-evidence ratings hug the prior instead of posing as precise.
 
 There is deliberately no per-visitor rating: the personal "Mine" tab renders
 the visitor's own sorter ranking (merge-sort output, client-side), so the two
@@ -22,6 +24,25 @@ _KST = datetime.timezone(datetime.timedelta(hours=9))
 LEADERBOARD_SNAPSHOT_LIMIT = 45
 LEADERBOARD_PAGE_SIZE = 15
 GLOBAL_ELO_K = 8
+
+# Evidence bar for the consensus board. A rating with fewer matchups is
+# pulled toward the prior for ranking, seeding, and display; below this many
+# matchups an idol renders in the unranked "fresh faces" strip instead of a
+# numbered rank. One constant governs all three.
+ELO_PRIOR = 1200
+RANKED_MIN_MATCHES = 15
+
+
+def shrunk_elo(elo: int, matches: int, prior: int = ELO_PRIOR, m: int = RANKED_MIN_MATCHES) -> int:
+    """Evidence-weighted rating: the honest number to rank by.
+
+    A Bayesian average of the raw ELO toward the prior. Deep-evidence
+    ratings pass through nearly untouched; thin-evidence ratings hug the
+    prior instead of masquerading as precise. Raw ELO is still stored and
+    still accumulates — this only affects reads.
+    """
+    matches = max(0, int(matches))
+    return round(prior + (elo - prior) * matches / (matches + m))
 
 _ACTIVE_IDOL_PREDICATE = (
     "r.member_name IS NOT NULL AND TRIM(r.member_name) != '' "
@@ -54,6 +75,9 @@ class LeaderboardEntry:
     image_url: str
     previous_rank: int | None = None
     votes: int = 0
+    # Numbered rank among ranked entries only (None in the fresh strip).
+    rank: int | None = None
+    provisional: bool = False
 
 
 @dataclass(frozen=True)
@@ -73,9 +97,11 @@ class GroupLeaderboardEntry:
     image_url: str | None
     votes: int = 0
     top_member_images: list[str] | None = None
-    # Highest member ELO in the group. The sorter lineup orders groups by
+    # Highest member score in the group. The sorter lineup orders groups by
     # this; the Groups board itself ranks by the top-3 average (elo).
     peak_elo: int = 0
+    rank: int | None = None
+    provisional: bool = False
 
 
 @dataclass(frozen=True)
@@ -100,27 +126,42 @@ def format_movement(previous_rank: int | None, rank: int, has_baseline: bool) ->
 
 def _build_leaderboard(rows, vote_count: int) -> Leaderboard:
     baseline = next((row[7] for row in rows if len(row) > 7 and row[7] is not None), None)
-    return Leaderboard(
-        entries=[
+    entries = []
+    rank = 0
+    for row in rows:
+        votes = int(row[6] or 0) if len(row) > 6 else 0
+        provisional = votes < RANKED_MIN_MATCHES
+        if not provisional:
+            rank += 1
+        entries.append(
             LeaderboardEntry(
                 role_id=row[0],
                 member_name=row[1],
                 group_name=row[2],
-                elo=row[3],
+                elo=int(row[8]) if len(row) > 8 and row[8] is not None else int(row[3]),
                 image_url=row[4],
                 previous_rank=row[5] if len(row) > 5 else None,
-                votes=int(row[6] or 0) if len(row) > 6 else 0,
+                votes=votes,
+                rank=rank if not provisional else None,
+                provisional=provisional,
             )
-            for row in rows
-        ],
+        )
+    return Leaderboard(
+        entries=entries,
         vote_count=int(vote_count or 0),
         movement_baseline_date=baseline,
     )
 
 
 def _build_group_leaderboard(rows, vote_count: int, top_n: int) -> GroupLeaderboard:
-    return GroupLeaderboard(
-        entries=[
+    entries = []
+    rank = 0
+    for row in rows:
+        votes = int(row[7] or 0) if len(row) > 7 else 0
+        provisional = votes < RANKED_MIN_MATCHES * top_n
+        if not provisional:
+            rank += 1
+        entries.append(
             GroupLeaderboardEntry(
                 group_name=row[0],
                 elo=row[1],
@@ -128,15 +169,14 @@ def _build_group_leaderboard(rows, vote_count: int, top_n: int) -> GroupLeaderbo
                 ranked_member_count=row[3],
                 top_members=list(row[4] or []),
                 image_url=row[5],
-                votes=int(row[7] or 0) if len(row) > 7 else 0,
+                votes=votes,
                 top_member_images=list(row[6] or []) if len(row) > 6 else [],
                 peak_elo=int(row[8]) if len(row) > 8 and row[8] is not None else 0,
+                rank=rank if not provisional else None,
+                provisional=provisional,
             )
-            for row in rows
-        ],
-        vote_count=int(vote_count or 0),
-        top_n=top_n,
-    )
+        )
+    return GroupLeaderboard(entries=entries, vote_count=int(vote_count or 0), top_n=top_n)
 
 
 def _pool():
@@ -276,15 +316,21 @@ def get_global_leaderboard(limit: int = LEADERBOARD_SNAPSHOT_LIMIT) -> Leaderboa
                 SELECT r.role_id, r.member_name, r.group_name, r.global_elo,
                        r.image_url, p.rank AS previous_rank,
                        r.global_match_count AS votes,
-                       ps.snapshot_date AS movement_baseline_date
+                       ps.snapshot_date AS movement_baseline_date,
+                       -- The ranked number: raw ELO pulled toward the prior
+                       -- by evidence. ORDER BY this, display this.
+                       ROUND(
+                           1200.0 + (r.global_elo - 1200) * r.global_match_count
+                           / (r.global_match_count + %s)
+                       )::int AS score
                 FROM role_info r
                 CROSS JOIN previous_snapshot ps
                 LEFT JOIN previous_ranks p ON r.role_id = p.role_id
                 WHERE {_ACTIVE_IDOL_PREDICATE}
-                ORDER BY r.global_elo DESC, r.member_name, r.role_id
+                ORDER BY score DESC, r.member_name, r.role_id
                 LIMIT %s;
                 """,
-                (limit,),
+                (RANKED_MIN_MATCHES, limit),
             )
             return _build_leaderboard(cur.fetchall(), vote_count)
 
@@ -298,33 +344,37 @@ def get_global_group_leaderboard(limit: int = 15, top_n: int = 3) -> GroupLeader
                 f"""
                 WITH idol_scores AS (
                     SELECT r.group_name, r.member_name, r.image_url,
-                           r.global_elo AS elo,
+                           -- Member score: same evidence weighting as the
+                           -- idol board, so both boards rank one number.
+                           (1200.0 + (r.global_elo - 1200) * r.global_match_count
+                            / (r.global_match_count + %s)) AS shrunk,
                            r.global_match_count AS matches,
                            COUNT(*) OVER (PARTITION BY r.group_name) AS member_count,
                            ROW_NUMBER() OVER (
                                PARTITION BY r.group_name
-                               ORDER BY r.global_elo DESC, r.member_name
+                               ORDER BY (1200.0 + (r.global_elo - 1200) * r.global_match_count
+                                         / (r.global_match_count + %s)) DESC, r.member_name
                            ) AS member_rank
                     FROM role_info r
                     WHERE {_ACTIVE_IDOL_PREDICATE}
                       AND r.group_name IS NOT NULL
                       AND TRIM(r.group_name) != ''
                 )
-                SELECT group_name, ROUND(AVG(elo))::int AS elo,
+                SELECT group_name, ROUND(AVG(shrunk))::int AS elo,
                        MAX(member_count)::int AS member_count,
                        COUNT(*)::int AS ranked_member_count,
-                       ARRAY_AGG(member_name ORDER BY elo DESC, member_name) AS top_members,
-                       (ARRAY_AGG(image_url ORDER BY elo DESC, member_name))[1] AS image_url,
-                       ARRAY_AGG(image_url ORDER BY elo DESC, member_name) AS member_images,
+                       ARRAY_AGG(member_name ORDER BY shrunk DESC, member_name) AS top_members,
+                       (ARRAY_AGG(image_url ORDER BY shrunk DESC, member_name))[1] AS image_url,
+                       ARRAY_AGG(image_url ORDER BY shrunk DESC, member_name) AS member_images,
                        SUM(CASE WHEN member_rank <= %s THEN matches ELSE 0 END)::int AS votes,
-                       MAX(elo)::int AS peak_elo
+                       MAX(shrunk)::int AS peak_elo
                 FROM idol_scores
                 WHERE member_rank <= %s
                 GROUP BY group_name
                 ORDER BY elo DESC, group_name
                 LIMIT %s;
                 """,
-                (top_n, top_n, limit),
+                (RANKED_MIN_MATCHES, RANKED_MIN_MATCHES, top_n, top_n, limit),
             )
             return _build_group_leaderboard(cur.fetchall(), vote_count, top_n)
 
@@ -390,7 +440,10 @@ def _fetch_global_snapshot_rows(cur, limit: int) -> list:
         WITH ranked AS (
             SELECT r.role_id, r.global_elo AS elo,
                    ROW_NUMBER() OVER (
-                       ORDER BY r.global_elo DESC, r.member_name, r.role_id
+                       ORDER BY ROUND(
+                           1200.0 + (r.global_elo - 1200) * r.global_match_count
+                           / (r.global_match_count + %s)
+                       ) DESC, r.member_name, r.role_id
                    ) AS rank,
                    (SELECT (COALESCE(SUM(global_match_count), 0) / 2)::int
                     FROM role_info) AS vote_count
@@ -400,7 +453,7 @@ def _fetch_global_snapshot_rows(cur, limit: int) -> list:
         SELECT role_id, rank::int, elo, vote_count FROM ranked
         WHERE rank <= %s ORDER BY rank;
         """,
-        (limit,),
+        (RANKED_MIN_MATCHES, limit),
     )
     return cur.fetchall()
 

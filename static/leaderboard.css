@@ -170,3 +170,7 @@ body {
   }
   .row:hover { background: #fff8fb; }
 }
+.fresh-head { margin: 28px 0 2px; font-size: 15px; }
+.fresh-sub { margin: 0 0 10px; color: var(--muted); font-size: 12px; }
+.fresh-tag { background: #fff; color: var(--pink); border: 1px solid var(--pink); font-size: 9px; padding: 1px 6px; }
+.mini-card.fresh, .group-card.fresh { opacity: 0.92; }

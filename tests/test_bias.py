@@ -155,8 +155,8 @@ def test_leaderboard_rejects_bad_kind_but_ignores_legacy_scope(monkeypatch):
 def test_global_idol_leaderboard_serializes_movement(monkeypatch):
     board = bias.Leaderboard(
         entries=[
-            bias.LeaderboardEntry("role-1", "Hanni", "NewJeans", 1284, "https://img/1.jpg", None, 420),
-            bias.LeaderboardEntry("role-2", "Minji", "NewJeans", 1270, "https://img/2.jpg", 1, 380),
+            bias.LeaderboardEntry("role-1", "Hanni", "NewJeans", 1284, "https://img/1.jpg", None, 420, 1),
+            bias.LeaderboardEntry("role-2", "Minji", "NewJeans", 1270, "https://img/2.jpg", 1, 380, 2),
         ],
         vote_count=1234,
         movement_baseline_date=None,
@@ -183,6 +183,8 @@ def test_global_idol_leaderboard_serializes_movement(monkeypatch):
     assert payload["entries"][0]["rank"] == 1
     assert payload["entries"][0]["previous_rank"] is None
     assert payload["entries"][0]["votes"] == 420
+    assert payload["entries"][0]["provisional"] is False
+    assert payload["entries"][1]["rank"] == 2
     assert payload["entries"][1]["previous_rank"] == 1
     assert payload["entries"][1]["votes"] == 380
 
@@ -239,7 +241,7 @@ def test_global_group_board_resolves_photos_and_members(monkeypatch):
                 "aespa", 1495, 4, 3, ["Karina", "Winter", "NingNing"],
                 "https://legacy.kpopping.com/top.jpg", 3844,
                 ["https://legacy.kpopping.com/k.jpg", "https://legacy.kpopping.com/w.jpg", None],
-                1520,
+                1520, 1,
             ),
         ],
         vote_count=74712,
@@ -266,6 +268,8 @@ def test_global_group_board_resolves_photos_and_members(monkeypatch):
     assert entry["image_url"] == "/static/sorter/idols/group-aespa.jpg"
     assert entry["votes"] == 3844
     assert entry["peak_elo"] == 1520
+    assert entry["rank"] == 1
+    assert entry["provisional"] is False
     assert entry["top_members"][0] == {
         "name": "Karina",
         "image_url": "https://images-ext-1.discordapp.net/external/K/x",
@@ -282,6 +286,46 @@ def test_group_board_maps_peak_elo():
 
     assert board.entries[0].peak_elo == 1520
     assert board.entries[0].elo == 1495
+    assert board.entries[0].rank == 1
+    assert board.entries[0].provisional is False
+
+
+def test_shrunk_elo_pulls_thin_evidence_to_prior():
+    assert bias.shrunk_elo(1300, 200) == 1293
+    assert bias.shrunk_elo(1250, 3) == 1208
+    assert bias.shrunk_elo(1200, 0) == 1200
+    assert bias.shrunk_elo(1150, 60) == 1160
+    assert bias.shrunk_elo(1400, 10**9) == 1400
+
+
+def test_idol_board_ranks_shrunk_and_flags_fresh():
+    board = bias._build_leaderboard(
+        [
+            ("r-hot", "Hot", "G", 1500, "img", None, 200, None, 1493),
+            ("r-new", "New", "G", 1500, "img", None, 3, None, 1233),
+            ("r-solid", "Solid", "G", 1300, "img", None, 100, None, 1287),
+        ],
+        303,
+    )
+    assert [e.member_name for e in board.entries] == ["Hot", "New", "Solid"]
+    assert board.entries[0].rank == 1
+    assert board.entries[1].provisional is True
+    assert board.entries[1].rank is None
+    # Ranked-only numbering skips the fresh entry.
+    assert board.entries[2].rank == 2
+
+
+def test_group_board_flags_thin_groups():
+    board = bias._build_group_leaderboard(
+        [("big", 1400, 5, 3, ["A"], "img", ["img"], 900, 1450),
+         ("tiny", 1400, 5, 3, ["B"], "img", ["img"], 9, 1450)],
+        909,
+        3,
+    )
+    assert board.entries[0].provisional is False
+    assert board.entries[0].rank == 1
+    assert board.entries[1].provisional is True
+    assert board.entries[1].rank is None
 
 
 def test_sorter_catalog_manual_idols_present():

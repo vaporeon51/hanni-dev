@@ -101,18 +101,36 @@
     )}</div>`;
   }
 
+  function freshIdolCard(entry) {
+    return `<div class="mini-card fresh"><div class="mini-photo">${imgTag(
+      entry,
+      "",
+    )}<span class="mini-rank fresh-tag">NEW</span></div><strong>${escape(
+      entry.member_name,
+    )}</strong><small>${escape(entry.group_name || "")}</small><div class="mini-stats">${eloPill(
+      entry.elo,
+    )}</div><div class="mini-votes">${votesPill(entry.votes)}</div></div>`;
+  }
+
+  function freshStrip(cards, noun) {
+    if (!cards.length) return "";
+    return `<h3 class="fresh-head">Fresh faces ♡</h3><p class="fresh-sub">Not enough ${noun} matchups to rank yet — sort them to weigh in.</p><div class="mini-grid mini-grid-5">${cards}</div>`;
+  }
+
   function renderIdols(board) {
     const hasBaseline = !!board.movement_baseline_date;
-    const tops = board.entries.slice(0, 3);
-    const gridFour = board.entries.slice(3, 7);
-    const gridFive = board.entries.slice(7, 12);
-    const rest = board.entries.slice(12);
+    const ranked = board.entries.filter((e) => !e.provisional);
+    const fresh = board.entries.filter((e) => e.provisional);
+    const tops = ranked.slice(0, 3);
+    const gridFour = ranked.slice(3, 7);
+    const gridFive = ranked.slice(7, 12);
+    const rest = ranked.slice(12);
     let html = "";
     if (tops.length) {
       const ordered = [tops[1], tops[0], tops[2]].filter(Boolean);
       html += '<div class="podium">';
       ordered.forEach((entry) => {
-        html += podiumCard(entry, board.entries.indexOf(entry) + 1);
+        html += podiumCard(entry, entry.rank);
       });
       html += "</div>";
     }
@@ -137,6 +155,7 @@
       });
       html += "</div>";
     }
+    html += freshStrip(fresh.map(freshIdolCard).join(""), "idol");
     const basis =
       scope === "global"
         ? `Based on ${board.vote_count.toLocaleString()} votes`
@@ -145,11 +164,12 @@
           : "Your votes will shape this board";
     const movement = hasBaseline ? ` · Movement since ${escape(board.movement_baseline_date)}` : "";
     const explain = " · ELO is the head-to-head score; ♡ counts matchups";
-    html += `<p class="board-foot">${basis}${movement}${explain}</p>`;
+    const freshNote = fresh.length ? " · fresh faces need more matchups to join the ranks" : "";
+    html += `<p class="board-foot">${basis}${movement}${explain}${freshNote}</p>`;
     return html;
   }
 
-  function groupCard(entry, index) {
+  function groupCard(entry) {
     const members = entry.top_members || [];
     const fans = members
       .slice(0, 3)
@@ -166,7 +186,11 @@
     const photo = entry.image_url
       ? `<img src="${escape(entry.image_url)}" alt="${escape(entry.group_name)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='${fallbackImage()}'" class="group-photo">`
       : "";
-    return `<div class="group-card"><div class="group-photo-wrap">${photo}<span class="mini-rank">#${index + 1}</span><div class="fan">${fans}</div></div><div class="group-info"><strong>${escape(entry.group_name)}</strong><small>${entry.member_count} members · top ${escape(tops)}</small><span class="group-stats">${eloPill(entry.elo)}${votesPill(entry.votes)}</span></div></div>`;
+    return `<div class="group-card"><div class="group-photo-wrap">${photo}<span class="mini-rank">#${entry.rank}</span><div class="fan">${fans}</div></div><div class="group-info"><strong>${escape(entry.group_name)}</strong><small>${entry.member_count} members · top ${escape(tops)}</small><span class="group-stats">${eloPill(entry.elo)}${votesPill(entry.votes)}</span></div></div>`;
+  }
+
+  function freshGroupCard(entry) {
+    return `<div class="group-card fresh"><div class="group-photo-wrap"><span class="mini-rank fresh-tag">NEW</span></div><div class="group-info"><strong>${escape(entry.group_name)}</strong><small>${entry.member_count} members</small><span class="group-stats">${eloPill(entry.elo)}${votesPill(entry.votes)}</span></div></div>`;
   }
 
   function groupHero(entry) {
@@ -190,24 +214,27 @@
   }
 
   function renderGroups(board) {
+    const ranked = board.entries.filter((e) => !e.provisional);
+    const fresh = board.entries.filter((e) => e.provisional);
     let html = "";
-    if (board.entries.length) {
-      html += groupHero(board.entries[0]);
+    if (ranked.length) {
+      html += groupHero(ranked[0]);
     }
-    if (board.entries.length > 1) {
+    if (ranked.length > 1) {
       html += '<div class="group-list">';
-      board.entries.slice(1).forEach((entry, i) => {
-        html += groupCard(entry, i + 1);
+      ranked.slice(1).forEach((entry) => {
+        html += groupCard(entry);
       });
       html += "</div>";
     }
+    html += freshStrip(fresh.map(freshGroupCard).join(""), "group");
     const basis =
       scope === "global"
         ? `Based on ${board.vote_count.toLocaleString()} votes`
         : board.vote_count > 0
           ? `Based on ${board.vote_count.toLocaleString()} of your votes`
           : "Your votes will shape this board";
-    html += `<p class="board-foot">${basis} · Group ELO is the average of the top ${board.top_n} members · ♡ counts their matchups</p>`;
+    html += `<p class="board-foot">${basis} · Group ELO is the average of the top ${board.top_n} members · ♡ counts their matchups${fresh.length ? " · fresh faces need more matchups to join the ranks" : ""}</p>`;
     return html;
   }
 

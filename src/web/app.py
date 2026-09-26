@@ -907,15 +907,21 @@ async def sorter_vote(
 @app.get("/api/leaderboard")
 async def leaderboard(
     kind: str = Query(default="idols"),
+    limit: int = Query(default=0, ge=0, le=500),
 ) -> dict[str, Any]:
     """Global consensus board. The Mine tab renders the visitor's own sorter
-    ranking client-side, so it never hits this endpoint."""
+    ranking client-side, so it never hits this endpoint.
+
+    `limit` caps entries (default 45 idols / 15 groups). The sorter passes a
+    large limit so every group gets a peak score for lineup ordering — the
+    default caps would strand off-board groups in alphabetical order.
+    """
     if kind not in {"idols", "groups"}:
         raise HTTPException(status_code=400, detail="kind must be idols or groups")
     try:
         if kind == "idols":
             board = await asyncio.to_thread(
-                get_global_leaderboard, LEADERBOARD_SNAPSHOT_LIMIT
+                get_global_leaderboard, limit or LEADERBOARD_SNAPSHOT_LIMIT
             )
             return {
                 "scope": "global",
@@ -939,7 +945,7 @@ async def leaderboard(
                     for entry in board.entries
                 ],
             }
-        group_board = await asyncio.to_thread(get_global_group_leaderboard, 15, 3)
+        group_board = await asyncio.to_thread(get_global_group_leaderboard, limit or 15, 3)
         return {
             "scope": "global",
             "kind": kind,

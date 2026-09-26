@@ -135,6 +135,57 @@ def test_sorter_vote_rate_limits_rapid_beacons(monkeypatch):
     assert second.json() == {"recorded": False}
 
 
+def test_leaderboard_limit_param_caps_entries(monkeypatch):
+    seen_idols = []
+    seen_groups = []
+
+    def fake_idols(limit):
+        seen_idols.append(limit)
+        return bias.Leaderboard(
+            entries=[
+                bias.LeaderboardEntry(f"r-{i}", f"M{i}", "G", 1200 + i, "img", None, 100, i + 1)
+                for i in range(5)
+            ][:limit],
+            vote_count=500,
+            movement_baseline_date=None,
+        )
+
+    def fake_groups(limit, top_n):
+        seen_groups.append((limit, top_n))
+        return bias.GroupLeaderboard(
+            entries=[
+                bias.GroupLeaderboardEntry(f"g{i}", 1300, 4, 3, ["A"], "img", 100, ["img"], 1350, i + 1)
+                for i in range(5)
+            ][:limit],
+            vote_count=500,
+            top_n=top_n,
+        )
+
+    monkeypatch.setattr(web_app, "get_global_leaderboard", fake_idols)
+    monkeypatch.setattr(web_app, "get_global_group_leaderboard", fake_groups)
+
+    async def request():
+        transport = httpx.ASGITransport(app=web_app.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            default_idols = await client.get("/api/leaderboard?kind=idols")
+            two_idols = await client.get("/api/leaderboard?kind=idols&limit=2")
+            default_groups = await client.get("/api/leaderboard?kind=groups")
+            many_groups = await client.get("/api/leaderboard?kind=groups&limit=200")
+            too_many = await client.get("/api/leaderboard?kind=idols&limit=501")
+            return default_idols, two_idols, default_groups, many_groups, too_many
+
+    default_idols, two_idols, default_groups, many_groups, too_many = asyncio.run(request())
+    assert seen_idols[0] == bias.LEADERBOARD_SNAPSHOT_LIMIT
+    assert len(default_idols.json()["entries"]) == 5  # fake only has 5
+    assert seen_idols[1] == 2
+    assert len(two_idols.json()["entries"]) == 2
+    assert seen_groups[0] == (15, 3)
+    assert len(default_groups.json()["entries"]) == 5  # fake only has 5
+    assert seen_groups[1] == (200, 3)
+    assert len(many_groups.json()["entries"]) == 5  # fake only has 5
+    assert too_many.status_code == 422
+
+
 def test_leaderboard_rejects_bad_kind_but_ignores_legacy_scope(monkeypatch):
     board = bias.Leaderboard(entries=[], vote_count=0, movement_baseline_date=None)
     monkeypatch.setattr(web_app, "get_global_leaderboard", lambda limit: board)

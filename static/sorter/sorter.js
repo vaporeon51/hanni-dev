@@ -191,7 +191,7 @@
     // Best effort and bounded: starting a sort never waits for consensus.
     const seedController = new AbortController();
     const seedTimeout = setTimeout(() => seedController.abort(), 1500);
-    fetch("/api/leaderboard?kind=idols", { credentials: "same-origin", signal: seedController.signal })
+    fetch("/api/leaderboard?kind=idols&limit=200", { credentials: "same-origin", signal: seedController.signal })
       .then((response) => response.ok ? response.json() : null)
       .then((board) => { if (Array.isArray(board?.entries)) idolSeedBoard = board; })
       .catch(() => {}).finally(() => clearTimeout(seedTimeout));
@@ -279,7 +279,7 @@
     async function fetchEloOrder(timeoutMs) {
       try {
         const response = await Promise.race([
-          fetch("/api/leaderboard?kind=groups", { credentials: "same-origin" }),
+          fetch("/api/leaderboard?kind=groups&limit=200", { credentials: "same-origin" }),
           new Promise((_, reject) => setTimeout(() => reject(new Error("order timeout")), timeoutMs)),
         ]);
         if (!response.ok) return false;

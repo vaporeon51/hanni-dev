@@ -871,6 +871,16 @@ def test_sorter_group_order_is_unpinned_elo():
     assert "renderGroupsLoading()" in script
 
 
+def test_sorter_fetches_full_board_for_lineup_ordering():
+    # The default board caps (45 idols / 15 groups) would strand off-board
+    # groups without peak scores; the sorter needs full coverage so every
+    # group ranks instead of falling back to alphabetical.
+    script = (web_app.REPO_ROOT / "static" / "sorter" / "sorter.js").read_text()
+
+    assert "/api/leaderboard?kind=idols&limit=200" in script
+    assert "/api/leaderboard?kind=groups&limit=200" in script
+
+
 def test_collection_links_point_at_feed_collection_view():
     for name in ("app.js", "scroll.js"):
         script = (web_app.REPO_ROOT / "static" / name).read_text()

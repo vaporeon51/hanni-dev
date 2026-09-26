@@ -142,6 +142,15 @@ def _parse_dataset(path: Path) -> tuple[str, list[dict], list[dict], list[dict]]
     for idol in idol_entries:
         if "tripleS" in idol["groups"]:
             idol["gen"] = ["gen5"]
+    # FIFTY FIFTY's "second generation": Keena debuted November 2022
+    # (gen4); Chanelle, Yewon, Hana, and Athena debuted September 2024
+    # (gen5). The group as it exists today promotes in the gen-5 era.
+    for group in group_defs:
+        if group["key"] == "FIFTY FIFTY":
+            group["gen"] = ["gen5"]
+    for idol in idol_entries:
+        if "FIFTY FIFTY" in idol["groups"] and idol["name"] != "FIFTY FIFTY Keena":
+            idol["gen"] = ["gen5"]
     return version, group_defs, idol_entries, group_cards
 
 

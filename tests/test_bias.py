@@ -387,6 +387,26 @@ def test_sorter_catalog_manual_idols_present():
     assert len(loossemble) == 5
 
 
+def test_sorter_catalog_fifty_fifty_second_generation_split():
+    import json
+
+    catalog = json.loads(
+        (web_app.REPO_ROOT / "static" / "sorter" / "catalog.json").read_text()
+    )
+    members = [
+        e for e in catalog["entries"]
+        if e.get("kind") == "idol" and "FIFTY FIFTY" in (e.get("groups") or [])
+    ]
+    assert sorted(e["short"] for e in members) == [
+        "Athena", "Chanelle", "Hana", "Keena", "Yewon",
+    ]
+    for entry in members:
+        # Keena debuted November 2022; the other four debuted September 2024.
+        assert entry["gen"] == (["gen4"] if entry["short"] == "Keena" else ["gen5"])
+    group_def = next(g for g in catalog["groups"] if g["key"] == "FIFTY FIFTY")
+    assert group_def["gen"] == ["gen5"]
+
+
 def test_sorter_page_renders():
     async def request():
         transport = httpx.ASGITransport(app=web_app.app)

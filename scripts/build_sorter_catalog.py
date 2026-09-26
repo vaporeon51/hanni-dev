@@ -242,7 +242,12 @@ KEEP_FULL_NAMES = frozenset({
     "Lee Suhyun",
     "Jo Hyunah",
     "Cheng Xiao",
+    "Cao Lu",
     "Kim Lip",
+    "Lee Hyori",
+    "Jo Yuri",
+    "Lee Youngji",
+    "Kim Yeji",
 })
 # Lowercased copy: upstream renames must not silently drop stage-name cover.
 KEEP_FULL_LOWER = frozenset(name.lower() for name in KEEP_FULL_NAMES)
@@ -313,15 +318,13 @@ def main() -> int:
         for role_id, member, group, image, _ in roles
         if member.strip()
     }
-    # Family names survive only on true collisions (see given_counts).
-    # (given name, group) frequencies live beside it: lets "Kim Chaeyeon"
-    # link to the tripleS Chaeyeon row even though the display keeps the
-    # family name.
-    given_counts: dict[str, int] = {}
+    # (given name, group) frequencies: lets "Kim Chaeyeon" link to the
+    # tripleS Chaeyeon row, and tells display when a family name must stay
+    # (same-group collision only — the UI always shows the group beside
+    # the name).
     group_given_counts: dict[tuple[str, str], int] = {}
     for item in idol_entries:
         given = _short_name(item["name"], item["groups"]).split()[-1]
-        given_counts[given] = given_counts.get(given, 0) + 1
         for group in item["groups"]:
             key = (_norm(given), GROUP_ALIASES.get(_norm(group), _norm(group)))
             group_given_counts[key] = group_given_counts.get(key, 0) + 1
@@ -345,7 +348,15 @@ def main() -> int:
             len(parts) == 2
             and short.lower() not in KEEP_FULL_LOWER
             and parts[0].lower() in FAMILY_NAMES
-            and given_counts.get(parts[1], 0) == 1
+            # The group is always shown beside the name in the UI, so strip
+            # the family name unless the given name collides within the
+            # same group.
+            and all(
+                group_given_counts.get(
+                    (_norm(parts[1]), resolve_group_key(group)), 0
+                ) <= 1
+                for group in item["groups"]
+            )
         ):
             short = parts[1]
         role_id: str | None = None

@@ -83,6 +83,7 @@ IDOL_PHOTO_OVERRIDES = {
     "Hyewon": "/static/sorter/idols/kang-hyewon-HJ-PgnfbUAANeNF.jpg",
     # https://wimg.heraldcorp.com/news/cms/2026/03/31/news-p.v1.20260331.93dd06d29c144fb2988bd39cd3c1923c_P1.jpg
     "Kwon Eunbi": "/static/sorter/idols/kwon-eunbi-herald-20260331.jpg",
+    "Hearts2Hearts Stella": "/static/sorter/idols/hearts2hearts-stella.jpg",
 }
 
 
@@ -100,6 +101,7 @@ ROLE_PHOTO_OVERRIDES = {
     "1313202074607157268": "/static/sorter/idols/tripleS-dahyun.jpg",  # Dahyun, tripleS
     "1234942669751455846": "/static/sorter/idols/tripleS-yeonji.jpg",  # Yeonji, tripleS
     "1147390143980908584": "/static/sorter/idols/illit-moka.jpg",  # Moka, ILLIT
+    "1358993831823020062": "/static/sorter/idols/hearts2hearts-stella.jpg",  # Stella, Hearts2Hearts
 }
 
 

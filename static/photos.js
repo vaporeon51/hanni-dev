@@ -90,9 +90,11 @@
     const wall = $("wall");
     wall.innerHTML = '<div class="loading">Gathering photos</div>';
     try {
+      const catalogURL = document.body.dataset.catalog || "/static/sorter/catalog.json";
+      const embedsURL = document.body.dataset.embeds || "/static/sorter/embed-photos.json";
       const [catalogResponse, embedsResponse, boardResponse] = await Promise.all([
-        fetch("/static/sorter/catalog.json", { credentials: "same-origin" }),
-        fetch("/static/sorter/embed-photos.json", { credentials: "same-origin" }),
+        fetch(catalogURL, { credentials: "same-origin" }),
+        fetch(embedsURL, { credentials: "same-origin" }),
         fetch("/api/leaderboard?kind=groups&limit=200", { credentials: "same-origin" }).catch(() => null),
       ]);
       if (!catalogResponse.ok) throw new Error("catalog " + catalogResponse.status);

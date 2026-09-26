@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="/static/nav.css?v={{ static_version }}" />
     <link rel="stylesheet" href="/static/photos.css?v={{ static_version }}" />
   </head>
-  <body>
+  <body data-catalog="/static/sorter/catalog.json?v={{ static_version }}" data-embeds="/static/sorter/embed-photos.json?v={{ static_version }}">
     {% set active = "sorter" %}{% include "_nav.html" %}
     <main class="shell">
       <header class="masthead">

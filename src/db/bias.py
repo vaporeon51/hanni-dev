@@ -239,6 +239,22 @@ def register_pair_vote(
             return int(row[0]), bool(row[1])
 
 
+def prune_visitor_pair_votes(retention_days: int = 2) -> int:
+    """Delete pair ballots older than `retention_days`. Returns rows removed.
+
+    Ballots only matter for their own UTC day (first-meeting check + daily
+    volume count), so anything older is dead weight. Runs inside the weekly
+    bias worker job — no schedule of its own.
+    """
+    with _pool().connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM visitor_pair_votes WHERE day < CURRENT_DATE - %s;",
+                (max(0, int(retention_days)),),
+            )
+            return int(cur.rowcount or 0)
+
+
 def record_sorter_vote(
     winner_id: str, loser_id: str, k: int = GLOBAL_ELO_K
 ) -> dict[str, int] | None:

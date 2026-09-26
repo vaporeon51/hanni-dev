@@ -290,6 +290,46 @@ def test_group_board_maps_peak_elo():
     assert board.entries[0].provisional is False
 
 
+def test_prune_visitor_pair_votes_deletes_only_stale_days(monkeypatch):
+    executed = {}
+
+    class FakeCursor:
+        rowcount = 41
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def execute(self, query, params):
+            executed["query"] = query
+            executed["params"] = params
+
+    class FakeConnection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def cursor(self):
+            return FakeCursor()
+
+    class FakePool:
+        def connection(self):
+            return FakeConnection()
+
+    monkeypatch.setattr(bias, "_pool", lambda: FakePool())
+
+    assert bias.prune_visitor_pair_votes() == 41
+    assert "DELETE FROM visitor_pair_votes" in executed["query"]
+    assert "day < CURRENT_DATE - %s" in executed["query"]
+    assert executed["params"] == (2,)
+    assert bias.prune_visitor_pair_votes(-5) == 41
+    assert executed["params"] == (0,)
+
+
 def test_shrunk_elo_pulls_thin_evidence_to_prior():
     assert bias.shrunk_elo(1300, 200) == 1293
     assert bias.shrunk_elo(1250, 3) == 1208

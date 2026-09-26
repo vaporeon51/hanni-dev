@@ -27,7 +27,7 @@ from src.config.constants import (  # noqa: E402
 from src.content_recovery import RecoveryBatchConfig, dead_link_role_notice, run_recovery_batch  # noqa: E402
 from src.content_update import run_incremental_update  # noqa: E402
 from src.db import POOL  # noqa: E402
-from src.db.bias import create_weekly_global_snapshot  # noqa: E402
+from src.db.bias import create_weekly_global_snapshot, prune_visitor_pair_votes  # noqa: E402
 from src.db.dead_links import get_candidates_by_urls, get_due_urls, record_check  # noqa: E402
 from src.db.locks import advisory_lock  # noqa: E402
 from src.services.discord_embed_probe import post_discord_notice, probe_discord_embed  # noqa: E402
@@ -106,7 +106,8 @@ def run_bias_snapshot_once() -> dict[str, object]:
         if not acquired:
             return {"status": "skipped", "reason": "another bias snapshot job holds the lock"}
         written = create_weekly_global_snapshot()
-        return {"status": "completed", "global_snapshot_written": written}
+        pruned = prune_visitor_pair_votes()
+        return {"status": "completed", "global_snapshot_written": written, "pair_ballots_pruned": pruned}
 
 
 def run_all_once() -> dict[str, object]:

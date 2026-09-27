@@ -1038,8 +1038,9 @@ $("reel-feed").addEventListener("click", (event) => {
   }
   const control = event.target.closest("button[data-action]");
   const card = control?.closest(".reel-layout");
+  // Voting/reporting must not buy extra viewing time: the countdown keeps
+  // its original schedule instead of restarting on every tap.
   if (card) handleFeedback(card, control);
-  if (card) scheduleAutoplay();
 });
 
 $("reel-feed").addEventListener("wheel", (event) => {

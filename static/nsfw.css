@@ -57,6 +57,22 @@ body.nsfw .scroll-hint {
 body.nsfw .autoplay-toggle { background: rgba(33, 26, 36, 0.94); }
 body.nsfw .autoplay-menu { background: rgba(33, 26, 36, 0.97); }
 body.nsfw .view-toggle { background: var(--pink-soft); }
+/* Desktop feed-mode action pills + lightbox close kept hardcoded light
+   surfaces while their icons follow --text (near-white here). Same dark
+   glass as mobile/collage so they read on the dark stage. */
+body.nsfw .reel-action {
+  border-color: rgba(255, 255, 255, .16);
+  background: rgba(37, 27, 32, .55);
+  box-shadow: none;
+  color: #fff;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+body.nsfw .lightbox-close {
+  border-color: rgba(255, 255, 255, .16);
+  background: rgba(37, 27, 32, .85);
+  color: #fff;
+}
 
 /* Compact search controls across feed, sets, and desktop scroll. */
 body.nsfw .search input,

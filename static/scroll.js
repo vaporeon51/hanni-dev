@@ -21,6 +21,7 @@ const state = {
   autoplayDurationMs: 0,
   lastScrollAt: 0,
   settleTimer: null,
+  graceReel: null,
   seenQueue: [],
   seenUrls: new Set(),
   spacer: null,
@@ -447,6 +448,14 @@ function advanceAutoplay() {
     scheduleAutoplay();
     return;
   }
+  // Don't skip a reel that never played: grant one short grace period per
+  // card so slow loads get seen instead of flashed past.
+  if (!activeMediaReady(state.activeCard) && state.graceReel !== state.activeCard) {
+    state.graceReel = state.activeCard;
+    state.autoplayTimer = window.setTimeout(advanceAutoplay, 3000);
+    return;
+  }
+  state.graceReel = null;
   navigateBy(1);
   state.autoplayStart = window.performance.now();
   // The glide itself emits scroll events, which settle-restart this timer on
@@ -923,6 +932,7 @@ function resetFeed(query) {
   clearAutoplayTimers();
   if (state.settleTimer !== null) window.clearTimeout(state.settleTimer);
   state.settleTimer = null;
+  state.graceReel = null;
   state.query = query;
   state.seenQueue = [];
   state.seenUrls.clear();

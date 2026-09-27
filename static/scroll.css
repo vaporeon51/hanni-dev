@@ -739,6 +739,11 @@
   }
   .reel {
     min-height: 0;
+    /* svh: sized to the toolbar-shown viewport, which never changes as iOS
+       chrome shows/hides. dvh rows resize under snap and the resulting
+       instant re-seek reads as an in-place video swap. vh fallback first. */
+    height: 100vh;
+    height: 100svh;
     padding: 0;
   }
   .reel-layout {
@@ -749,7 +754,8 @@
   }
   .reel-stage {
     width: calc(100% - 12px);
-    height: calc(100dvh - 12px);
+    height: calc(100vh - 12px);
+    height: calc(100svh - 12px);
     max-width: none;
     max-height: none;
     margin: 6px;

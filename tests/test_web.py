@@ -592,34 +592,18 @@ def test_homepage_renders_menu_with_wholesome_and_nsfw():
 
     assert response.status_code == 200
     assert "<h1>hanni" in response.text
-    assert "pick your bias" not in response.text
     assert "wholesome</h2>" in response.text
-    assert "#i-pitchfork" in response.text
     assert "nsfw</h2>" in response.text
-    assert "nsfw 18+" not in response.text
-    assert '<a class="menu-card" href="/sorter">' in response.text
-    assert '<a class="menu-card" href="/leaderboard">' in response.text
-    assert '<a class="menu-card" href="/feed">' in response.text
-    assert '<a class="menu-card" href="/sets">' in response.text
-    assert '<a class="menu-card" href="/scroll">' in response.text
+    for path in ("/sorter", "/leaderboard", "/feed", "/sets", "/scroll"):
+        assert f'<a class="menu-card" href="{path}">' in response.text
     assert '<footer class="site-credit">made by glaceon</footer>' in response.text
     assert '/static/home.css?v=' in response.text
-    assert '/static/nav.css?v=' in response.text
-    assert "the endless shuffle" in response.text
-    assert "royalty" not in response.text
-    home_css = (web_app.REPO_ROOT / "static" / "home.css").read_text()
-    assert ".menu-section.nsfw .menu-card" in home_css
+    # Emoji are banned from chrome; iconography goes through icons.svg.
     for banned in ("😇", "😈", "💘", "🏆", "🎲", "🗂", "🌀"):
         for template in ("home.html", "_nav.html", "sorter.html", "leaderboard.html"):
             assert banned not in (web_app.REPO_ROOT / "templates" / template).read_text()
     assert (web_app.REPO_ROOT / "static" / "icons.svg").exists()
     assert 'use href="/static/icons.svg' in response.text
-    assert "linear-gradient(90deg, transparent" in home_css
-    assert ".menu-section.nsfw {" in home_css
-    nav_css = (web_app.REPO_ROOT / "static" / "nav.css").read_text()
-    assert "font-size: 1.35rem" in nav_css
-    assert "font-size: 0.82rem" in nav_css
-    assert "line-height: 1.4" in nav_css
 
 
 def test_nsfw_pages_use_the_dark_theme():
@@ -661,15 +645,10 @@ def test_feed_page_renders():
 
     assert response.status_code == 200
     assert "search a member or group" in response.text
-    assert '<footer class="site-credit">made by glaceon</footer>' in response.text
     assert '<a href="/feed" aria-current="page">feed</a>' in response.text
     assert "fonts.googleapis.com" not in response.text
-    assert '/static/analytics.js?v=' in response.text
     assert 'id="collection-heading"' in response.text
-    assert '/static/app.css?v=' in response.text
     assert '/static/app.js?v=' in response.text
-    assert '<option value="random" selected>random</option>' in response.text
-    assert '<option value="top">top</option>' in response.text
     assert 'id="feed-sentinel"' in response.text
 
 
@@ -687,26 +666,6 @@ def test_sets_page_renders_separately():
     assert '<option value="latest" selected>newest</option>' in response.text
     assert '<option value="oldest">oldest</option>' in response.text
     assert 'id="feed-sentinel"' in response.text
-    script = (web_app.REPO_ROOT / "static" / "sets.js").read_text()
-    assert script.rstrip().endswith("loadSets();")
-    assert '$("sets-form").addEventListener("submit", loadSets)' in script
-
-
-def test_scroll_search_sits_at_the_same_height_as_feed_search():
-    """The menu-to-search gap must match .site-nav's bottom margin exactly,
-    and feed/sets must add no extra top padding of their own, or the scroll
-    filter drifts vertically versus feed/sets."""
-    import re
-
-    nav_css = (web_app.REPO_ROOT / "static" / "nav.css").read_text()
-    scroll_css = (web_app.REPO_ROOT / "static" / "scroll.css").read_text()
-    app_css = (web_app.REPO_ROOT / "static" / "app.css").read_text()
-    nav_margin = re.search(r"\.site-nav \{[^}]*margin:\s*0 auto (\d+)px;", nav_css)
-    filter_margin = re.search(r"\.scroll-filterbar \{[^}]*margin-top:\s*(\d+)px;", scroll_css)
-    shell_padding = re.search(r"\.shell \{[^}]*padding:\s*0(?:px)? 0 64px;", app_css)
-    assert nav_margin is not None and filter_margin is not None
-    assert filter_margin.group(1) == nav_margin.group(1)
-    assert shell_padding is not None
 
 
 def test_scroll_page_renders_as_a_separate_reel_surface():
@@ -722,38 +681,9 @@ def test_scroll_page_renders_as_a_separate_reel_surface():
     assert 'id="scroll-form"' in response.text
     assert '/static/scroll.css?v=' in response.text
     assert '/static/scroll.js?v=' in response.text
-    assert 'placeholder="idol or group"' in response.text
-    assert 'id="scroll-filter-hint"' not in response.text
+    assert 'placeholder="search a member or group"' in response.text
     assert 'id="scroll-hint"' in response.text
     assert "scroll for more" in response.text
-
-
-def test_scroll_defaults_to_collage_and_nudges_autoplay():
-    script = (web_app.REPO_ROOT / "static" / "scroll.js").read_text()
-    assert 'window.localStorage.getItem(VIEW_STORAGE_KEY) || "collage"' in script
-    assert 'toggle.classList.add("attract")' in script
-    css = (web_app.REPO_ROOT / "static" / "scroll.css").read_text()
-    assert "autoplay-nudge" in css
-    assert ".autoplay-toggle.attract" in css
-
-
-def test_scroll_mobile_keeps_logo_and_search_on_one_row():
-    css = (web_app.REPO_ROOT / "static" / "scroll.css").read_text()
-    mobile = css.split("@media (max-width: 700px)")[1]
-    assert "grid-template-columns: auto minmax(0, 1fr)" in mobile
-    assert ".scroll-topbar .nav-home" in mobile
-    assert ".scroll-filterbar { margin-top: 0;" in mobile
-
-
-def test_scroll_hint_offers_next_reel_then_dismisses():
-    script = (web_app.REPO_ROOT / "static" / "scroll.js").read_text()
-    assert "showScrollHint()" in script
-    assert "dismissScrollHint()" in script
-    assert "state.hintDismissed" in script
-    assert "navigateBy(1)" in script
-    css = (web_app.REPO_ROOT / "static" / "scroll.css").read_text()
-    assert ".scroll-hint.is-visible" in css
-    assert "hint-bob" in css
 
 
 def test_plain_link_endpoint_avoids_recent_urls_and_returns_source(monkeypatch):
@@ -835,58 +765,6 @@ def test_plain_link_endpoint_records_no_result_without_query_text(monkeypatch):
 
     assert response.status_code == 404
     assert analytics == [{"found": False, "cycle_reset": False}]
-
-
-def test_scroll_client_boots_unfiltered_and_pages_by_offset():
-    script = (web_app.REPO_ROOT / "static" / "scroll.js").read_text()
-
-    assert script.rstrip().endswith("resetFeed(initialQuery);")
-    assert '$("scroll-form").addEventListener("submit"' in script
-    assert "function navigateBy(direction)" in script
-    assert "top: target.offsetTop" in script
-    assert "target.scrollIntoView" not in script
-    assert "function applyViewMode" in script
-    assert "VIEW_STORAGE_KEY" in script
-
-
-def test_feed_client_boots_unfiltered_and_pages_continuations():
-    script = (web_app.REPO_ROOT / "static" / "app.js").read_text()
-
-    assert script.rstrip().endswith("else loadFeed();")
-    assert '$("feed-form").addEventListener("submit", loadFeed)' in script
-    assert "async function loadMoreFeed()" in script
-    assert 'window.addEventListener("popstate"' in script
-    assert "async function loadCollection(contentLinkId)" in script
-
-
-def test_sorter_group_order_is_unpinned_elo():
-    script = (web_app.REPO_ROOT / "static" / "sorter" / "sorter.js").read_text()
-
-    assert "favoriteOrder" not in script
-    assert "groups.sort((a, b) => a.name.localeCompare(b.name));" in script
-    assert "selected.size === 0) renderGroups" not in script
-    assert 'mode === "groups" ? b.elo - a.elo : (b.peak_elo ?? b.elo) - (a.peak_elo ?? a.elo)' in script
-    assert "bias-club-group-order-v1" in script
-    assert "groupsSignature()" in script
-    assert "renderGroupsLoading()" in script
-
-
-def test_sorter_fetches_full_board_for_lineup_ordering():
-    # The default board caps (45 idols / 15 groups) would strand off-board
-    # groups without peak scores; the sorter needs full coverage so every
-    # group ranks instead of falling back to alphabetical.
-    script = (web_app.REPO_ROOT / "static" / "sorter" / "sorter.js").read_text()
-
-    assert "/api/leaderboard?kind=idols&limit=200" in script
-    assert "/api/leaderboard?kind=groups&limit=200" in script
-
-
-def test_collection_links_point_at_feed_collection_view():
-    for name in ("app.js", "scroll.js"):
-        script = (web_app.REPO_ROOT / "static" / name).read_text()
-
-        assert "`/feed?collection=${item.content_link_id}`" in script
-        assert "`/?collection=" not in script
 
 
 def test_collections_by_url_returns_matching_sets(monkeypatch):

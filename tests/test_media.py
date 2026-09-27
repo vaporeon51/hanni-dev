@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 import requests
 
 from src.services.media import (
@@ -51,15 +52,11 @@ def test_direct_mp4_does_not_need_an_imgur_lookup():
     assert result == ResolvedMedia("video", "https://i.imgur.com/abc123.mp4")
 
 
-def test_direct_goyangi_webp_is_browser_ready():
-    url = "https://cdn.goyangi.pics/v1/babymonster/260824-babymonster-ahyeon-asa-5084.webp"
-
-    assert resolve_media_url(url, client_id="") == ResolvedMedia("image", url)
-
-
-def test_direct_kpopping_jpg_is_browser_ready():
-    url = "https://cdn.kpopping.com/kpics/2026/06/1782845536570-2ej1px-2.jpg"
-
+@pytest.mark.parametrize("url", [
+    "https://cdn.goyangi.pics/v1/babymonster/260824-babymonster-ahyeon-asa-5084.webp",
+    "https://cdn.kpopping.com/kpics/2026/06/1782845536570-2ej1px-2.jpg",
+])
+def test_direct_allowlisted_image_is_browser_ready(url):
     assert resolve_media_url(url, client_id="") == ResolvedMedia("image", url)
 
 
@@ -197,22 +194,13 @@ def test_media_stream_forwards_a_valid_range_header():
     assert session.requests[0][1]["headers"]["Range"] == "bytes=0-1023"
 
 
-def test_media_stream_allows_goyangi_webp():
-    url = "https://cdn.goyangi.pics/v1/babymonster/260824-babymonster-ahyeon-asa-5084.webp"
+@pytest.mark.parametrize("url,content_type", [
+    ("https://cdn.goyangi.pics/v1/babymonster/260824-babymonster-ahyeon-asa-5084.webp", "image/webp"),
+    ("https://cdn.kpopping.com/kpics/2026/06/1782845536570-2ej1px-2.jpg", "image/jpeg"),
+])
+def test_media_stream_allows_allowlisted_image(url, content_type):
     session = FakeStreamSession(
-        [FakeStreamResponse(status_code=200, content_type="image/webp", url=url)]
-    )
-
-    response = open_media_stream(url, session=session)
-
-    assert response.status_code == 200
-    assert session.requests[0][0] == url
-
-
-def test_media_stream_allows_kpopping_jpg():
-    url = "https://cdn.kpopping.com/kpics/2026/06/1782845536570-2ej1px-2.jpg"
-    session = FakeStreamSession(
-        [FakeStreamResponse(status_code=200, content_type="image/jpeg", url=url)]
+        [FakeStreamResponse(status_code=200, content_type=content_type, url=url)]
     )
 
     response = open_media_stream(url, session=session)

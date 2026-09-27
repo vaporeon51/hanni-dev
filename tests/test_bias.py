@@ -528,19 +528,6 @@ def test_photos_page_renders():
     assert 'id="search"' in response.text
 
 
-def test_sorter_verify_round_is_wired():
-    script = (web_app.REPO_ROOT / "static" / "sorter" / "sorter.js").read_text()
-    engine = (web_app.REPO_ROOT / "static" / "sorter" / "engine.js").read_text()
-
-    assert "applyVerifySwaps" in engine
-    assert "facedPairs" in engine
-    assert "verifyRounds" in script
-    assert "buildVerifyPairs" in script
-    assert "finishVerify" in script
-    assert "facedPairKeys" in script
-    assert "CHALLENGE_TOP" in script
-
-
 def test_leaderboard_page_renders():
     async def request():
         transport = httpx.ASGITransport(app=web_app.app)

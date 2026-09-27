@@ -180,13 +180,14 @@ async function browserFixture(saved = null, boardFails = false, hash = "") {
     getElementById: element, querySelectorAll(selector) { return selector === "[data-mode]" ? modeButtons : []; }, querySelector() { return null; }, addEventListener() {},
     createElement() { return element("created"); },
   };
+  const beacons = [];
   const context = vm.createContext({
     document, console, URL, Blob, AbortController,
     localStorage: { getItem: (key) => storage.get(key) || null, setItem: (key, value) => storage.set(key, value), removeItem: (key) => storage.delete(key) },
     location: { hash, search: "", pathname: "/sorter", origin: "https://example.test" },
     history: { replaceState() { context.location.hash = ""; } },
     window: { scrollTo() {}, matchMedia: () => ({ matches: true }) },
-    navigator: { sendBeacon() { return true; }, clipboard: { async writeText(url) { context.copiedURL = url; } } },
+    navigator: { sendBeacon(url, payload) { beacons.push({ url, payload }); return true; }, clipboard: { async writeText(url) { context.copiedURL = url; } } },
     Image: class {}, setTimeout() { return 0; }, clearTimeout() {},
     fetch: async (url) => {
       if (url.includes("leaderboard")) {
@@ -200,7 +201,7 @@ async function browserFixture(saved = null, boardFails = false, hash = "") {
   vm.runInContext(readFileSync(new URL("../static/sorter/lz-string.min.js", import.meta.url), "utf8"), context);
   vm.runInContext(readFileSync(new URL("../static/sorter/sorter.js", import.meta.url), "utf8"), context);
   for (let i = 0; i < 30; i++) await Promise.resolve();
-  return { element, storage, ids, context, document, catalog,
+  return { element, storage, ids, context, document, catalog, beacons,
     session: () => JSON.parse(storage.get("bias-club-session-v1")) };
 }
 
@@ -329,4 +330,18 @@ Deno.test("completed rankings survive expiry and remain available until a new so
   ui = await browserFixture(unfinished);
   assert.equal(ui.element("resume-banner").hidden, true);
   assert.equal(ui.storage.has("bias-club-session-v1"), false);
+});
+
+Deno.test("idols without Discord roles still submit leaderboard votes", async () => {
+  const ui = await browserFixture();
+  assert.ok(ui.ids.every((id) => !ui.catalog.entries.find((e) => e.id === id).role_id));
+  ui.element("start").click();
+  ui.element("pick-left").click();
+  assert.equal(ui.beacons.length, 1);
+  const payload = JSON.parse(await ui.beacons[0].payload.text());
+  const pair = ui.session().matchups[0];
+  assert.equal(payload.winner_role_id, ui.catalog.entries.find((e) => e.id === pair[0]).leaderboard_id);
+  assert.equal(payload.loser_role_id, ui.catalog.entries.find((e) => e.id === pair[1]).leaderboard_id);
+  ui.element("tie").click();
+  assert.equal(ui.beacons.length, 1, "ties still only affect the personal ranking");
 });

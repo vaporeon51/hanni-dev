@@ -98,11 +98,13 @@
     if (choice === "tie") return; // ties never touch ELO
     const winner = choice === "left" ? leftItem : rightItem;
     const loser = choice === "left" ? rightItem : leftItem;
-    if (!winner.role_id || !loser.role_id) return;
+    const winnerId = winner.leaderboard_id || winner.role_id;
+    const loserId = loser.leaderboard_id || loser.role_id;
+    if (!winnerId || !loserId || winnerId === loserId) return;
     session.counted = (session.counted || 0) + 1;
     const payload = JSON.stringify({
-      winner_role_id: winner.role_id,
-      loser_role_id: loser.role_id,
+      winner_role_id: winnerId,
+      loser_role_id: loserId,
     });
     try {
       if (navigator.sendBeacon) {
@@ -191,7 +193,7 @@
     // Best effort and bounded: starting a sort never waits for consensus.
     const seedController = new AbortController();
     const seedTimeout = setTimeout(() => seedController.abort(), 1500);
-    fetch("/api/leaderboard?kind=idols&limit=200", { credentials: "same-origin", signal: seedController.signal })
+    fetch("/api/leaderboard?kind=idols&limit=200&include_provisional=false", { credentials: "same-origin", signal: seedController.signal })
       .then((response) => response.ok ? response.json() : null)
       .then((board) => { if (Array.isArray(board?.entries)) idolSeedBoard = board; })
       .catch(() => {}).finally(() => clearTimeout(seedTimeout));
@@ -202,7 +204,7 @@
       if (mode === "idols") {
         const roles = new Map((idolSeedBoard?.entries || []).map((e) => [e.role_id, e.elo]));
         ids.forEach((id) => {
-          const value = roles.get(byId.get(id).role_id);
+          const value = roles.get(byId.get(id).leaderboard_id || byId.get(id).role_id);
           if (Number.isFinite(value)) ratings.set(id, value);
         });
       } else {

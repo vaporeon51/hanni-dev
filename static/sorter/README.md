@@ -58,3 +58,50 @@ seed neutrality, legacy compatibility, replay/undo, ties, refinement, browser
 event flows with mocked data, and reproducible noisy-ranking simulations.
 The simulation is a regression check for the intended tradeoff, not evidence
 of accuracy on real users' preferences.
+
+## Idol leaderboard contributions
+
+Every idol has a stable `leaderboard_id`; `role_id` remains optional Discord
+metadata. Existing mapped idols retain their identity; others use
+`sorter:<catalog ID>`. Multiple cards for the same person share an identity
+and cannot vote against themselves. Catalog IDs are append-only; the builder
+preserves existing identities and rejects reused IDs. Catalog registration
+happens through `scripts/sync_sorter_idols.py`, not embedded migration data.
+
+There is one live Elo score per idol. Existing idols start from their previous
+displayed score; new idols start at 1200. Scores retain fractional precision
+and are rounded for display. One recorded matchup is enough to join the ranks.
+There is no confidence multiplier or lifetime contributor tracking.
+
+Votes use K=8 with the existing daily volume decay. Each visitor can move each
+idol by at most 12 Elo points per UTC day, counting gains and losses together.
+A pair transfers the same amount in both directions, limited by the remaining
+budget of both idols, and counts at most once per visitor per day. Repeats and
+exhausted budgets add neither points nor match counts. All accounting commits
+atomically, with stable lock order for simultaneous requests.
+
+A process-local token bucket allows 12 immediate requests and replenishes four
+per second, with a maximum of 2,048 tracked visitor keys. It is a cheap burst
+backstop, not the authoritative vote limit. Requests beyond it are rejected;
+ordinary fast choices are no longer subject to a two-second cooldown. The
+API distinguishes invalid payloads, unknown IDs, repeats, exhausted budgets,
+and rate limiting. Unknown IDs produce a diagnostic log without visitor data.
+
+New daily accounting rows store hashes instead of raw cookies and expire via
+the existing worker cleanup. Cookies are anonymous, not verified people.
+Clearing cookies can bypass visitor-level limits. The daily cap limits Elo
+movement, not how many leaderboard positions can change.
+
+The board requests up to 45 ranked idols plus five fresh faces, selected
+independently and rotated by UTC date. `include_provisional=false` suppresses
+the extra sample for sorter seeding. Snapshots include only ranked idols,
+serialize by week, and commit as a whole; unexpected rank collisions fail.
+
+Selection, omitted idols, ties, and personal sorting are unchanged. Global
+votes remain immediate; personal Undo does not retract a submitted global
+vote. The first global answer for a pair on a given day still stands.
+
+Groups retain the original Discord-mapped population and top-three average,
+now using the single live idol score without another shrinkage calculation.
+Recorded matchup totals include legacy history; they are not counts of
+unique voters, and historical totals were not retrospectively deduplicated.

@@ -30,10 +30,8 @@ from src.db.bias import (  # noqa: E402
     LEADERBOARD_SNAPSHOT_LIMIT,
     get_global_group_leaderboard,
     get_global_leaderboard,
-    pair_key_for,
     record_sorter_vote,
-    register_pair_vote,
-    scaled_global_k,
+    visitor_key,
 )
 from src.db.feedback import ContentFeedback, add_content_report, add_content_vote  # noqa: E402
 from src.db.media import get_live_content_url  # noqa: E402
@@ -216,6 +214,29 @@ class _RecentActionRateLimiter:
         return True
 
 
+class _SorterBurstLimiter:
+    """Small process-local backstop; durable vote limits remain in Postgres."""
+
+    def __init__(self, burst: int = 12, per_second: float = 4, capacity: int = 2048):
+        self.burst = burst
+        self.per_second = per_second
+        self.capacity = capacity
+        self._entries: OrderedDict[str, tuple[float, float]] = OrderedDict()
+
+    def allow(self, key: str) -> bool:
+        now = time.monotonic()
+        tokens, previous = self._entries.pop(key, (float(self.burst), now))
+        tokens = min(self.burst, tokens + (now - previous) * self.per_second)
+        allowed = tokens >= 1
+        self._entries[key] = (tokens - 1 if allowed else tokens, now)
+        while len(self._entries) > self.capacity:
+            self._entries.popitem(last=False)
+        return allowed
+
+
+_sorter_burst_limiter = _SorterBurstLimiter()
+
+
 _vote_rate_limiter = _RecentActionRateLimiter(FEEDBACK_COOLDOWN_SECONDS, FEEDBACK_CACHE_CAPACITY)
 _report_rate_limiter = _RecentActionRateLimiter(FEEDBACK_COOLDOWN_SECONDS, FEEDBACK_CACHE_CAPACITY)
 _search_rate_limiter = _RecentActionRateLimiter(SEARCH_COOLDOWN_SECONDS, SEARCH_CACHE_CAPACITY)
@@ -223,12 +244,6 @@ _scroll_rate_limiter = _RecentActionRateLimiter(SCROLL_COOLDOWN_SECONDS, SCROLL_
 _analytics_rate_limiter = _RecentActionRateLimiter(
     ANALYTICS_SESSION_SECONDS,
     ANALYTICS_CACHE_CAPACITY,
-)
-SORTER_VOTE_COOLDOWN_SECONDS = 2
-SORTER_VOTE_CACHE_CAPACITY = 2048
-_sorter_vote_rate_limiter = _RecentActionRateLimiter(
-    SORTER_VOTE_COOLDOWN_SECONDS,
-    SORTER_VOTE_CACHE_CAPACITY,
 )
 
 
@@ -880,55 +895,44 @@ async def report(
 async def sorter_vote(
     request: Request,
     response: Response,
-    payload: dict[str, Any] = Body(...),
+    payload: Any = Body(default=None),
 ) -> dict[str, Any]:
-    """Record one bias-sorter matchup as an ELO vote (best-effort, always 200).
-
-    One person, one vote per pair per day: a matchup's first meeting moves
-    ELO (fading with daily volume); rematches are logged but weightless.
-    Neither a marathon nor a farmed pair can move the shared boards by
-    itself. The sorter itself never blocks.
-    """
-
+    """Best-effort vote; all influence and evidence checks are atomic in SQL."""
+    if not isinstance(payload, dict):
+        return {"recorded": False, "reason": "invalid_payload"}
     visitor_token = _ensure_visitor_cookie(request, response)
+    winner_id = payload.get("winner_role_id")
+    loser_id = payload.get("loser_role_id")
+    if (not isinstance(winner_id, str) or not isinstance(loser_id, str)
+            or not winner_id or not loser_id or winner_id == loser_id
+            or max(len(winner_id), len(loser_id)) > 128):
+        return {"recorded": False, "reason": "invalid_payload"}
+    if not _sorter_burst_limiter.allow(visitor_key(visitor_token)):
+        return {"recorded": False, "reason": "rate_limited"}
     try:
-        winner_id = str(payload.get("winner_role_id", ""))
-        loser_id = str(payload.get("loser_role_id", ""))
-    except AttributeError:
-        return {"recorded": False}
-    if not winner_id or not loser_id or winner_id == loser_id:
-        return {"recorded": False}
-    if not _sorter_vote_rate_limiter.allow(visitor_token, "sorter-vote"):
-        return {"recorded": False}
-    try:
-        distinct, is_new = await asyncio.to_thread(
-            register_pair_vote,
-            visitor_token,
-            datetime.now(timezone.utc).date(),
-            pair_key_for(winner_id, loser_id),
-        )
-    except Exception:
-        logger.exception("Could not register pair vote")
-        distinct, is_new = 1, True
-    k = scaled_global_k(distinct - 1) if is_new else 0
-    try:
-        recorded = await asyncio.to_thread(record_sorter_vote, winner_id, loser_id, k)
+        result = await asyncio.to_thread(record_sorter_vote, winner_id, loser_id, visitor_token)
     except Exception:
         logger.exception("Could not record sorter vote")
-        return {"recorded": False}
-    return {"recorded": recorded is not None, "global_k": k}
+        return {"recorded": False, "reason": "unavailable"}
+    if result and result.get("reason") == "unknown_id":
+        # Do not log visitor cookies or untrusted payloads; this is usually
+        # a catalog deployed before its metadata sync.
+        logger.warning("Sorter vote rejected: unknown idol ID; check catalog sync")
+    return result if result is not None else {"recorded": False, "reason": "invalid_payload"}
 
 
 @app.get("/api/leaderboard")
 async def leaderboard(
     kind: str = Query(default="idols"),
     limit: int = Query(default=0, ge=0, le=500),
+    include_provisional: bool = Query(default=True),
 ) -> dict[str, Any]:
     """Global consensus board. The Mine tab renders the visitor's own sorter
     ranking client-side, so it never hits this endpoint.
 
-    `limit` caps entries (default 45 idols / 15 groups). The sorter passes a
-    large limit so every group gets a peak score for lineup ordering — the
+    `limit` caps ranked idols (default 45) or group entries (default 15).
+    Idol requests also include up to five fresh faces unless disabled.
+    The sorter passes a large limit so every group gets a peak score for lineup ordering — the
     default caps would strand off-board groups in alphabetical order.
     """
     if kind not in {"idols", "groups"}:
@@ -936,7 +940,7 @@ async def leaderboard(
     try:
         if kind == "idols":
             board = await asyncio.to_thread(
-                get_global_leaderboard, limit or LEADERBOARD_SNAPSHOT_LIMIT
+                get_global_leaderboard, limit or LEADERBOARD_SNAPSHOT_LIMIT, include_provisional
             )
             return {
                 "scope": "global",

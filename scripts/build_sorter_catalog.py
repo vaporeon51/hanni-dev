@@ -7,13 +7,15 @@ live Postgres ``role_info`` table, then writes
 For every sorter entry we attach, when a strict normalized
 ``(member, group)`` match exists in ``role_info``:
 
-- ``role_id`` — so sorter votes can update ELO
+- ``role_id`` — optional legacy Discord identity
 - ``photo`` — the kpopping/legacy portrait from ``role_info.image_url``,
   overwriting the old Imgur asset
 
-Unmatched entries keep ``photo: null`` / ``role_id: null`` and the frontend
-falls back to the original Imgur URL. No runtime SQL + file lookup mix, no
-vendored image binaries in the Heroku slug.
+Every idol also gets a stable ``leaderboard_id``, including entries without
+a Discord role. Explicit aliases reconnect known name/group changes.
+Unmatched entries keep ``photo: null`` / ``role_id: null``; vendored images
+and original URLs provide fallbacks. After rebuilding, register new identities
+with ``scripts/sync_sorter_idols.py --apply`` before publishing the catalog.
 
 Usage:
     python scripts/build_sorter_catalog.py \
@@ -33,6 +35,8 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
+
+from src.sorter_catalog import attach_leaderboard_ids, catalog_rating_rows
 
 from dotenv import load_dotenv
 
@@ -455,6 +459,19 @@ def main() -> int:
         manual_count += 1
     print(f"manual idols appended: {manual_count}")
 
+    # Saved sessions and leaderboard IDs rely on append-only catalog IDs.
+    # Preserve an existing identity even when a Discord mapping is added later.
+    if Path(args.output).exists():
+        previous = json.loads(Path(args.output).read_text())
+        old_entries = {e["id"]: e for e in previous["entries"]}
+        for entry in entries:
+            old = old_entries.get(entry["id"])
+            if old and old.get("leaderboard_id"):
+                if old["name"] != entry["name"]:
+                    raise ValueError(f"Catalog ID {entry['id']} changed identity; migrate it explicitly")
+                entry["leaderboard_id"] = old["leaderboard_id"]
+    attach_leaderboard_ids(entries)
+    matched_idols = sum(e["kind"] == "idol" and bool(e.get("role_id")) for e in entries)
     role_photos = {
         entry["role_id"]: entry["local"]
         for entry in entries
@@ -487,6 +504,7 @@ def main() -> int:
             "manual_idols": manual_count,
             "group_cards": len(group_cards),
             "matched_idols": matched_idols,
+            "leaderboard_idols": len(catalog_rating_rows(entries)),
             "matched_photos": matched_photos,
             "matched_group_cards": matched_groups,
         },

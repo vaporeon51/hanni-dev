@@ -43,9 +43,9 @@ body {
 .podium-card strong { display: block; font-size: 16px; margin-top: 10px; }
 .podium-card small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
 .podium-elo { display: inline-block; margin-top: 8px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; background: var(--light); color: var(--pink); border-radius: 999px; padding: 3px 12px; font-weight: 700; }
+.podium-stats, .mini-stats { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 6px; }
 .podium-stats { margin-top: 8px; }
 .podium-stats .podium-elo { margin-top: 0; }
-.podium-votes { margin-top: 6px; color: var(--muted); font-size: 12px; }
 .elo-tag { font-size: 9px; letter-spacing: 1.5px; font-weight: 700; line-height: 1; opacity: 0.75; margin-right: 6px; }
 .elo-num { line-height: 1; }
 /* mini grids: ranks 4–7 four across, ranks 8–12 five across — widening cascade */
@@ -61,11 +61,9 @@ body {
 .mini-grid-5 .mini-card strong { font-size: 13px; }
 .mini-grid-5 .mini-card small { font-size: 10px; }
 .mini-grid-5 .mini-stats .row-elo { font-size: 10px; padding: 2px 8px; }
-.mini-grid-5 .mini-votes { font-size: 10px; }
 .mini-card small { display: block; color: var(--muted); font-size: 11px; margin-top: 1px; overflow-wrap: anywhere; }
 .mini-stats { margin-top: 7px; }
 .mini-stats .row-elo { font-size: 11px; padding: 2px 10px; }
-.mini-votes { margin-top: 5px; color: var(--muted); font-size: 11px; }
 /* rows */
 .rows { box-shadow: 0 8px 24px #b84d7909; margin-top: 10px; border: 1px solid var(--line); border-radius: 18px; background: var(--paper); overflow: hidden; }
 .mini-grid + .rows { box-shadow: 0 8px 24px #b84d7909; margin-top: 14px; }
@@ -127,16 +125,14 @@ body {
   .podium-card.first { order: -1; }
   .podium-photo img { aspect-ratio: 1 / 1; }
   .podium-card strong { font-size: 18px; }
-  .podium-votes { font-size: 11px; }
   .row { gap: 9px; padding: 8px 12px 8px 8px; }
   .row-thumb { width: 38px; height: 42px; }
-  .row-votes { display: none; }
+  .row .row-votes { display: none; }
   .group-list { grid-template-columns: minmax(0, 1fr); }
   .group-card { gap: 12px; padding: 12px; }
   .group-photo { width: 64px; height: 70px; border-radius: 12px; }
   .fan-avatar { width: 30px; height: 30px; margin-left: -10px; }
   .group-info strong { font-size: 14px; }
-  .group-stats .row-votes { display: inline-flex; }
   .group-hero { gap: 14px; padding: 14px; }
   .hero-photo-wrap .group-photo { width: 112px; height: 124px; border-radius: 14px; }
   .hero-photo-wrap .fan-avatar { width: 34px; height: 34px; }
@@ -145,7 +141,6 @@ body {
   .mini-grid-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .mini-card { padding: 8px 8px 12px; }
   .mini-card strong { font-size: 13px; }
-  .mini-votes { font-size: 10px; }
   .row-elo { font-size: 11px; }
   .row-move { font-size: 10px; padding: 2px 7px; }
 }
@@ -170,7 +165,3 @@ body {
   }
   .row:hover { background: #fff8fb; }
 }
-.fresh-head { margin: 28px 0 2px; font-size: 15px; }
-.fresh-sub { margin: 0 0 10px; color: var(--muted); font-size: 12px; }
-.fresh-tag { background: #fff; color: var(--pink); border: 1px solid var(--pink); font-size: 9px; padding: 1px 6px; }
-.mini-card.fresh, .group-card.fresh { opacity: 0.92; }

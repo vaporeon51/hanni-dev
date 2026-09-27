@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 
 import httpx
+import pytest
 
 from src.db import bias
 from src.web import app as web_app
@@ -35,17 +36,14 @@ def test_record_sorter_vote_rejects_bad_ids():
     assert bias.record_sorter_vote("", "") is None
 
 
-def _post_vote(monkeypatch, payload, distinct=1, is_new=True):
+def _post_vote(monkeypatch, payload, result=None):
     recorded = {}
 
-    def fake_record(winner_id, loser_id, k):
-        recorded["args"] = (winner_id, loser_id, k)
-        return {"winner_delta": 4, "loser_delta": -4}
+    def fake_record(winner_id, loser_id, visitor_token):
+        recorded["args"] = (winner_id, loser_id, visitor_token)
+        return result or {"recorded": True, "global_k": 8}
 
     monkeypatch.setattr(web_app, "record_sorter_vote", fake_record)
-    monkeypatch.setattr(
-        web_app, "register_pair_vote", lambda token, day, pair: (distinct, is_new)
-    )
 
     async def request():
         transport = httpx.ASGITransport(app=web_app.app)
@@ -57,31 +55,17 @@ def _post_vote(monkeypatch, payload, distinct=1, is_new=True):
 
 def test_sorter_vote_records_matchup(monkeypatch):
     response, recorded = _post_vote(
-        monkeypatch, {"winner_role_id": "role-a", "loser_role_id": "role-b"}
-    )
-    assert response.status_code == 200
+        monkeypatch, {"winner_role_id": "role-a", "loser_role_id": "role-b"})
     assert response.json() == {"recorded": True, "global_k": 8}
-    assert recorded["args"] == ("role-a", "role-b", 8)
+    assert recorded["args"][:2] == ("role-a", "role-b")
+    assert recorded["args"][2]
 
 
-def test_sorter_vote_damps_k_after_marathon(monkeypatch):
-    response, recorded = _post_vote(
+def test_sorter_vote_returns_atomic_noop(monkeypatch):
+    response, _ = _post_vote(
         monkeypatch, {"winner_role_id": "role-a", "loser_role_id": "role-b"},
-        distinct=1001,
-    )
-    assert response.status_code == 200
-    assert response.json() == {"recorded": True, "global_k": 2}
-    assert recorded["args"] == ("role-a", "role-b", 2)
-
-
-def test_sorter_vote_stops_farmed_rematches(monkeypatch):
-    response, recorded = _post_vote(
-        monkeypatch, {"winner_role_id": "role-a", "loser_role_id": "role-b"},
-        distinct=1, is_new=False,
-    )
-    assert response.status_code == 200
-    assert response.json() == {"recorded": True, "global_k": 0}
-    assert recorded["args"] == ("role-a", "role-b", 0)
+        result={"recorded": False, "global_k": 0})
+    assert response.json() == {"recorded": False, "global_k": 0}
 
 
 def test_pair_key_is_order_independent():
@@ -104,42 +88,42 @@ def test_sorter_vote_rejects_same_idol(monkeypatch):
         monkeypatch, {"winner_role_id": "role-a", "loser_role_id": "role-a"}
     )
     assert response.status_code == 200
-    assert response.json() == {"recorded": False}
+    assert response.json() == {"recorded": False, "reason": "invalid_payload"}
     assert recorded == {}
 
 
-def test_sorter_vote_rate_limits_rapid_beacons(monkeypatch):
+def test_sorter_vote_keeps_fast_legitimate_choices(monkeypatch):
+    calls = []
+    def record(winner, loser, token):
+        calls.append((winner, loser, token))
+        return {"recorded": True, "global_k": 8}
+    monkeypatch.setattr(web_app, "record_sorter_vote", record)
+
     async def request():
         transport = httpx.ASGITransport(app=web_app.app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-            first = await client.post(
-                "/api/sorter/vote",
-                json={"winner_role_id": "role-a", "loser_role_id": "role-b"},
-            )
-            second = await client.post(
-                "/api/sorter/vote",
-                json={"winner_role_id": "role-a", "loser_role_id": "role-b"},
-            )
-            return first, second
+            return [await client.post("/api/sorter/vote", json={
+                "winner_role_id": "role-a", "loser_role_id": loser}) for loser in ("role-b", "role-c")]
+    responses = asyncio.run(request())
+    assert all(r.json()["recorded"] for r in responses)
+    assert len(calls) == 2 and calls[0][2] == calls[1][2]
 
-    monkeypatch.setattr(
-        web_app, "register_pair_vote", lambda token, day, pair: (1, True)
-    )
-    monkeypatch.setattr(
-        web_app, "record_sorter_vote",
-        lambda winner_id, loser_id, k: {"ok": True},
-    )
-    first, second = asyncio.run(request())
-    assert first.status_code == 200
-    assert second.status_code == 200
-    assert second.json() == {"recorded": False}
+
+def test_sorter_vote_fails_closed(monkeypatch):
+    def fail(*args):
+        raise RuntimeError("database unavailable")
+    monkeypatch.setattr(web_app, "record_sorter_vote", fail)
+    async def request():
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=web_app.app), base_url="http://test") as client:
+            return await client.post("/api/sorter/vote", json={"winner_role_id": "a", "loser_role_id": "b"})
+    assert asyncio.run(request()).json() == {"recorded": False, "reason": "unavailable"}
 
 
 def test_leaderboard_limit_param_caps_entries(monkeypatch):
     seen_idols = []
     seen_groups = []
 
-    def fake_idols(limit):
+    def fake_idols(limit, include_provisional=True):
         seen_idols.append(limit)
         return bias.Leaderboard(
             entries=[
@@ -188,7 +172,7 @@ def test_leaderboard_limit_param_caps_entries(monkeypatch):
 
 def test_leaderboard_rejects_bad_kind_but_ignores_legacy_scope(monkeypatch):
     board = bias.Leaderboard(entries=[], vote_count=0, movement_baseline_date=None)
-    monkeypatch.setattr(web_app, "get_global_leaderboard", lambda limit: board)
+    monkeypatch.setattr(web_app, "get_global_leaderboard", lambda limit, include_provisional=True: board)
 
     async def request():
         transport = httpx.ASGITransport(app=web_app.app)
@@ -219,7 +203,7 @@ def test_global_idol_leaderboard_serializes_movement(monkeypatch):
         entries=board.entries, vote_count=1234,
         movement_baseline_date=datetime.date(2026, 9, 14),
     )
-    monkeypatch.setattr(web_app, "get_global_leaderboard", lambda limit: board)
+    monkeypatch.setattr(web_app, "get_global_leaderboard", lambda limit, include_provisional=True: board)
 
     async def request():
         transport = httpx.ASGITransport(app=web_app.app)
@@ -261,7 +245,7 @@ def test_leaderboard_image_priority_is_vendored_then_embed_then_database(monkeyp
         vote_count=10,
         movement_baseline_date=datetime.date(2026, 9, 14),
     )
-    monkeypatch.setattr(web_app, "get_global_leaderboard", lambda limit: board)
+    monkeypatch.setattr(web_app, "get_global_leaderboard", lambda limit, include_provisional=True: board)
     monkeypatch.setattr(
         web_app, "EMBED_PHOTOS", {
             "role-both": "https://images-ext-1.discordapp.net/external/SIG/x",
@@ -376,27 +360,19 @@ def test_prune_visitor_pair_votes_deletes_only_stale_days(monkeypatch):
     monkeypatch.setattr(bias, "_pool", lambda: FakePool())
 
     assert bias.prune_visitor_pair_votes() == 41
-    assert "DELETE FROM visitor_pair_votes" in executed["query"]
+    assert "DELETE FROM visitor_idol_budget" in executed["query"]
     assert "day < CURRENT_DATE - %s" in executed["query"]
     assert executed["params"] == (2,)
     assert bias.prune_visitor_pair_votes(-5) == 41
     assert executed["params"] == (0,)
 
 
-def test_shrunk_elo_pulls_thin_evidence_to_prior():
-    assert bias.shrunk_elo(1300, 200) == 1293
-    assert bias.shrunk_elo(1250, 3) == 1208
-    assert bias.shrunk_elo(1200, 0) == 1200
-    assert bias.shrunk_elo(1150, 60) == 1160
-    assert bias.shrunk_elo(1400, 10**9) == 1400
-
-
-def test_idol_board_ranks_shrunk_and_flags_fresh():
+def test_idol_board_uses_recorded_matchups_for_eligibility():
     board = bias._build_leaderboard(
         [
-            ("r-hot", "Hot", "G", 1500, "img", None, 200, None, 1493),
-            ("r-new", "New", "G", 1500, "img", None, 3, None, 1233),
-            ("r-solid", "Solid", "G", 1300, "img", None, 100, None, 1287),
+            ("r-hot", "Hot", "G", 1500, "img", None, 200, None, 1500),
+            ("r-new", "New", "G", 1200, "img", None, 0, None, 1200),
+            ("r-solid", "Solid", "G", 1300, "img", None, 1, None, 1300),
         ],
         303,
     )
@@ -586,3 +562,56 @@ def test_leaderboard_mine_tab_replays_sorter_session():
     assert "BiasSorter.replay" in script
     assert "/api/leaderboard?kind=" in script
     assert "scope=${scope}" not in script
+
+
+@pytest.mark.parametrize("payload", [None, [], "hello", 1, True, {}])
+def test_sorter_invalid_json_shapes_fail_closed(monkeypatch, payload):
+    response, recorded = _post_vote(monkeypatch, payload)
+    assert response.status_code == 200
+    assert response.json() == {"recorded": False, "reason": "invalid_payload"}
+    assert not recorded
+
+
+def test_sorter_unknown_id_is_observable_without_logging_identity(monkeypatch, caplog):
+    response, _ = _post_vote(monkeypatch,
+        {"winner_role_id": "missing-secret-marker", "loser_role_id": "r1"},
+        {"recorded": False, "reason": "unknown_id"})
+    assert response.json()["reason"] == "unknown_id"
+    assert "check catalog sync" in caplog.text
+    assert "missing-secret-marker" not in caplog.text
+
+
+def test_sorter_burst_limiter_allows_bursts_refills_and_bounds_memory(monkeypatch):
+    now = [100.0]
+    monkeypatch.setattr(web_app.time, "monotonic", lambda: now[0])
+    limiter = web_app._SorterBurstLimiter(burst=12, per_second=4, capacity=2)
+    assert all(limiter.allow("alice") for _ in range(12))
+    assert not limiter.allow("alice")
+    now[0] += .25
+    assert limiter.allow("alice")
+    assert not limiter.allow("alice")
+    assert limiter.allow("bob") and limiter.allow("charlie")
+    assert len(limiter._entries) == 2
+
+
+def test_rate_limited_vote_never_calls_database(monkeypatch):
+    class Deny:
+        def allow(self, key):
+            return False
+    monkeypatch.setattr(web_app, "_sorter_burst_limiter", Deny())
+    response, recorded = _post_vote(monkeypatch, {"winner_role_id": "a", "loser_role_id": "b"})
+    assert response.json() == {"recorded": False, "reason": "rate_limited"}
+    assert not recorded
+
+
+def test_sorter_can_opt_out_of_provisional_sample(monkeypatch):
+    seen = []
+    def board(limit, include_provisional=True):
+        seen.append((limit, include_provisional))
+        return bias.Leaderboard([], 0)
+    monkeypatch.setattr(web_app, "get_global_leaderboard", board)
+    async def request():
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=web_app.app), base_url="http://test") as client:
+            return await client.get('/api/leaderboard?kind=idols&limit=200&include_provisional=false')
+    assert asyncio.run(request()).status_code == 200
+    assert seen == [(200, False)]

@@ -68,7 +68,7 @@ def test_clean_content_apis_404():
 
 def test_clean_wholesome_still_served(monkeypatch):
     board = bias.Leaderboard(entries=[], vote_count=0, movement_baseline_date=None)
-    monkeypatch.setattr(web_app, "get_global_leaderboard", lambda limit: board)
+    monkeypatch.setattr(web_app, "get_global_leaderboard", lambda limit, include_provisional=True: board)
 
     sorter = _get("/sorter", host=CLEAN_HOST)
     assert sorter.status_code == 200
@@ -90,13 +90,10 @@ def test_clean_wholesome_still_served(monkeypatch):
 
 def test_clean_sorter_votes_still_count(monkeypatch):
     recorded = {}
-    monkeypatch.setattr(
-        web_app, "register_pair_vote", lambda token, day, pair: (1, True)
-    )
-    monkeypatch.setattr(
-        web_app, "record_sorter_vote",
-        lambda winner_id, loser_id, k: recorded.setdefault("args", (winner_id, loser_id, k)) or {"winner_delta": 4, "loser_delta": -4},
-    )
+    def record(winner_id, loser_id, token):
+        recorded["args"] = (winner_id, loser_id, token)
+        return {"recorded": True, "global_k": 8}
+    monkeypatch.setattr(web_app, "record_sorter_vote", record)
 
     async def request():
         transport = httpx.ASGITransport(app=web_app.app)
@@ -113,7 +110,8 @@ def test_clean_sorter_votes_still_count(monkeypatch):
     response = asyncio.run(request())
     assert response.status_code == 200
     assert response.json() == {"recorded": True, "global_k": 8}
-    assert recorded["args"] == ("role-a", "role-b", 8)
+    assert recorded["args"][:2] == ("role-a", "role-b")
+    assert recorded["args"][2]
 
 
 def test_clean_host_match_ignores_port():

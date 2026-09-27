@@ -20,6 +20,7 @@ from src.services.content_backfill import (
 
 from . import POOL
 from .content_update import INSERT_CONTENT_LINK, content_link_params
+from . import content_dedup
 
 DISCORD_EPOCH_MILLISECONDS = 1_420_070_400_000
 DEFAULT_BACKFILL_START_UTC = datetime(2025, 1, 1, tzinfo=timezone.utc)
@@ -180,6 +181,8 @@ def reconcile_page(
     """Plan one page and optionally commit its reconciled content rows."""
 
     with POOL.connection() as connection, connection.transaction(), connection.cursor() as cursor:
+        if apply and links:
+            cursor.execute(content_dedup.LOCK_SQL)
         decisions = plan_reconciliation(links, _candidate_rows(cursor, links))
         stats = summarize_decisions(decisions, messages_scanned=messages_scanned)
         if verbose:
@@ -200,4 +203,7 @@ def reconcile_page(
             return stats
 
         _apply_decisions(cursor, decisions, datetime.now(timezone.utc))
+        changed = [decision.link for decision in decisions if decision.action in {"insert", "update"}]
+        if changed:
+            content_dedup.reconcile_exact(cursor, roots={link.root_message_id for link in changed})
         return stats

@@ -7,6 +7,7 @@ import psycopg
 from src.content_ingestion import ContentLinkDraft
 
 from . import POOL
+from . import content_dedup
 
 INSERT_CONTENT_LINK = """
     INSERT INTO content_links
@@ -76,7 +77,13 @@ def reconcile_content_links(processed_date: datetime, links: list[ContentLinkDra
     with POOL.connection() as connection:
         with connection.transaction():
             with connection.cursor() as cursor:
-                return _insert_content_links(cursor, processed_date, links)
+                if links:
+                    cursor.execute(content_dedup.LOCK_SQL)
+                    inserted = _insert_content_links(cursor, processed_date, links)
+                    content_dedup.reconcile_exact(cursor, roots={link.root_message_id for link in links})
+                else:
+                    inserted = 0
+                return inserted
 
 
 def persist_content_update(processed_date: datetime, last_message_id: str, links: list[ContentLinkDraft]) -> int:
@@ -85,7 +92,11 @@ def persist_content_update(processed_date: datetime, last_message_id: str, links
     with POOL.connection() as connection:
         with connection.transaction():
             with connection.cursor() as cursor:
+                if links:
+                    cursor.execute(content_dedup.LOCK_SQL)
                 inserted_count = _insert_content_links(cursor, processed_date, links)
+                if links:
+                    content_dedup.reconcile_exact(cursor, roots={link.root_message_id for link in links})
                 cursor.execute(
                     """
                     INSERT INTO update_log (processed_date, last_message_id, rows_inserted)

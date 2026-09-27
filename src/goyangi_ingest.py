@@ -4,20 +4,26 @@ Embed-only policy: gif filetype, direct/imgur origin, cdn preview URLs.
 Discord-origin contents are always skipped (dupes or attachment posts).
 Idempotent: unique index on (goyangi_content_id, role_id) plus exact-URL
 and mirror imgur-ID pre-checks. Cursor lives in goyangi_ingest_state and
-never touches update_log.
+never touches update_log. Fingerprint-only set suppression stays pending until
+GOYANGI_ALLOW_VISUAL_AUTO_DEDUPE=1 explicitly enables it.
 """
 
 from __future__ import annotations
 
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
-from typing import Any
-from urllib.parse import urlsplit
 
 import requests
 
 from src.db import POOL
+from src.content_dedup import (
+    MediaSet, MediaSetIndex, media_key, exact_match, candidate_posts, media_signature,
+    visual_auto_dedupe_enabled, VISUAL_REVIEW_REASON,
+)
+from src.db import content_dedup as dedup_db
+from src.services.content_fingerprint import Fingerprinter, Unverified
 
 API_BASE = "https://api.goyangi.pics/api/collections/contents_sets/records"
 PAGE_DELAY_SECONDS = 1.2
@@ -98,32 +104,8 @@ def resolve_role(code: str, lookup: dict[tuple[str, str], str], groups: set[str]
 
 
 def _imgur_ids(url: str) -> set[str]:
-    host = (urlsplit(url).hostname or "").lower()
-    if "imgur.com" not in host and "imgur.gg" not in host:
-        return set()
-    ids: set[str] = set()
-    for token in re.findall(r"[A-Za-z0-9]{5,}", urlsplit(url).path):
-        if token.lower() not in {"gallery", "album", "a"}:
-            ids.add(token)
-    return ids
-
-
-def load_dedup_state() -> tuple[set[str], set[str], set[str]]:
-    """Return (exact_urls, goyangi_content_ids, imgur_ids) from content_links."""
-
-    exact: set[str] = set()
-    goyangi_ids: set[str] = set()
-    imgur_ids: set[str] = set()
-    with POOL.connection() as connection:
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT url, goyangi_content_id FROM content_links;")
-            for url, content_id in cursor.fetchall():
-                if isinstance(url, str) and url:
-                    exact.add(url)
-                    imgur_ids.update(_imgur_ids(url))
-                if content_id:
-                    goyangi_ids.add(str(content_id))
-    return exact, goyangi_ids, imgur_ids
+    key = media_key(url)
+    return {key} if key.startswith("imgur:") else set()
 
 
 def parse_created(value: object) -> datetime | None:
@@ -169,6 +151,21 @@ def fetch_sets(since: str | None, per_page: int, max_sets: int,
         page += 1
         time.sleep(PAGE_DELAY_SECONDS)
     return out[:max_sets]
+
+
+def fetch_set(set_id: str) -> dict:
+    """Fetch one older set queued for a delayed cross-source recheck."""
+    response = requests.get(
+        f"{API_BASE}/{set_id}",
+        params={"expand": "idol,group,uploader,contents_via_set,contents_via_set.idol,"
+                           "contents_via_set.group,contents_via_set.uploader"},
+        timeout=10,
+    )
+    response.raise_for_status()
+    item = response.json()
+    if not isinstance(item.get("expand", {}).get("contents_via_set"), (list, dict)):
+        raise ValueError("Goyangi set response omitted expanded contents")
+    return item
 
 
 def iter_contents(item: dict) -> tuple[dict[str, str], dict[str, str], list[dict]]:
@@ -249,120 +246,185 @@ def read_cursor() -> tuple[datetime | None, str | None]:
     return row[0], (str(row[1]) if row[1] is not None else None)
 
 
+def _set_media(item, lookup, groups):
+    media = MediaSet(str(item['id']), complete=False)
+    codes, _, contents = iter_contents(item)
+    expanded = (item.get('expand') or {}).get('contents_via_set')
+    complete = isinstance(expanded, (list, dict)) and bool(contents)
+    for content in contents:
+        if content.get('filetype') != 'gif':
+            continue
+        idols = content.get('idol') or []
+        content_roles = [
+            (idol, resolve_role(codes.get(str(idol), ''), lookup, groups))
+            for idol in idols
+        ]
+        if not content_roles or not content.get('preview') or not content.get('id'):
+            complete = False
+            continue
+        if any(role is None for _, role in content_roles):
+            complete = False
+        for idol, role in content_roles:
+            if role:
+                media.add(role, content['preview'], parse_created(content.get('created')),
+                          content.get('id'), content.get('original'), content.get('mirror'))
+    media.complete = complete and bool(media.members)
+    return media
+
+
+def _signature(posts):
+    return tuple(sorted((p.id, media_signature(p)) for p in posts))
+
+
 def run_pass(*, since: str | None, per_page: int, max_sets: int, apply: bool) -> dict:
-    """Fetch, decide, and optionally insert one pass. Returns a summary.
+    """Discord-first ingest. Unverified candidate sets survive cursor advances.
 
-    ``since=None`` resumes from the stored cursor minus a small overlap, so
-    scheduled runs only ever scan ~1 page. Pass an explicit ``since`` for
-    backfills. The cursor only ever moves forward.
+    Fetch/decoding happens outside write transactions. The final check and
+    mutations share a transaction lock with Discord ingestion and cleanup.
     """
-
     if since is None:
         cursor_created, _ = read_cursor()
         if cursor_created is not None:
             since = (cursor_created - CURSOR_OVERLAP).strftime("%Y-%m-%d %H:%M:%S")
-
     lookup, groups = build_role_lookup()
-    exact, goyangi_ids, imgur_ids = load_dedup_state()
-    sets = fetch_sets(since, per_page, max_sets)
-    summary: dict[str, Any] = {"sets": len(sets), "contents": 0, "inserted": 0, "skipped": 0}
-    decisions: dict[str, int] = {}
-    high_watermark: tuple[datetime, str] | None = None
-
-    with POOL.connection() as connection:
-        with connection.transaction():
-            with connection.cursor() as cursor:
-                for item in sets:
-                    idol_codes, uploaders, contents = iter_contents(item)
-                    for content in contents:
-                        summary["contents"] += 1
-                        created = parse_created(content.get("created"))
-                        cid = str(content.get("id") or "")
-                        if created is not None and (
-                            high_watermark is None or (created, cid) > high_watermark
-                        ):
-                            high_watermark = (created, cid)
-                        decision, roles, _ = decide(content, idol_codes, lookup, groups,
-                                                    exact, goyangi_ids, imgur_ids)
-                        decisions[decision] = decisions.get(decision, 0) + 1
-                        if decision != "would-insert":
-                            summary["skipped"] += 1
-                            continue
-                        rows = _draft_rows(content, roles, uploaders,
-                                           str(item.get("id") or ""))
-                        for row in rows:
-                            if apply:
-                                cursor.execute(INSERT_GOYANGI_LINK, row)
-                                summary["inserted"] += cursor.rowcount
-                            else:
-                                summary["inserted"] += 1
-                            # In-memory guard so one pass never double-inserts.
-                            goyangi_ids.add(str(content.get("id")))
-                            exact.add(str(content.get("preview")))
-                if apply and high_watermark is not None:
-                    cursor.execute(
-                        """
-                        UPDATE goyangi_ingest_state
-                        SET last_content_created = %s, last_content_id = %s,
-                            updated_at = NOW()
-                        WHERE id = 1
-                          AND (
-                              last_content_created IS NULL
-                              OR last_content_created < %s
-                              OR (last_content_created = %s AND (last_content_id IS NULL OR last_content_id < %s))
-                          );
-                        """,
-                        (*high_watermark, high_watermark[0], high_watermark[0], high_watermark[1]),
-                    )
-    summary["decisions"] = decisions
-    summary["high_watermark"] = (
-        (high_watermark[0].isoformat(), high_watermark[1]) if high_watermark else None
-    )
+    fetched = fetch_sets(since, per_page, max_sets)
+    with POOL.connection() as connection, connection.cursor() as cursor:
+        discord, existing = dedup_db.load_sets(cursor)
+        blocked = dedup_db.blocked_sets(cursor)
+        cursor.execute("SELECT payload FROM goyangi_pending_sets WHERE retry_after <= NOW() ORDER BY random() LIMIT %s", (max_sets,))
+        pending = [r[0] for r in cursor.fetchall()]
+        cursor.execute("SELECT set_id FROM goyangi_pending_sets WHERE retry_after > NOW()")
+        cooling = {r[0] for r in cursor.fetchall()}
+    # Fresh metadata takes precedence over a stored retry payload. Existing
+    # pre-migration rows carry no Goyangi mirror metadata, so hydrate a bounded
+    # number of those sets by their stable API ID before media verification.
+    items = {item['id']: item for item in pending}
+    items.update({item['id']: item for item in fetched if item['id'] not in cooling})
+    hydrate_errors = {}
+    hydrate = [(sid, item) for sid, item in items.items() if item.get('existing_only')][:25]
+    if hydrate:
+        with ThreadPoolExecutor(max_workers=min(5, len(hydrate))) as executor:
+            futures = {executor.submit(fetch_set, sid): sid for sid, _ in hydrate}
+            for future in as_completed(futures):
+                sid = futures[future]
+                try:
+                    items[sid] = future.result()
+                except (requests.RequestException, ValueError) as error:
+                    hydrate_errors[sid] = type(error).__name__
+    existing = {item.id: item for item in existing}
+    discord_index = MediaSetIndex(discord)
+    fingerprinter = Fingerprinter(cache_writes=apply)
+    plans = []
+    high_watermark = None
+    for item in fetched:
+        for content in iter_contents(item)[2]:
+            created = parse_created(content.get('created'))
+            if created:
+                point = (created, str(content.get('id') or ''))
+                high_watermark = max(high_watermark, point) if high_watermark else point
+    for sid, item in items.items():
+        if sid in blocked:
+            plans.append((item, None, None, 'blocked', []))
+            continue
+        media = existing.get(sid) if item.get('existing_only') else _set_media(item, lookup, groups)
+        if sid in hydrate_errors:
+            plans.append((item, media, None, 'Goyangi metadata unavailable: ' + hydrate_errors[sid], []))
+            continue
+        if media is None or not media.urls:
+            plans.append((item, media, None, 'empty', []))
+            continue
+        match = exact_match(media, discord_index)
+        candidates = candidate_posts(media, discord_index)
+        reason = None
+        if not match and candidates and media.complete:
+            try:
+                match = fingerprinter.match(media, candidates)
+            except Unverified as error:
+                reason = str(error)
+        if (match and match[1].get('kind') == 'video-fingerprint-v1'
+                and not visual_auto_dedupe_enabled()):
+            match = None
+            reason = VISUAL_REVIEW_REASON
+        if not media.complete and item.get('existing_only'):
+            reason = 'complete Goyangi set metadata unavailable'
+        if not match and not reason and media.dates and (
+            datetime.now(timezone.utc) - max(media.dates) < timedelta(minutes=15)
+        ):
+            reason = 'waiting 15 minutes for Discord'
+        plans.append((item, media, match, reason, _signature(candidates)))
+    summary = {'sets': len(items), 'contents': 0, 'inserted': 0, 'skipped': 0,
+               'deleted': 0, 'duplicate_sets': 0, 'deferred_sets': 0, 'decisions': {}}
+    with POOL.connection() as connection, connection.transaction(), connection.cursor() as cursor:
+        cursor.execute(dedup_db.LOCK_SQL)
+        fresh_discord, _ = dedup_db.load_sets(cursor)
+        fresh_index = MediaSetIndex(fresh_discord)
+        blocked = dedup_db.blocked_sets(cursor)
+        # Load under the same lock, using this connection (pool may have size 1).
+        cursor.execute('SELECT url, goyangi_content_id FROM content_links')
+        rows = cursor.fetchall()
+        exact = {r[0] for r in rows}
+        ids = {str(r[1]) for r in rows if r[1]}
+        imgur_ids = {key for url in exact for key in _imgur_ids(url)}
+        for item, media, match, reason, signature in plans:
+            sid = item['id']
+            codes, uploaders, contents = iter_contents(item)
+            summary['contents'] += len(contents)
+            if sid in blocked:
+                summary['skipped'] += len(contents)
+                summary['duplicate_sets'] += 1
+                continue
+            if media:
+                # Exact matches have priority, including Discord arrivals while
+                # we were downloading. Never act on stale visual evidence.
+                fresh_match = exact_match(media, fresh_index)
+                if fresh_match:
+                    match, reason = fresh_match, None
+                elif _signature(candidate_posts(media, fresh_index)) != signature:
+                    match, reason = None, 'Discord changed during verification'
+            if match:
+                post, evidence = match
+                if apply:
+                    summary['deleted'] += dedup_db.remove_set(cursor, sid, post.id, evidence)
+                summary['duplicate_sets'] += 1
+                summary['skipped'] += len(contents)
+                continue
+            if reason and reason != 'empty':
+                if apply:
+                    dedup_db.defer_set(cursor, item, reason)
+                summary['deferred_sets'] += 1
+                summary['skipped'] += len(contents)
+                continue
+            for content in contents:
+                decision, roles, _ = decide(content, codes, lookup, groups, exact, ids, imgur_ids)
+                summary['decisions'][decision] = summary['decisions'].get(decision, 0) + 1
+                if decision != 'would-insert':
+                    summary['skipped'] += 1
+                    continue
+                for row in _draft_rows(content, roles, uploaders, sid):
+                    if apply:
+                        cursor.execute(INSERT_GOYANGI_LINK, row)
+                        summary['inserted'] += cursor.rowcount
+                    else:
+                        summary['inserted'] += 1
+                ids.add(str(content.get('id')))
+                exact.add(str(content.get('preview')))
+            if apply:
+                # Discord writes enqueue only likely candidates. Keeping every
+                # successfully ingested set here would create an endless queue.
+                cursor.execute('DELETE FROM goyangi_pending_sets WHERE set_id=%s', (sid,))
+        if apply and high_watermark:
+            cursor.execute("""UPDATE goyangi_ingest_state
+                SET last_content_created=%s,last_content_id=%s,updated_at=NOW()
+                WHERE id=1 AND (last_content_created IS NULL OR
+                  (last_content_created, COALESCE(last_content_id,'')) < (%s,%s))""",
+                (*high_watermark, *high_watermark))
+    summary['high_watermark'] = (high_watermark[0].isoformat(), high_watermark[1]) if high_watermark else None
     return summary
 
 
 def sweep_forward_race(*, apply: bool, limit: int = 500) -> dict:
-    """Find Discord-ingested viewer links duplicating goyangi-sourced rows.
-
-    Keeps the goyangi row (stable cdn URL + provenance) and reports, or with
-    apply=True deletes, the newer Discord-side viewer-link row.
-    """
-
-    with POOL.connection() as connection:
-        with connection.transaction():
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT content_link_id, url, uploaded_date,
-                           split_part(substring(url from '/v/([^/?#]+)'), '.', 1)
-                               AS viewer_id
-                    FROM content_links
-                    WHERE url LIKE '%%goyangi.pics/v/%%'
-                      AND source_message_id IS NOT NULL
-                    LIMIT %s;
-                    """,
-                    (limit,),
-                )
-                viewer_rows = cursor.fetchall()
-                cursor.execute(
-                    """
-                    SELECT content_link_id, goyangi_content_id, url, uploaded_date
-                    FROM content_links
-                    WHERE source_kind = 'goyangi' AND goyangi_content_id IS NOT NULL;
-                    """
-                )
-                keep = {str(row[1]): row for row in cursor.fetchall()}
-                pairs: list[tuple] = []
-                for link_id, url, uploaded, viewer_id in viewer_rows:
-                    if viewer_id and viewer_id in keep:
-                        pairs.append((link_id, url, uploaded, keep[viewer_id]))
-                deleted = 0
-                if apply:
-                    for link_id, _, _, _ in pairs:
-                        cursor.execute(
-                            "DELETE FROM content_links WHERE content_link_id = %s;",
-                            (link_id,),
-                        )
-                        deleted += cursor.rowcount
-    return {"candidates": len(pairs), "deleted": deleted,
-            "pairs": [(p[1], p[3][2]) for p in pairs[:10]]}
+    """Compatibility entrypoint: now ALWAYS removes Goyangi, never Discord."""
+    from src.services.goyangi_cleanup import cleanup
+    result = cleanup(apply=apply, confirmed=False, verify_media=False, limit=limit)
+    return {'candidates': len(result['matches']), 'deleted': result['deleted'],
+            'pairs': [(m['set_id'], m['discord_root_id']) for m in result['matches']]}

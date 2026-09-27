@@ -3,7 +3,7 @@
 The SQL files are the existing Hanni schema history copied into this web-only
 repository. For a fresh database, apply `create_tables.sql`, then `roles.sql`,
 then `content.sql`, followed by `table_updates.sql` and
-`table_updates2.sql` through `table_updates41.sql` in numeric order. For the
+`table_updates2.sql` through `table_updates43.sql` in numeric order. For the
 existing Heroku Postgres database, apply only migrations it does not already
 have. Do not recreate the production database.
 
@@ -27,6 +27,13 @@ qualifies an idol for a numbered rank; no contributor threshold is required.
 `goyangi_ingest_state` cursor, and seeds content IDs from stored viewer links.
 `table_updates41.sql` adds the generated `set_key` column (Discord root
 message or goyangi set) backing the /sets feed.
+`table_updates42.sql` adds the Discord-first Goyangi duplicate archive, suppression,
+pending-verification queue, and insert guard. `table_updates43.sql` narrows that
+guard to inserts, avoiding unnecessary global locking on unrelated content updates.
+Fingerprint-only matches remain pending by default; set
+`GOYANGI_ALLOW_VISUAL_AUTO_DEDUPE=1` for the worker or pass
+`--allow-visual-delete` to the one-time cleanup script after validating its
+thresholds against real duplicate and nonduplicate sets.
 
 Migration 39 contains no catalog rows. `scripts/sync_sorter_idols.py` is the
 only catalog inserter; it uses `catalog_rating_rows()` to resolve the current

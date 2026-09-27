@@ -279,21 +279,6 @@ Deno.test("browser flow supports offline seeding, sort undo, adaptive review und
   assert.equal(ui.element("results").hidden, false);
   assert.equal(ui.session().verifyRounds.length, 1);
   assert.equal(ui.session().verify, null);
-  // The Mine tab must use the same completed review evidence as the sorter.
-  const reviewed = ui.session();
-  const expected = Sorter.ranking(Sorter.replay(reviewed.ids, reviewed.choices,
-    reviewed.algorithm, reviewed.matchups), reviewed.verifyRounds).flat();
-  const mine = ui.element("mine-tab"); mine.dataset.scope = "personal";
-  ui.document.querySelectorAll = (selector) => selector === "[data-scope]" ? [mine] : [];
-  vm.runInContext(readFileSync(new URL("../static/leaderboard.js", import.meta.url), "utf8"), ui.context);
-  for (let i = 0; i < 10; i++) await Promise.resolve();
-  mine.click();
-  for (let i = 0; i < 20; i++) await Promise.resolve();
-  const html = ui.element("board").innerHTML;
-  const champion = ui.catalog.entries.find((entry) => entry.id === expected[0]);
-  assert.ok(html.includes("your sorter ranking"));
-  assert.ok(html.includes(champion.short || champion.name));
-  assert.ok(!html.includes("Ranking in progress"));
   ui.element("undo-final").click();
   assert.equal(ui.session().verifyRounds.length, 0);
   assert.equal(ui.session().choices.length, ui.session().matchups.length);
@@ -312,7 +297,10 @@ Deno.test("completed rankings survive expiry and remain available until a new so
   assert.equal(ui.element("resume-banner").hidden, false);
   assert.equal(ui.element("resume").textContent, "View results →");
   assert.ok(ui.element("resume-message").textContent.includes("Your ranking is ready"));
-  assert.deepEqual(ui.session(), completed, "visiting setup does not rewrite the saved ranking");
+  assert.equal(ui.element("results").hidden, false, "a finished ranking opens right on this page");
+  const reopened = ui.session();
+  assert.deepEqual(reopened.choices, completed.choices, "revisiting does not rewrite the saved ranking");
+  assert.deepEqual(reopened.ids, completed.ids, "revisiting does not rewrite the saved ranking");
   ui.element("resume").click();
   assert.equal(ui.element("results").hidden, false);
   ui.element("new-lineup").click();

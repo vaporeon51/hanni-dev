@@ -550,18 +550,9 @@ def test_leaderboard_page_renders():
     response = asyncio.run(request())
     assert response.status_code == 200
     assert "/static/leaderboard.js?v=" in response.text
-    assert "/static/sorter/engine.js?v=" in response.text
-    assert 'data-scope="personal"' in response.text
+    assert "/static/sorter/engine.js?v=" not in response.text
+    assert 'data-scope' not in response.text
     assert 'data-kind="groups"' in response.text
-
-
-def test_leaderboard_mine_tab_replays_sorter_session():
-    script = (web_app.REPO_ROOT / "static" / "leaderboard.js").read_text()
-
-    assert "bias-club-session-v1" in script
-    assert "BiasSorter.replay" in script
-    assert "/api/leaderboard?kind=" in script
-    assert "scope=${scope}" not in script
 
 
 @pytest.mark.parametrize("payload", [None, [], "hello", 1, True, {}])

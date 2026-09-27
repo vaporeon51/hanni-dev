@@ -955,6 +955,25 @@ dialog p {
   font-size: 15px;
   line-height: 1.7;
 }
+.help-steps {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.help-steps li {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  font-size: 15px;
+  line-height: 1.6;
+}
+.help-steps li > span:first-child {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent, #b84d79);
+}
 .close {
   float: right;
   padding: 2px 9px;

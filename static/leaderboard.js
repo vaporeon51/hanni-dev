@@ -1,13 +1,11 @@
-/* Leaderboard ♡ — global ELO board plus your own sorter ranking.
+/* Leaderboard ♡ — global ELO board.
  *
- * Global tabs fetch the server ELO board. The Mine tab renders your last
- * sorter session straight from localStorage, using its versioned engine and
- * completed refinement rounds to match the sorter results page.
+ * Fetches the server ELO board. Your own ranking lives on the sorter page;
+ * finishing there is what moves these shared boards.
  */
 (() => {
   "use strict";
   const $ = (id) => document.getElementById(id);
-  let scope = "global";
   let kind = "idols";
 
   const escape = (value) =>
@@ -138,12 +136,7 @@
       });
       html += "</div>";
     }
-    const basis =
-      scope === "global"
-        ? `Based on ${board.vote_count.toLocaleString()} recorded matchups`
-        : board.vote_count > 0
-          ? `Based on ${board.vote_count.toLocaleString()} of your recorded matchups`
-          : "Your votes will shape this board";
+    const basis = `Based on ${board.vote_count.toLocaleString()} recorded matchups`;
     const movement = hasBaseline ? ` · Movement since ${escape(board.movement_baseline_date)}` : "";
     const explain = " · ELO reflects head-to-head preferences; ♡ counts recorded matchups";
     html += `<p class="board-foot">${basis}${movement}${explain}</p>`;
@@ -203,173 +196,12 @@
       });
       html += "</div>";
     }
-    const basis =
-      scope === "global"
-        ? `Based on ${board.vote_count.toLocaleString()} recorded matchups`
-        : board.vote_count > 0
-          ? `Based on ${board.vote_count.toLocaleString()} of your recorded matchups`
-          : "Your votes will shape this board";
+    const basis = `Based on ${board.vote_count.toLocaleString()} recorded matchups`;
     html += `<p class="board-foot">${basis} · Group rankings cover the original member catalog; ELO averages the top ${board.top_n} scores · ♡ counts their matchups</p>`;
     return html;
   }
 
-  function renderEmpty() {
-    return `<div class="empty"><div class="big">♡</div><h2>No finished ranking yet</h2><p>Finish a sorter run and your ranking will show up here — exactly as the sorter called it.</p><a href="/sorter">Start sorting →</a></div>`;
-  }
-
-  function mineImg(item, cls) {
-    return `<img src="${escape(item.img)}" alt="${escape(item.name)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='${fallbackImage()}'" class="${cls}">`;
-  }
-
-  function minePodiumCard(item, rank) {
-    return `<div class="podium-card${rank === 1 ? " first" : ""}"><div class="podium-photo">${mineImg(item, "")}<span class="podium-rank">#${rank}</span></div><strong>${escape(item.name)}</strong><small>${escape(item.group)}</small></div>`;
-  }
-
-  function mineMiniCard(item) {
-    return `<div class="mini-card"><div class="mini-photo">${mineImg(item, "")}<span class="mini-rank">#${item.rank}</span></div><strong>${escape(item.name)}</strong><small>${escape(item.group)}</small></div>`;
-  }
-
-  function mineListRow(item) {
-    return `<div class="row"><span class="row-rank">#${item.rank}</span>${mineImg(item, "row-thumb")}<div class="row-names"><strong>${escape(item.name)}</strong><small>${escape(item.group)}</small></div></div>`;
-  }
-
-  function renderMine(ranked, session) {
-    const tops = ranked.slice(0, 3);
-    const gridFour = ranked.slice(3, 7);
-    const gridFive = ranked.slice(7, 12);
-    const rest = ranked.slice(12);
-    let html = "";
-    if (tops.length) {
-      const ordered = [tops[1], tops[0], tops[2]].filter(Boolean);
-      html += '<div class="podium">';
-      ordered.forEach((item) => {
-        html += minePodiumCard(item, item.rank);
-      });
-      html += "</div>";
-    }
-    if (gridFour.length) {
-      html += '<div class="mini-grid mini-grid-4">';
-      gridFour.forEach((item) => {
-        html += mineMiniCard(item);
-      });
-      html += "</div>";
-    }
-    if (gridFive.length) {
-      html += '<div class="mini-grid mini-grid-5">';
-      gridFive.forEach((item) => {
-        html += mineMiniCard(item);
-      });
-      html += "</div>";
-    }
-    if (rest.length) {
-      html += '<div class="rows">';
-      rest.forEach((item) => {
-        html += mineListRow(item);
-      });
-      html += "</div>";
-    }
-    html += `<p class="board-foot">your sorter ranking · ${session.ids.length} ${escape(session.mode)} · ${session.choices.length} matchups · <a href="/sorter">open in sorter →</a></p>`;
-    return html;
-  }
-
-  function validMineSession(session) {
-    return (
-      !!session &&
-      ["idols", "groups"].includes(session.mode) &&
-      Array.isArray(session.ids) &&
-      session.ids.length >= 2 &&
-      session.ids.length <= 2000 &&
-      new Set(session.ids).size === session.ids.length &&
-      BiasSorter.validAlgorithm(session.algorithm, session.ids) &&
-      Array.isArray(session.choices) &&
-      session.choices.length <= BiasSorter.bound(session.ids.length, session.algorithm) &&
-      session.choices.every((c) => ["left", "right", "tie"].includes(c)) &&
-      (session.verifyRounds === undefined || (Array.isArray(session.verifyRounds) &&
-        session.verifyRounds.length <= 25 && session.verifyRounds.every((round) =>
-          Array.isArray(round) && round.length <= 40 && round.every((p) =>
-            p && p.a !== p.b && session.ids.includes(p.a) && session.ids.includes(p.b) &&
-            (p.winner === "tie" || p.winner === p.a || p.winner === p.b)))))
-    );
-  }
-
-  async function loadMine() {
-    const board = $("board");
-    board.innerHTML = '<div class="loading">Finding your ranking</div>';
-    if (typeof BiasSorter === "undefined") {
-      board.innerHTML = '<div class="loading">Could not load the sorter engine. Please refresh to try again.</div>';
-      return;
-    }
-    let session = null;
-    try {
-      session = JSON.parse(localStorage.getItem("bias-club-session-v1"));
-    } catch {
-      session = null;
-    }
-    if (!validMineSession(session)) {
-      board.innerHTML = renderEmpty();
-      return;
-    }
-    let catalog;
-    let embeds = {};
-    try {
-      const [catalogResponse, embedsResponse] = await Promise.all([
-        fetch("/static/sorter/catalog.json", { credentials: "same-origin" }),
-        fetch("/static/sorter/embed-photos.json", { credentials: "same-origin" }),
-      ]);
-      if (!catalogResponse.ok) throw new Error("catalog " + catalogResponse.status);
-      catalog = await catalogResponse.json();
-      if (embedsResponse.ok) {
-        const embedsData = await embedsResponse.json();
-        embeds = (embedsData && embedsData.by_role) || {};
-      }
-    } catch {
-      board.innerHTML = '<div class="loading">Could not load the idol catalog. Please refresh to try again.</div>';
-      return;
-    }
-    if ((catalog.version || "2025-11-01") !== session.version) {
-      board.innerHTML = renderEmpty();
-      return;
-    }
-    const byId = new Map(catalog.entries.map((item) => [item.id, item]));
-    if (!session.ids.every((id) => byId.has(id))) {
-      board.innerHTML = renderEmpty();
-      return;
-    }
-    let sorter = null;
-    try {
-      sorter = BiasSorter.replay(session.ids, session.choices, session.algorithm, session.matchups);
-    } catch {
-      board.innerHTML = renderEmpty();
-      return;
-    }
-    if (!sorter.result) {
-      board.innerHTML = `<div class="empty"><div class="big">♡</div><h2>Ranking in progress</h2><p>${session.choices.length} choices in — pick up where you left off.</p><a href="/sorter">Resume sorting →</a></div>`;
-      return;
-    }
-    const imageURL = (item) =>
-      item.local || (item.role_id && embeds[item.role_id]) || item.fallback;
-    const ranked = [];
-    let rank = 1;
-    BiasSorter.ranking(sorter, session.verifyRounds).forEach((bucket) => {
-      bucket.forEach((id) => {
-        const item = byId.get(id);
-        ranked.push({
-          rank,
-          name: item.short || item.name,
-          group: item.group || "Group",
-          img: imageURL(item),
-        });
-      });
-      rank += bucket.length;
-    });
-    board.innerHTML = renderMine(ranked, session);
-  }
-
   async function load() {
-    if (scope === "personal") {
-      loadMine();
-      return;
-    }
     const board = $("board");
     board.innerHTML = '<div class="loading">Gathering idols</div>';
     try {
@@ -389,24 +221,11 @@
   }
 
   function syncTabs() {
-    document.querySelectorAll("[data-scope]").forEach((b) =>
-      b.setAttribute("aria-pressed", String(b.dataset.scope === scope)),
-    );
     document.querySelectorAll("[data-kind]").forEach((b) =>
       b.setAttribute("aria-pressed", String(b.dataset.kind === kind)),
     );
-    const subtabs = document.querySelector(".subtabs");
-    if (subtabs) subtabs.hidden = scope === "personal";
   }
 
-  document.querySelectorAll("[data-scope]").forEach((button) => {
-    button.addEventListener("click", () => {
-      if (scope === button.dataset.scope) return;
-      scope = button.dataset.scope;
-      syncTabs();
-      load();
-    });
-  });
   document.querySelectorAll("[data-kind]").forEach((button) => {
     button.addEventListener("click", () => {
       if (kind === button.dataset.kind) return;

@@ -638,11 +638,31 @@
     // for direct loads with no prior entry.
     let pushedFromSetup = false;
     let pendingToast = "";
+    // History is best-effort: real browsers always have window.history, but
+    // minimal DOM stubs (and privacy modes) may not. Views must work either
+    // way — Back just exits when tagging is unavailable.
+    function histState() {
+      try {
+        return (window.history || history)?.state?.sorterView;
+      } catch {
+        return undefined;
+      }
+    }
+    function goBack() {
+      try {
+        const h = window.history || history;
+        if (typeof h.back === "function") h.back();
+      } catch {
+        /* no history to pop — caller falls back to setView */
+      }
+    }
     function tagView(next, action, url) {
       try {
+        const h = window.history || history;
+        const target = url || location.pathname + location.search;
         const state = { sorterView: next };
-        if (action === "push") window.history.pushState(state, "", url || location.pathname + location.search);
-        else window.history.replaceState(state, "", url || location.pathname + location.search);
+        if (action === "push" && typeof h.pushState === "function") h.pushState(state, "", target);
+        else if (typeof h.replaceState === "function") h.replaceState(state, "", target);
       } catch {
         /* history unavailable — views still work, Back just exits */
       }
@@ -651,7 +671,7 @@
       if (view !== next) setView(next);
       if (action === "push" || action === "replace") tagView(next, action);
     }
-    window.addEventListener("popstate", (event) => {
+    if (typeof window.addEventListener === "function") window.addEventListener("popstate", (event) => {
       const target = event.state?.sorterView;
       if (!target || target === view || !session || !sorter) return;
       if (target === "setup") {
@@ -894,9 +914,9 @@
     $("pause").onclick = () => {
       save();
       updateResumeBanner();
-      if (pushedFromSetup && window.history.state?.sorterView === "sorting") {
+      if (pushedFromSetup && histState() === "sorting") {
         pushedFromSetup = false;
-        window.history.back();
+        goBack();
       } else {
         pushedFromSetup = false;
         goView("setup", "replace");
@@ -1167,9 +1187,9 @@
       const message = moved ? `${moved} favorite${moved === 1 ? "" : "s"} moved ♡` : "Ranking checked ♡";
       // Pop the verifying entry so Back never lands on a spent round;
       // the popstate handler re-renders results and shows this toast.
-      if (window.history.state?.sorterView === "verifying") {
+      if (histState() === "verifying") {
         pendingToast = message;
-        window.history.back();
+        goBack();
       } else {
         goView("results", "replace");
         toast(message);
@@ -1181,8 +1201,8 @@
       if (verify && !verify.picks.length) session.verify = null;
       verify = null;
       save();
-      if (window.history.state?.sorterView === "verifying") {
-        window.history.back();
+      if (histState() === "verifying") {
+        goBack();
       } else {
         goView("results", "replace");
         renderResults();
@@ -1194,9 +1214,9 @@
       document.querySelectorAll("[data-mode]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.mode === mode));
       updateResumeBanner();
       refresh();
-      if (pushedFromSetup && window.history.state?.sorterView === "results") {
+      if (pushedFromSetup && histState() === "results") {
         pushedFromSetup = false;
-        window.history.back();
+        goBack();
       } else {
         pushedFromSetup = false;
         goView("setup", "replace");
@@ -1325,7 +1345,14 @@
         toast("That session link could not be read. Your lineup is ready below.");
       }
     } else {
-      tagView(view, "replace");
+      // A finished ranking opens right here on this page — no hunting under
+      // another tab. Back still steps to the lineup below.
+      const saved = readSavedState(key, true);
+      if (saved && Number.isFinite(saved.finished) && saved.finished > 0 && resume(saved, "push")) {
+        pushedFromSetup = true;
+      } else {
+        tagView(view, "replace");
+      }
     }
   }
 

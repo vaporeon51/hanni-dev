@@ -630,6 +630,105 @@
       window.scrollTo({ top: 0, behavior: "instant" });
       if (next !== "setup") $(shown).focus({ preventScroll: true });
     }
+    // Browser-back support, kept deliberately tiny: view-level entries only
+    // (never per pick), stack never deeper than setup → results → verifying.
+    // Back never mutates votes; finishing replaces the dead sorting entry so
+    // Back from results lands on setup instead of bouncing back to results.
+    // In-app back buttons delegate to history.back() with a setView fallback
+    // for direct loads with no prior entry.
+    let pushedFromSetup = false;
+    let pendingToast = "";
+    function tagView(next, action, url) {
+      try {
+        const state = { sorterView: next };
+        if (action === "push") window.history.pushState(state, "", url || location.pathname + location.search);
+        else window.history.replaceState(state, "", url || location.pathname + location.search);
+      } catch {
+        /* history unavailable — views still work, Back just exits */
+      }
+    }
+    function goView(next, action = "none") {
+      if (view !== next) setView(next);
+      if (action === "push" || action === "replace") tagView(next, action);
+    }
+    window.addEventListener("popstate", (event) => {
+      const target = event.state?.sorterView;
+      if (!target || target === view || !session || !sorter) return;
+      if (target === "setup") {
+        verify = null;
+        pushedFromSetup = false;
+        save();
+        updateResumeBanner();
+        setView("setup");
+        return;
+      }
+      if (target === "sorting") {
+        if (sorter.result) {
+          goView("results", "replace");
+          renderResults();
+          return;
+        }
+        verify = null;
+        pushedFromSetup = true;
+        setView("sorting");
+        renderBattle();
+        return;
+      }
+      if (target === "results") {
+        verify = null;
+        if (!sorter.result) {
+          if (session.choices) {
+            setView("sorting");
+            renderBattle();
+          } else setView("setup");
+          tagView(view, "replace");
+          return;
+        }
+        setView("results");
+        renderResults();
+        if (pendingToast) {
+          toast(pendingToast);
+          pendingToast = "";
+        }
+        return;
+      }
+      if (target === "verifying") {
+        if (!sorter.result) {
+          setView(session.choices ? "sorting" : "setup");
+          if (view === "sorting") renderBattle();
+          tagView(view, "replace");
+          return;
+        }
+        if (!verify) {
+          buckets = baseBuckets();
+          if (validVerifyState(session.verify, session.ids)) {
+            verify = {
+              pairs: session.verify.pairs,
+              shown: session.verify.shown,
+              picks: [...session.verify.picks],
+              limit: session.verify.limit,
+            };
+          } else {
+            const pairs = buildVerifyPairs();
+            if (!pairs.length) {
+              setView("results");
+              renderResults();
+              tagView("results", "replace");
+              return;
+            }
+            verify = {
+              pairs,
+              shown: pairs.map(() => (Math.random() < 0.5 ? [0, 1] : [1, 0])),
+              picks: [],
+              ...(session.algorithm ? { limit: 10 } : {}),
+            };
+            session.verify = null;
+          }
+        }
+        setView("verifying");
+        renderVerifyBattle();
+      }
+    });
     function save() {
       session.savedAt = Date.now();
       write(key, session);
@@ -682,7 +781,7 @@
           validVerifyState(value.verify, value.ids))
       );
     }
-    function resume(value) {
+    function resume(value, historyAction = "push") {
       if (!validSession(value)) {
         toast("This session could not be loaded. Please start a new lineup.");
         return;
@@ -691,7 +790,7 @@
       session.verifyRounds = session.verifyRounds || [];
       sorter = BiasSorter.replay(session.ids, session.choices, session.algorithm, session.matchups);
       save();
-      setView(sorter.result ? "results" : "sorting");
+      goView(sorter.result ? "results" : "sorting", historyAction);
       renderBattle();
       return true;
     }
@@ -705,14 +804,15 @@
       session = { version: dataSetVersion, mode, ids, algorithm: newAlgorithm(ids), matchups: [], choices: [], verifyRounds: [], verify: null, counted: 0, started: Date.now() };
       sorter = BiasSorter.create(ids, session.algorithm);
       save();
-      setView("sorting");
+      goView("sorting", "push");
+      pushedFromSetup = true;
       renderBattle();
     };
     function renderBattle() {
       if (sorter.result) {
         session.finished ||= Date.now();
         save();
-        if (view !== "results") setView("results");
+        if (view !== "results") goView("results", "replace");
         renderResults();
         return;
       }
@@ -794,12 +894,18 @@
     $("pause").onclick = () => {
       save();
       updateResumeBanner();
-      setView("setup");
+      if (pushedFromSetup && window.history.state?.sorterView === "sorting") {
+        pushedFromSetup = false;
+        window.history.back();
+      } else {
+        pushedFromSetup = false;
+        goView("setup", "replace");
+      }
     };
     $("resume").onclick = () => {
       const saved = readSavedState(key, true);
       updateResumeBanner(saved);
-      resume(saved);
+      if (resume(saved, "push")) pushedFromSetup = true;
     };
     let ranked = [];
     let buckets = [];
@@ -918,6 +1024,7 @@
       clearVerifyRounds("Verification cleared — ranking changed.");
       setView("sorting");
       $("undo").click();
+      tagView("sorting", "replace");
     };
     let verify = null;
     function validVerifyState(value, ids) {
@@ -964,7 +1071,7 @@
         };
         session.verify = null;
       }
-      setView("verifying");
+      goView("verifying", "push");
       renderVerifyBattle();
     }
     function renderVerifyBattle() {
@@ -1053,27 +1160,47 @@
           (p) => p.winner !== "tie" && before.get(p.winner) !== after.get(p.winner),
         ).length;
       } else {
+        save();
         setView("results");
         renderResults();
       }
-      toast(moved ? `${moved} favorite${moved === 1 ? "" : "s"} moved ♡` : "Ranking checked ♡");
+      const message = moved ? `${moved} favorite${moved === 1 ? "" : "s"} moved ♡` : "Ranking checked ♡";
+      // Pop the verifying entry so Back never lands on a spent round;
+      // the popstate handler re-renders results and shows this toast.
+      if (window.history.state?.sorterView === "verifying") {
+        pendingToast = message;
+        window.history.back();
+      } else {
+        goView("results", "replace");
+        toast(message);
+      }
     }
     $("verify").onclick = startVerify;
     $("verify-back").onclick = () => {
       // Progress stays saved — tapping the button resumes where you left off.
       if (verify && !verify.picks.length) session.verify = null;
       verify = null;
-      setView("results");
-      renderResults();
+      save();
+      if (window.history.state?.sorterView === "verifying") {
+        window.history.back();
+      } else {
+        goView("results", "replace");
+        renderResults();
+      }
     };
     $("new-lineup").onclick = () => {
       mode = session.mode;
       selected = new Set(session.ids);
       document.querySelectorAll("[data-mode]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.mode === mode));
-      history.replaceState(null, "", location.pathname);
       updateResumeBanner();
       refresh();
-      setView("setup");
+      if (pushedFromSetup && window.history.state?.sorterView === "results") {
+        pushedFromSetup = false;
+        window.history.back();
+      } else {
+        pushedFromSetup = false;
+        goView("setup", "replace");
+      }
     };
     function download(blob, filename) {
       const url = URL.createObjectURL(blob),
@@ -1186,13 +1313,19 @@
     const sessionLink = location.hash.match(/^#(ranking|continue)=(.*)$/);
     if (sessionLink) {
       try {
-        if (resume(JSON.parse(LZString.decompressFromEncodedURIComponent(sessionLink[2]))) && sessionLink[1] === "continue") {
-          // Refresh must keep newer local choices instead of importing the snapshot again.
-          history.replaceState(null, "", location.pathname + location.search);
+        const keepHash = sessionLink[1] === "ranking" ? location.hash : "";
+        if (resume(JSON.parse(LZString.decompressFromEncodedURIComponent(sessionLink[2])), "none")) {
+          // Preserve the old URL contract: ranking links keep their hash so a
+          // refresh re-imports the snapshot; continue links drop it so a
+          // refresh keeps newer local choices instead. Either way the entry
+          // is tagged so Back steps to the referrer, not into a dead view.
+          tagView(view, "replace", location.pathname + location.search + keepHash);
         }
       } catch {
         toast("That session link could not be read. Your lineup is ready below.");
       }
+    } else {
+      tagView(view, "replace");
     }
   }
 

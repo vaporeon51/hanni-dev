@@ -26,6 +26,8 @@ EPHEMERAL_MEDIA_HOSTS = frozenset({"cdn.discordapp.com", "media.discordapp.net"}
 
 # Background jobs.
 INGESTION_INTERVAL_SECONDS = int(os.getenv("INGESTION_INTERVAL_SECONDS", str(12 * 60 * 60)))
+GOYANGI_INGEST_INTERVAL_SECONDS = int(os.getenv("GOYANGI_INGEST_INTERVAL_SECONDS", str(12 * 60 * 60)))
+GOYANGI_INGEST_MAX_SETS = int(os.getenv("GOYANGI_INGEST_MAX_SETS", "200"))
 # Run a small Discord-check pass frequently while keeping each individual URL
 # on a separate minimum recheck interval.
 DEAD_LINK_RUN_INTERVAL_SECONDS = int(os.getenv("DEAD_LINK_RUN_INTERVAL_SECONDS", "2"))

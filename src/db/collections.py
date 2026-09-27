@@ -53,6 +53,17 @@ class _Anchor:
     url: str
     member_name: str | None
     group_name: str | None
+    goyangi_set_id: str | None = None
+
+    @property
+    def set_key(self) -> str:
+        """Unified set identity: Discord root message or goyangi set."""
+
+        if self.root_message_id is not None:
+            return self.root_message_id
+        if self.goyangi_set_id is not None:
+            return f"goyangi:{self.goyangi_set_id}"
+        return ""
 
     @property
     def label(self) -> str:
@@ -93,7 +104,8 @@ def _get_anchor(connection, content_link_id: int) -> _Anchor | None:
                 cl.root_message_id,
                 cl.url,
                 ri.member_name,
-                ri.group_name
+                ri.group_name,
+                cl.goyangi_set_id
             FROM content_links AS cl
             JOIN role_info AS ri ON ri.role_id = cl.role_id
             WHERE cl.content_link_id = %s
@@ -113,10 +125,18 @@ def _get_anchor(connection, content_link_id: int) -> _Anchor | None:
         url=str(row[4]),
         member_name=row[5],
         group_name=row[6],
+        goyangi_set_id=str(row[7]) if row[7] is not None else None,
     )
 
 
 def _exact_member_ids(connection, anchor: _Anchor) -> list[int]:
+    """Return live members of one exact set (Discord post or goyangi set)."""
+
+    if anchor.root_message_id is not None:
+        key_column, key_value = "cl.root_message_id", anchor.root_message_id
+    else:
+        assert anchor.goyangi_set_id is not None
+        key_column, key_value = "cl.goyangi_set_id", anchor.goyangi_set_id
     filters, params = _live_filters()
     with connection.cursor() as cursor:
         cursor.execute(
@@ -130,14 +150,14 @@ def _exact_member_ids(connection, anchor: _Anchor) -> list[int]:
                 FROM content_links AS cl
                 JOIN role_info AS ri ON ri.role_id = cl.role_id
                 WHERE cl.role_id = %s
-                  AND cl.root_message_id = %s
+                  AND {key_column} = %s
                   AND {' AND '.join(filters)}
                 ORDER BY cl.url, cl.uploaded_date, cl.content_link_id
             ) AS distinct_links
             ORDER BY uploaded_date, content_link_id
             LIMIT %s
             """,
-            (anchor.role_id, anchor.root_message_id, *params, MAX_FEED_ITEMS),
+            (anchor.role_id, key_value, *params, MAX_FEED_ITEMS),
         )
         return [int(row[0]) for row in cursor.fetchall()]
 
@@ -216,7 +236,7 @@ def _legacy_member_ids(connection, anchor: _Anchor) -> list[int]:
 
 
 def _member_ids(connection, anchor: _Anchor) -> list[int]:
-    if anchor.root_message_id:
+    if anchor.root_message_id is not None or anchor.goyangi_set_id is not None:
         return _exact_member_ids(connection, anchor)
     return _legacy_member_ids(connection, anchor)
 
@@ -313,10 +333,11 @@ def get_collection_feed(
 ) -> list[ContentSet]:
     """Return multi-link parent posts for the set-oriented feed.
 
-    Search results use exact Discord root-message boundaries. That keeps a set
-    semantically precise and lets the query hydrate all selected sets in one
-    batch. The existing per-item collection view retains its legacy burst
-    fallback for rows that predate root-message ingestion.
+    Search results use exact Discord root-message boundaries plus exact
+    goyangi set boundaries. That keeps a set semantically precise and lets
+    the query hydrate all selected sets in one batch. The existing per-item
+    collection view retains its legacy burst fallback for rows that predate
+    root-message ingestion and carry no goyangi set.
     """
 
     if sort not in {"random", "latest", "oldest", "top"}:
@@ -386,6 +407,8 @@ def get_collection_feed(
                         cl.role_id,
                         cl.author_id,
                         cl.root_message_id,
+                        cl.goyangi_set_id,
+                        cl.set_key,
                         cl.url,
                         cl.uploaded_date,
                         ri.member_name,
@@ -402,18 +425,18 @@ def get_collection_feed(
                         )::double precision AS item_random_score
                     FROM content_links AS cl
                     JOIN role_info AS ri ON ri.role_id = cl.role_id
-                    WHERE cl.root_message_id IS NOT NULL
+                    WHERE (cl.root_message_id IS NOT NULL OR cl.goyangi_set_id IS NOT NULL)
                       AND {' AND '.join(where)}
                 ),
                 grouped AS (
                     SELECT
                         role_id,
-                        root_message_id,
+                        set_key,
                         MIN(uploaded_date) AS set_date,
                         MAX(item_score) AS set_score,
                         MAX(item_random_score) AS set_random_score
                     FROM eligible
-                    GROUP BY role_id, root_message_id
+                    GROUP BY role_id, set_key
                     HAVING COUNT(DISTINCT url) >= 2
                 ),
                 ranked AS (
@@ -423,17 +446,18 @@ def get_collection_feed(
                         grouped.set_score,
                         grouped.set_random_score,
                         ROW_NUMBER() OVER (
-                            PARTITION BY eligible.role_id, eligible.root_message_id
+                            PARTITION BY eligible.role_id, eligible.set_key
                             ORDER BY eligible.uploaded_date, eligible.content_link_id
                         ) AS anchor_rank
                     FROM eligible
-                    JOIN grouped USING (role_id, root_message_id)
+                    JOIN grouped USING (role_id, set_key)
                 )
                 SELECT
                     content_link_id AS anchor_id,
                     role_id,
                     author_id,
                     root_message_id,
+                    goyangi_set_id,
                     url,
                     member_name,
                     group_name,
@@ -462,14 +486,15 @@ def get_collection_feed(
                 content_link_id=int(row[0]),
                 role_id=str(row[1]),
                 author_id=str(row[2]) if row[2] is not None else None,
-                root_message_id=str(row[3]),
-                url=str(row[4]),
-                member_name=row[5],
-                group_name=row[6],
+                root_message_id=str(row[3]) if row[3] is not None else None,
+                goyangi_set_id=str(row[4]) if row[4] is not None else None,
+                url=str(row[5]),
+                member_name=row[6],
+                group_name=row[7],
             )
             for row in rows
         ]
-        set_dates = {int(row[0]): row[7] for row in rows}
+        set_dates = {int(row[0]): row[8] for row in rows}
         if not anchors:
             return []
 
@@ -480,23 +505,23 @@ def get_collection_feed(
                 WITH wanted AS (
                     SELECT *
                     FROM unnest(%s::text[], %s::text[])
-                        AS selected(role_id, root_message_id)
+                        AS selected(role_id, set_key)
                 ),
                 distinct_links AS (
-                    SELECT DISTINCT ON (cl.role_id, cl.root_message_id, cl.url)
+                    SELECT DISTINCT ON (cl.role_id, cl.set_key, cl.url)
                         cl.role_id,
-                        cl.root_message_id,
+                        cl.set_key,
                         cl.content_link_id,
                         cl.uploaded_date
                     FROM content_links AS cl
                     JOIN wanted
                       ON wanted.role_id = cl.role_id
-                     AND wanted.root_message_id = cl.root_message_id
+                     AND wanted.set_key = cl.set_key
                     JOIN role_info AS ri ON ri.role_id = cl.role_id
                     WHERE {' AND '.join(member_filters)}
                     ORDER BY
                         cl.role_id,
-                        cl.root_message_id,
+                        set_key,
                         cl.url,
                         cl.uploaded_date,
                         cl.content_link_id
@@ -505,19 +530,19 @@ def get_collection_feed(
                     SELECT
                         *,
                         ROW_NUMBER() OVER (
-                            PARTITION BY role_id, root_message_id
+                            PARTITION BY role_id, set_key
                             ORDER BY uploaded_date, content_link_id
                         ) AS member_rank
                     FROM distinct_links
                 )
-                SELECT role_id, root_message_id, content_link_id
+                SELECT role_id, set_key, content_link_id
                 FROM numbered
                 WHERE member_rank <= %s
-                ORDER BY role_id, root_message_id, member_rank
+                ORDER BY role_id, set_key, member_rank
                 """,
                 (
                     [anchor.role_id for anchor in anchors],
-                    [anchor.root_message_id for anchor in anchors],
+                    [anchor.set_key for anchor in anchors],
                     *member_filter_params,
                     MAX_FEED_ITEMS,
                 ),
@@ -525,8 +550,8 @@ def get_collection_feed(
             member_rows = cursor.fetchall()
 
         ids_by_set: dict[tuple[str, str], list[int]] = {}
-        for role_id, root_message_id, content_link_id in member_rows:
-            ids_by_set.setdefault((str(role_id), str(root_message_id)), []).append(int(content_link_id))
+        for role_id, set_key, content_link_id in member_rows:
+            ids_by_set.setdefault((str(role_id), str(set_key)), []).append(int(content_link_id))
         all_member_ids = [content_link_id for ids in ids_by_set.values() for content_link_id in ids]
         item_by_id = {
             item.content_link_id: item
@@ -536,7 +561,7 @@ def get_collection_feed(
         results: list[ContentSet] = []
         seen_memberships: set[tuple[str, ...]] = set()
         for anchor in anchors:
-            content_link_ids = ids_by_set.get((anchor.role_id, anchor.root_message_id or ""), [])
+            content_link_ids = ids_by_set.get((anchor.role_id, anchor.set_key), [])
             items = tuple(item_by_id[item_id] for item_id in content_link_ids if item_id in item_by_id)
             if len(items) < 2:
                 continue

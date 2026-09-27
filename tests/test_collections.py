@@ -51,7 +51,7 @@ class FakePool:
         return self.connection_instance
 
 
-def anchor(*, root_message_id="root-1", author_id="author-1"):
+def anchor(*, root_message_id="root-1", author_id="author-1", goyangi_set_id=None):
     return collection_db._Anchor(
         content_link_id=42,
         role_id="role-1",
@@ -60,6 +60,7 @@ def anchor(*, root_message_id="root-1", author_id="author-1"):
         url="https://i.imgur.com/one.mp4",
         member_name="Hanni",
         group_name="NewJeans",
+        goyangi_set_id=goyangi_set_id,
     )
 
 
@@ -98,6 +99,7 @@ def test_collection_preview_returns_anchor_url_and_set_size(monkeypatch):
                 "https://i.imgur.com/one.mp4",
                 "Hanni",
                 "NewJeans",
+                None,
             )
         ],
         [(42,), (43,), (44,)],
@@ -120,6 +122,7 @@ def test_collection_feed_batches_exact_parent_sets(monkeypatch):
                 "role-1",
                 "author-1",
                 "root-1",
+                None,
                 "https://i.imgur.com/one.mp4",
                 "Hanni",
                 "NewJeans",
@@ -142,9 +145,64 @@ def test_collection_feed_batches_exact_parent_sets(monkeypatch):
     assert sets[0].collection_of == 42
     assert sets[0].label == "Hanni - NewJeans"
     assert [item.content_link_id for item in sets[0].items] == [42, 43]
-    assert "cl.root_message_id IS NOT NULL" in connection.cursors[0].query
+    assert "(cl.root_message_id IS NOT NULL OR cl.goyangi_set_id IS NOT NULL)" in connection.cursors[0].query
     assert connection.cursors[0].params[-1] == 12
     assert "unnest(%s::text[], %s::text[])" in connection.cursors[1].query
+
+
+def test_goyangi_collection_uses_exact_set_members():
+    connection = FakeConnection([(42,), (43,)])
+
+    member_ids = collection_db._member_ids(
+        connection, anchor(root_message_id=None, goyangi_set_id="set-1")
+    )
+
+    assert member_ids == [42, 43]
+    assert "cl.goyangi_set_id = %s" in connection.cursors[0].query
+    assert "DISTINCT ON (cl.url)" in connection.cursors[0].query
+    assert connection.cursors[0].params[:2] == ("role-1", "set-1")
+
+
+def test_goyangi_anchor_routes_to_set_not_legacy_burst():
+    goyangi_anchor = anchor(root_message_id=None, goyangi_set_id="set-1")
+    assert goyangi_anchor.set_key == "goyangi:set-1"
+    assert anchor().set_key == "root-1"
+    assert anchor(root_message_id=None).set_key == ""
+
+
+def test_collection_feed_includes_goyangi_sets(monkeypatch):
+    connection = FakeConnection(
+        [
+            (
+                42,
+                "role-1",
+                "author-1",
+                None,
+                "set-1",
+                "https://cdn.goyangi.pics/v1/aespa/winter/a.webp",
+                "Winter",
+                "Aespa",
+                None,
+                3.0,
+                1.0,
+            )
+        ],
+        [("role-1", "goyangi:set-1", 42), ("role-1", "goyangi:set-1", 43)],
+        [
+            (42, "role-1", "Winter", "Aespa", "https://cdn.goyangi.pics/v1/aespa/winter/a.webp", None, None, 3.0, 0, 0, 0, 0, None),
+            (43, "role-1", "Winter", "Aespa", "https://cdn.goyangi.pics/v1/aespa/winter/b.webp", None, None, 2.0, 0, 0, 0, 0, None),
+        ],
+    )
+    monkeypatch.setattr(collection_db, "POOL", FakePool(connection))
+
+    sets = collection_db.get_collection_feed(sort="latest", limit=1, min_age="18 year 1 month")
+
+    assert len(sets) == 1
+    assert sets[0].collection_of == 42
+    assert sets[0].label == "Winter - Aespa"
+    assert [item.content_link_id for item in sets[0].items] == [42, 43]
+    assert "cl.set_key" in connection.cursors[0].query
+    assert connection.cursors[1].params[:2] == (["role-1"], ["goyangi:set-1"])
 
 
 def test_collection_feed_applies_chronological_cursor(monkeypatch):

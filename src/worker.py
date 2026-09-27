@@ -20,6 +20,8 @@ from src.config.constants import (  # noqa: E402
     DEAD_LINK_INTERVAL_SECONDS,
     DEAD_LINK_RUN_INTERVAL_SECONDS,
     DISCORD_DEAD_LINK_WEBHOOK_URL,
+    GOYANGI_INGEST_INTERVAL_SECONDS,
+    GOYANGI_INGEST_MAX_SETS,
     INGESTION_INTERVAL_SECONDS,
     MIN_CONTENT_AGE,
     RECOVERY_INTERVAL_SECONDS,
@@ -29,6 +31,7 @@ from src.content_update import run_incremental_update  # noqa: E402
 from src.db import POOL  # noqa: E402
 from src.db.bias import create_weekly_global_snapshot, prune_visitor_pair_votes  # noqa: E402
 from src.db.dead_links import get_candidates_by_urls, get_due_urls, record_check  # noqa: E402
+from src.goyangi_ingest import run_pass as run_goyangi_pass  # noqa: E402
 from src.db.locks import advisory_lock  # noqa: E402
 from src.services.discord_embed_probe import post_discord_notice, probe_discord_embed  # noqa: E402
 from src.services.dead_link_queue import take_priority_urls  # noqa: E402
@@ -39,6 +42,13 @@ def run_ingestion_once() -> object:
         if not acquired:
             return {"status": "skipped", "reason": "another ingestion job holds the lock"}
         return run_incremental_update()
+
+
+def run_goyangi_ingest_once() -> object:
+    with advisory_lock("hanni:goyangi-ingest") as acquired:
+        if not acquired:
+            return {"status": "skipped", "reason": "another goyangi job holds the lock"}
+        return run_goyangi_pass(since=None, per_page=100, max_sets=GOYANGI_INGEST_MAX_SETS, apply=True)
 
 
 def run_dead_link_checks_once() -> dict[str, int | str]:
@@ -115,6 +125,7 @@ def run_all_once() -> dict[str, object]:
 
     return {
         "ingestion": run_ingestion_once(),
+        "goyangi_ingest": run_goyangi_ingest_once(),
         "dead_links": run_dead_link_checks_once(),
         "recovery": run_recovery_once(),
         "bias_snapshot": run_bias_snapshot_once(),
@@ -139,6 +150,7 @@ async def scheduler_loop() -> None:
     """Run jobs continuously when the app is deployed as the one-dyno version."""
 
     last_ingestion = 0.0
+    last_goyangi_ingest = 0.0
     last_dead_links = 0.0
     last_recovery = 0.0
     last_bias_snapshot = 0.0
@@ -149,6 +161,9 @@ async def scheduler_loop() -> None:
         if now - last_ingestion >= INGESTION_INTERVAL_SECONDS:
             jobs.append(("ingestion", run_ingestion_once))
             last_ingestion = now
+        if now - last_goyangi_ingest >= GOYANGI_INGEST_INTERVAL_SECONDS:
+            jobs.append(("goyangi ingest", run_goyangi_ingest_once))
+            last_goyangi_ingest = now
         if now - last_dead_links >= DEAD_LINK_RUN_INTERVAL_SECONDS:
             jobs.append(("dead-link checks", run_dead_link_checks_once))
         if now - last_recovery >= RECOVERY_INTERVAL_SECONDS:
@@ -168,7 +183,7 @@ async def scheduler_loop() -> None:
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run Hanni background jobs")
-    parser.add_argument("job", choices=("ingest", "dead-links", "recovery", "bias-snapshot", "all", "scheduler"), default="all", nargs="?")
+    parser.add_argument("job", choices=("ingest", "goyangi", "dead-links", "recovery", "bias-snapshot", "all", "scheduler"), default="all", nargs="?")
     return parser.parse_args(argv)
 
 
@@ -180,6 +195,8 @@ def main(argv: list[str] | None = None) -> int:
             asyncio.run(scheduler_loop())
         elif args.job == "ingest":
             print(run_ingestion_once())
+        elif args.job == "goyangi":
+            print(run_goyangi_ingest_once())
         elif args.job == "dead-links":
             print(run_dead_link_checks_once())
         elif args.job == "recovery":

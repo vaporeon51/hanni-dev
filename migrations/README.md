@@ -30,6 +30,8 @@ message or goyangi set) backing the /sets feed.
 `table_updates42.sql` adds the Discord-first Goyangi duplicate archive, suppression,
 pending-verification queue, and insert guard. `table_updates43.sql` narrows that
 guard to inserts, avoiding unnecessary global locking on unrelated content updates.
+`table_updates44.sql` adds durable per-content suppressions for confirmed partial
+duplicates while preserving the other items in their Goyangi set.
 Fingerprint-only matches remain pending by default; set
 `GOYANGI_ALLOW_VISUAL_AUTO_DEDUPE=1` for the worker or pass
 `--allow-visual-delete` to the one-time cleanup script after validating its

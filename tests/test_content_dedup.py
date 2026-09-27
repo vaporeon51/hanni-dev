@@ -59,3 +59,13 @@ def test_exact_member_coverage_confirms_a_single_clip_set():
     discord = MediaSet('d')
     discord.add('r1', 'https://goyangi.pics/v/one.webp')
     assert exact_match(goyangi, [discord])[0] is discord
+
+
+def test_whole_set_exact_match_requires_distinct_discord_members():
+    goyangi = MediaSet('g')
+    goyangi.add('r1', 'https://imgur.com/same123', content_id='one')
+    goyangi.add('r1', 'https://imgur.com/same123', content_id='two')
+    discord = MediaSet('d')
+    discord.add('r1', 'https://imgur.com/same123')
+
+    assert exact_match(goyangi, [discord]) is None

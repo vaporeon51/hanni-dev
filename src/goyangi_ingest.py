@@ -276,6 +276,28 @@ def _signature(posts):
     return tuple(sorted((p.id, media_signature(p)) for p in posts))
 
 
+def _full_member_match(media, member_matches, candidates):
+    """Return a same-Discord-set match only when every source member is covered."""
+    if not media.complete:
+        return None
+    expected = {
+        (member, role)
+        for member, roles in media.member_roles.items()
+        for role in roles
+    }
+    matched = {(match['member'], match['role_id']) for match in member_matches}
+    roots = {match['discord_root_id'] for match in member_matches}
+    if not expected or matched != expected or len(roots) != 1:
+        return None
+    post = next((candidate for candidate in candidates if candidate.id in roots), None)
+    if post is None:
+        return None
+    kind = ('shared-media' if all(match['evidence']['kind'] == 'shared-media'
+                                  for match in member_matches)
+            else 'video-fingerprint-v1')
+    return post, {'kind': kind, 'clips': len(expected)}
+
+
 def run_pass(*, since: str | None, per_page: int, max_sets: int, apply: bool) -> dict:
     """Discord-first ingest. Unverified candidate sets survive cursor advances.
 
@@ -291,6 +313,7 @@ def run_pass(*, since: str | None, per_page: int, max_sets: int, apply: bool) ->
     with POOL.connection() as connection, connection.cursor() as cursor:
         discord, existing = dedup_db.load_sets(cursor)
         blocked = dedup_db.blocked_sets(cursor)
+        blocked_contents = dedup_db.blocked_contents(cursor)
         cursor.execute("SELECT payload FROM goyangi_pending_sets WHERE retry_after <= NOW() ORDER BY random() LIMIT %s", (max_sets,))
         pending = [r[0] for r in cursor.fetchall()]
         cursor.execute("SELECT set_id FROM goyangi_pending_sets WHERE retry_after > NOW()")
@@ -324,48 +347,59 @@ def run_pass(*, since: str | None, per_page: int, max_sets: int, apply: bool) ->
                 high_watermark = max(high_watermark, point) if high_watermark else point
     for sid, item in items.items():
         if sid in blocked:
-            plans.append((item, None, None, 'blocked', []))
+            plans.append((item, None, None, [], 'blocked', []))
             continue
         media = existing.get(sid) if item.get('existing_only') else _set_media(item, lookup, groups)
         if sid in hydrate_errors:
-            plans.append((item, media, None, 'Goyangi metadata unavailable: ' + hydrate_errors[sid], []))
+            plans.append((item, media, None, [], 'Goyangi metadata unavailable: ' + hydrate_errors[sid], []))
             continue
         if media is None or not media.urls:
-            plans.append((item, media, None, 'empty', []))
+            plans.append((item, media, None, [], 'empty', []))
             continue
-        match = exact_match(media, discord_index)
         candidates = candidate_posts(media, discord_index)
         reason = None
-        if not match and candidates and media.complete:
+        member_matches = []
+        verification_complete = True
+        if candidates:
             try:
-                match = fingerprinter.match(media, candidates)
+                member_matches, verification_complete = fingerprinter.match_contents(
+                    media, candidates, visual=True, excluded=blocked_contents,
+                )
             except Unverified as error:
                 reason = str(error)
-        if (match and match[1].get('kind') == 'video-fingerprint-v1'
-                and not visual_auto_dedupe_enabled()):
-            match = None
+        match = _full_member_match(media, member_matches, candidates)
+        has_visual_match = any(
+            matched['evidence'].get('kind') == 'video-fingerprint-v1'
+            for matched in member_matches
+        )
+        if has_visual_match and not visual_auto_dedupe_enabled():
+            match, member_matches = None, []
             reason = VISUAL_REVIEW_REASON
+        elif not verification_complete:
+            reason = 'some candidate media could not be verified'
         if not media.complete and item.get('existing_only'):
-            reason = 'complete Goyangi set metadata unavailable'
+            reason = reason or 'complete Goyangi set metadata unavailable'
         if not match and not reason and media.dates and (
             datetime.now(timezone.utc) - max(media.dates) < timedelta(minutes=15)
         ):
             reason = 'waiting 15 minutes for Discord'
-        plans.append((item, media, match, reason, _signature(candidates)))
+        plans.append((item, media, match, member_matches, reason, _signature(candidates)))
     summary = {'sets': len(items), 'contents': 0, 'inserted': 0, 'skipped': 0,
+               'duplicate_contents': 0,
                'deleted': 0, 'duplicate_sets': 0, 'deferred_sets': 0, 'decisions': {}}
     with POOL.connection() as connection, connection.transaction(), connection.cursor() as cursor:
         cursor.execute(dedup_db.LOCK_SQL)
         fresh_discord, _ = dedup_db.load_sets(cursor)
         fresh_index = MediaSetIndex(fresh_discord)
         blocked = dedup_db.blocked_sets(cursor)
+        blocked_contents = dedup_db.blocked_contents(cursor)
         # Load under the same lock, using this connection (pool may have size 1).
         cursor.execute('SELECT url, goyangi_content_id FROM content_links')
         rows = cursor.fetchall()
         exact = {r[0] for r in rows}
         ids = {str(r[1]) for r in rows if r[1]}
         imgur_ids = {key for url in exact for key in _imgur_ids(url)}
-        for item, media, match, reason, signature in plans:
+        for item, media, match, member_matches, reason, signature in plans:
             sid = item['id']
             codes, uploaders, contents = iter_contents(item)
             summary['contents'] += len(contents)
@@ -376,11 +410,13 @@ def run_pass(*, since: str | None, per_page: int, max_sets: int, apply: bool) ->
             if media:
                 # Exact matches have priority, including Discord arrivals while
                 # we were downloading. Never act on stale visual evidence.
+                fresh_candidates = candidate_posts(media, fresh_index)
                 fresh_match = exact_match(media, fresh_index)
                 if fresh_match:
                     match, reason = fresh_match, None
-                elif _signature(candidate_posts(media, fresh_index)) != signature:
-                    match, reason = None, 'Discord changed during verification'
+                    member_matches = []
+                elif _signature(fresh_candidates) != signature:
+                    match, member_matches, reason = None, [], 'Discord changed during verification'
             if match:
                 post, evidence = match
                 if apply:
@@ -388,6 +424,19 @@ def run_pass(*, since: str | None, per_page: int, max_sets: int, apply: bool) ->
                 summary['duplicate_sets'] += 1
                 summary['skipped'] += len(contents)
                 continue
+            planned_duplicates = set()
+            for duplicate in member_matches:
+                content_id, role_id = duplicate['content_id'], duplicate['role_id']
+                if content_id is None:
+                    continue
+                planned_duplicates.add((content_id, role_id))
+                summary['duplicate_contents'] += 1
+                if apply:
+                    summary['deleted'] += dedup_db.remove_content(
+                        cursor, content_id, role_id, sid,
+                        duplicate['discord_root_id'], duplicate['evidence'],
+                    )
+                    blocked_contents.add((content_id, role_id))
             if reason and reason != 'empty':
                 if apply:
                     dedup_db.defer_set(cursor, item, reason)
@@ -396,6 +445,15 @@ def run_pass(*, since: str | None, per_page: int, max_sets: int, apply: bool) ->
                 continue
             for content in contents:
                 decision, roles, _ = decide(content, codes, lookup, groups, exact, ids, imgur_ids)
+                if decision == 'would-insert':
+                    content_id = str(content.get('id') or '')
+                    duplicate_roles = [role for role in roles
+                                       if ((content_id, role) in blocked_contents
+                                           or (content_id, role) in planned_duplicates)]
+                    if duplicate_roles:
+                        roles = [role for role in roles if role not in duplicate_roles]
+                        if not roles:
+                            decision = 'skip:confirmed-duplicate-content'
                 summary['decisions'][decision] = summary['decisions'].get(decision, 0) + 1
                 if decision != 'would-insert':
                     summary['skipped'] += 1
@@ -425,6 +483,6 @@ def run_pass(*, since: str | None, per_page: int, max_sets: int, apply: bool) ->
 def sweep_forward_race(*, apply: bool, limit: int = 500) -> dict:
     """Compatibility entrypoint: now ALWAYS removes Goyangi, never Discord."""
     from src.services.goyangi_cleanup import cleanup
-    result = cleanup(apply=apply, confirmed=False, verify_media=False, limit=limit)
+    result = cleanup(apply=apply, verify_media=False, limit=limit)
     return {'candidates': len(result['matches']), 'deleted': result['deleted'],
             'pairs': [(m['set_id'], m['discord_root_id']) for m in result['matches']]}

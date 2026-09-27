@@ -13,7 +13,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 import requests
 from psycopg.types.json import Jsonb
-from src.content_dedup import media_key, full_media_match
+from src.content_dedup import media_key, fingerprint_equal
 from src.db import POOL
 
 MAX_BYTES = 64 * 1024 * 1024
@@ -79,12 +79,9 @@ class Fingerprinter:
             self._assets_cache[url] = assets
             return assets
         if key.startswith('goyangi:'):
-            cid = key[len('goyangi:'):]
-            with self.get('https://api.goyangi.pics/api/collections/contents/records/' + cid) as r:
-                original = r.json().get('original', '')
-            if urlsplit(original).hostname != 'cdn.goyangi.pics':
-                raise Unverified('unsupported Goyangi original')
-            self._assets_cache[url] = (original,)
+            # The stored viewer link is itself downloadable. Avoid fetching
+            # Goyangi record metadata during matching and backfill.
+            self._assets_cache[url] = (url,)
             return self._assets_cache[url]
         raise Unverified('unsupported media host')
 
@@ -113,35 +110,166 @@ class Fingerprinter:
                                     created_at=NOW()''', (url, Jsonb(result)))
         return result
 
-    def set_fingerprints(self, item):
-        if not item.complete:
-            raise Unverified('incomplete set metadata')
-        assets = set()
-        for url in sorted(item.urls):
-            assets.update(self.assets(url))
-            if len(assets) > 40:
-                raise Unverified('set exceeds 40-clip verification limit')
-        return [self.fingerprint(url) for url in sorted(assets)]
+    def match_contents(self, item, candidates, *, visual=True, excluded=frozenset()):
+        """Match individual source clips to distinct Discord media members.
 
-    def match(self, item, candidates):
-        """Return match or None. Any incomplete comparison raises Unverified."""
-        try:
-            left = self.set_fingerprints(item)
-            incomplete = False
-            for post in candidates:
+        A positive match is useful even when the source set only partly
+        overlaps a Discord set. ``complete`` is false if any asset could not
+        be inspected, so callers can defer unmatched clips safely.
+        """
+        source_nodes = sorted(
+            (member, role)
+            for member, roles in item.member_roles.items()
+            for role in roles
+            if not (member.startswith('goyangi:')
+                    and (member[len('goyangi:'):], role) in excluded)
+        )
+        exact_targets = []
+        for post in candidates:
+            for member, roles in post.member_roles.items():
+                for role in roles:
+                    exact_targets.append((post, member, role))
+        exact_targets.sort(key=lambda target: (target[0].id, target[1], target[2]))
+
+        if not source_nodes or not exact_targets:
+            return [], bool(not source_nodes or not candidates)
+
+        matches = {}
+        exact_used_targets = set()
+        exact_edges = {}
+        exact_evidence = {}
+        for source_index, (source_member, role) in enumerate(source_nodes):
+            for target_index, (post, target_member, target_role) in enumerate(exact_targets):
+                if role != target_role:
+                    continue
+                shared = item.members.get(source_member, set()) & post.members.get(target_member, set())
+                if shared:
+                    exact_edges.setdefault(source_index, []).append(target_index)
+                    exact_evidence[(source_index, target_index)] = sorted(shared)
+
+        def assign(edges, unavailable_targets=frozenset()):
+            owner = {}
+
+            def visit(source_index, seen):
+                for target_index in sorted(edges.get(source_index, ())):
+                    if target_index in seen or target_index in unavailable_targets:
+                        continue
+                    seen.add(target_index)
+                    previous = owner.get(target_index)
+                    if previous is None or visit(previous, seen):
+                        owner[target_index] = source_index
+                        return True
+                return False
+
+            for source_index in sorted(edges):
+                visit(source_index, set())
+            return {source_index: target_index for target_index, source_index in owner.items()}
+
+        for source_index, target_index in assign(exact_edges).items():
+            source_member, role = source_nodes[source_index]
+            post, target_member, _ = exact_targets[target_index]
+            matches[(source_member, role)] = {
+                'member': source_member,
+                'content_id': source_member[len('goyangi:'):] if source_member.startswith('goyangi:') else None,
+                'role_id': role,
+                'discord_root_id': post.id,
+                'evidence': {'kind': 'shared-media', 'keys': exact_evidence[(source_index, target_index)]},
+            }
+            exact_used_targets.add((post.id, target_member, role))
+
+        unmatched = [i for i, node in enumerate(source_nodes) if node not in matches]
+        if not visual or not unmatched:
+            return list(matches.values()), len(matches) == len(source_nodes)
+
+        complete = True
+        fingerprint_cache = {}
+
+        def fingerprints(urls, seen_assets):
+            nonlocal complete
+            found = {}
+            for media_url in sorted(urls):
                 try:
-                    right = self.set_fingerprints(post)
-                    if full_media_match(left, right):
-                        return post, {'kind': 'video-fingerprint-v1', 'clips': len(left)}
+                    asset_urls = self.assets(media_url)
                 except (requests.RequestException, Unverified, ValueError, KeyError):
-                    incomplete = True
-                    if self.rate_limited:
-                        break
-            if incomplete:
-                raise Unverified('some candidate media could not be verified')
-            return None
-        except (requests.RequestException, subprocess.SubprocessError, OSError, ValueError, KeyError) as e:
-            raise Unverified(type(e).__name__) from e
+                    complete = False
+                    continue
+                for asset_url in asset_urls:
+                    if asset_url not in seen_assets and len(seen_assets) >= 40:
+                        complete = False
+                        continue
+                    seen_assets.add(asset_url)
+                    if asset_url not in fingerprint_cache:
+                        try:
+                            fingerprint_cache[asset_url] = self.fingerprint(asset_url)
+                        except (requests.RequestException, Unverified, subprocess.SubprocessError,
+                                OSError, ValueError, KeyError):
+                            complete = False
+                            fingerprint_cache[asset_url] = None
+                    result = fingerprint_cache[asset_url]
+                    if result is not None:
+                        found[asset_url] = result
+            return found
+
+        source_fingerprints = {}
+        source_assets = set()
+        for source_index in unmatched:
+            member, _ = source_nodes[source_index]
+            values = fingerprints(item.member_urls.get(member, set()), source_assets)
+            source_fingerprints[source_index] = values
+            if not values:
+                complete = False
+
+        target_slots = []
+        target_assets = {}
+        for post in candidates:
+            seen_assets = set()
+            for member, roles in post.member_roles.items():
+                for role in roles:
+                    if (post.id, member, role) in exact_used_targets:
+                        continue
+                    asset_fingerprints = target_assets.get((post.id, member))
+                    if asset_fingerprints is None:
+                        asset_fingerprints = fingerprints(post.member_urls.get(member, set()), seen_assets)
+                        target_assets[(post.id, member)] = asset_fingerprints
+                    if not asset_fingerprints:
+                        complete = False
+                    for asset_url, asset_fp in asset_fingerprints.items():
+                        target_slots.append((post, member, role, asset_url, asset_fp))
+
+        visual_edges = {}
+        edge_evidence = {}
+        for source_index in unmatched:
+            source_member, role = source_nodes[source_index]
+            for target_index, (post, target_member, target_role, target_url, target_fp) in enumerate(target_slots):
+                if role != target_role:
+                    continue
+                source_values = source_fingerprints.get(source_index, {})
+                evidence = next((
+                    source_url
+                    for source_url, source_fp in source_values.items()
+                    if fingerprint_equal(source_fp, target_fp)
+                ), None)
+                if evidence:
+                    visual_edges.setdefault(source_index, []).append(target_index)
+                    edge_evidence[(source_index, target_index)] = (evidence, target_url)
+
+        for source_index, target_index in assign(visual_edges).items():
+            source_member, role = source_nodes[source_index]
+            post, target_member, _, _, _ = target_slots[target_index]
+            matched_source_url, matched_target_url = edge_evidence[(source_index, target_index)]
+            matches[(source_member, role)] = {
+                'member': source_member,
+                'content_id': source_member[len('goyangi:'):] if source_member.startswith('goyangi:') else None,
+                'role_id': role,
+                'discord_root_id': post.id,
+                'evidence': {
+                    'kind': 'video-fingerprint-v1',
+                    'source_asset': matched_source_url,
+                    'discord_asset': matched_target_url,
+                },
+            }
+
+        return list(matches.values()), complete
 
 
 def fingerprint_file(path, *, deadline=None):

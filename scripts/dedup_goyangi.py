@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Find/remove duplicate Goyangi sets while retaining Discord rows."""
+"""Find/remove duplicate Goyangi clips while retaining Discord rows."""
 from __future__ import annotations
 import argparse
 import json
@@ -18,15 +18,15 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--apply', action='store_true', help='archive and remove matched Goyangi rows')
     parser.add_argument('--exact-only', action='store_true',
-                        help='use stored identities only; skip API hydration and video fingerprints')
+                        help='use stored identities only; skip media downloads and video fingerprints')
     parser.add_argument('--allow-visual-delete', action='store_true',
-                        help='allow fingerprint matches to archive and remove Goyangi sets')
+                        help='allow fingerprint matches to archive and remove duplicate Goyangi clips')
     parser.add_argument('--limit', type=int, default=10000)
     parser.add_argument('--report', type=Path, help='write full JSON report')
     args = parser.parse_args(argv)
     POOL.open()
     try:
-        result = cleanup(apply=args.apply, confirmed=True,
+        result = cleanup(apply=args.apply,
                          verify_media=not args.exact_only, limit=args.limit,
                          allow_visual=args.allow_visual_delete)
     finally:

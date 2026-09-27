@@ -54,6 +54,11 @@ def blocked_sets(cursor):
     return {row[0] for row in cursor.fetchall()}
 
 
+def blocked_contents(cursor):
+    cursor.execute('SELECT content_id, role_id FROM goyangi_duplicate_contents')
+    return {(str(content_id), str(role_id)) for content_id, role_id in cursor.fetchall()}
+
+
 def remove_set(cursor, set_id, root_id, evidence):
     """Caller holds shared xact lock. Never delete or update a Discord row."""
     cursor.execute('''SELECT 1 FROM content_links
@@ -81,6 +86,43 @@ def remove_set(cursor, set_id, root_id, evidence):
     deleted = cursor.rowcount
     cursor.execute('DELETE FROM goyangi_pending_sets WHERE set_id = %s', (set_id,))
     return deleted
+
+
+def remove_content(cursor, content_id, role_id, set_id, root_id, evidence):
+    """Archive and suppress one confirmed duplicate clip, keeping its set intact."""
+    cursor.execute('''SELECT 1 FROM content_links
+                     WHERE source_kind IS DISTINCT FROM 'goyangi'
+                       AND source_message_id IS NOT NULL
+                       AND role_id = %s
+                       AND COALESCE(root_message_id, source_message_id) = %s LIMIT 1''',
+                   (role_id, root_id))
+    if cursor.fetchone() is None:
+        raise ValueError(f'Discord post {root_id} no longer exists for role {role_id}')
+    cursor.execute('''SELECT discord_root_id FROM goyangi_duplicate_contents
+                     WHERE content_id = %s AND role_id = %s''', (content_id, role_id))
+    prior = cursor.fetchone()
+    if prior and prior[0] != root_id:
+        raise ValueError(f'Goyangi content {content_id} is already suppressed for another Discord post')
+    cursor.execute('''SELECT goyangi_set_id FROM content_links
+                     WHERE source_kind = 'goyangi'
+                       AND goyangi_content_id = %s AND role_id = %s LIMIT 1''',
+                   (content_id, role_id))
+    row = cursor.fetchone()
+    if row is not None and row[0] != set_id:
+        raise ValueError(f'Goyangi content {content_id} is no longer in set {set_id}')
+    cursor.execute('''INSERT INTO goyangi_duplicate_contents(content_id, role_id, discord_root_id, evidence)
+                      VALUES (%s,%s,%s,%s) ON CONFLICT (content_id, role_id) DO NOTHING''',
+                   (content_id, role_id, root_id, Jsonb(evidence)))
+    cursor.execute('''INSERT INTO goyangi_duplicate_archive(content_link_id, set_id, row_data)
+                      SELECT content_link_id, goyangi_set_id, to_jsonb(cl)
+                      FROM content_links cl
+                      WHERE source_kind = 'goyangi'
+                        AND goyangi_content_id = %s AND role_id = %s
+                      ON CONFLICT (content_link_id) DO NOTHING''', (content_id, role_id))
+    cursor.execute('''DELETE FROM content_links
+                      WHERE source_kind = 'goyangi'
+                        AND goyangi_content_id = %s AND role_id = %s''', (content_id, role_id))
+    return cursor.rowcount
 
 
 def reconcile_exact(cursor, roots=None):

@@ -11,6 +11,7 @@ from src.db import content_dedup
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATION = (ROOT / 'migrations/table_updates42.sql').read_text()
 MIGRATION_GUARD_FIX = (ROOT / 'migrations/table_updates43.sql').read_text()
+MIGRATION_CONTENT_GUARD = (ROOT / 'migrations/table_updates44.sql').read_text()
 
 
 @pytest.fixture
@@ -35,6 +36,7 @@ def db(monkeypatch):
                 original_url TEXT)''')
             conn.execute(MIGRATION)
             conn.execute(MIGRATION_GUARD_FIX)
+            conn.execute(MIGRATION_CONTENT_GUARD)
         yield pool
     finally:
         pool.close()
@@ -75,3 +77,44 @@ def test_incomplete_database_set_is_queued_for_full_verification(db):
         assert queued[0]['existing_only'] is True
         reason = queued[1].decode() if isinstance(queued[1], bytes) else queued[1]
         assert reason == 'Discord post candidate'
+
+
+def test_confirmed_clip_archive_keeps_rest_of_set_and_blocks_reingest(db):
+    with db.connection() as conn, conn.transaction(), conn.cursor() as cur:
+        cur.execute("""INSERT INTO content_links(role_id,url,source_kind,source_message_id,root_message_id)
+                        VALUES ('r','https://imgur.com/a/album123','root','discord-3','discord-3')""")
+        cur.execute("""INSERT INTO content_links(role_id,url,goyangi_content_id,goyangi_set_id,source_kind)
+                        VALUES ('r','https://cdn.goyangi.pics/v1/a/b/duplicate.webp','duplicate','set-3','goyangi'),
+                               ('r','https://cdn.goyangi.pics/v1/a/b/unique.webp','unique','set-3','goyangi')""")
+        cur.execute(content_dedup.LOCK_SQL)
+        assert content_dedup.remove_content(
+            cur, 'duplicate', 'r', 'set-3', 'discord-3', {'kind': 'user-confirmed-content'}
+        ) == 1
+        assert content_dedup.remove_content(
+            cur, 'future-duplicate', 'r', 'set-3', 'discord-3', {'kind': 'video-fingerprint-v1'}
+        ) == 0
+
+    with db.connection() as conn:
+        assert conn.execute(
+            "SELECT goyangi_content_id FROM content_links WHERE source_kind='goyangi' ORDER BY goyangi_content_id"
+        ).fetchall() == [('unique',)]
+        assert conn.execute("SELECT count(*) FROM goyangi_duplicate_archive").fetchone()[0] == 1
+        assert conn.execute(
+            "SELECT count(*) FROM goyangi_duplicate_contents WHERE content_id='duplicate' AND role_id='r'"
+        ).fetchone()[0] == 1
+        assert ('future-duplicate', 'r') in content_dedup.blocked_contents(conn.cursor())
+        assert conn.execute(
+            """INSERT INTO content_links(role_id,url,goyangi_content_id,goyangi_set_id,source_kind)
+               VALUES ('r','https://cdn.goyangi.pics/v1/a/b/reingested.webp','duplicate','set-3','goyangi')
+               RETURNING content_link_id"""
+        ).fetchone() is None
+        assert conn.execute(
+            """INSERT INTO content_links(role_id,url,goyangi_content_id,goyangi_set_id,source_kind)
+               VALUES ('r','https://cdn.goyangi.pics/v1/a/b/another.webp','another','set-3','goyangi')
+               RETURNING content_link_id"""
+        ).fetchone() is not None
+        assert conn.execute(
+            """INSERT INTO content_links(role_id,url,goyangi_content_id,goyangi_set_id,source_kind)
+               VALUES ('r','https://cdn.goyangi.pics/v1/a/b/future.webp','future-duplicate','set-3','goyangi')
+               RETURNING content_link_id"""
+        ).fetchone() is None

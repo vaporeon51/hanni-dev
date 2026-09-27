@@ -41,6 +41,8 @@ class MediaSet:
     urls: set[str] = field(default_factory=set)
     keys: set[str] = field(default_factory=set)
     members: dict[str, set[str]] = field(default_factory=dict)
+    member_roles: dict[str, set[str]] = field(default_factory=dict)
+    member_urls: dict[str, set[str]] = field(default_factory=dict)
     dates: list[datetime] = field(default_factory=list)
     # Set membership is authoritative only when built from a complete source
     # expansion. Database snapshots of Goyangi rows cannot establish that.
@@ -54,11 +56,14 @@ class MediaSet:
         self.keys.add(media_key(url))
         member = 'goyangi:' + content_id if content_id else media_key(url)
         self.members.setdefault(member, set()).update((media_key(url),))
+        self.member_roles.setdefault(member, set()).add(str(role))
+        self.member_urls.setdefault(member, set()).add(url)
         for alternate_url in (original_url, mirror_url):
             if alternate_url:
                 identity = media_key(alternate_url)
                 self.keys.add(identity)
                 self.members[member].add(identity)
+                self.member_urls[member].add(alternate_url)
         if content_id:
             self.keys.add('goyangi:' + content_id)
             self.members[member].add('goyangi:' + content_id)
@@ -81,19 +86,52 @@ class MediaSetIndex:
     def exact_match(self, goyangi):
         if not goyangi.complete:
             return None
-        coverage = {}
-        for member_keys in goyangi.members.values():
-            for key in member_keys:
-                for post in self.by_key.get(key, ()):
-                    if post.roles & goyangi.roles:
-                        coverage.setdefault(post.id, (post, set()))[1].add(key)
-        # Every independently identified Goyangi clip needs a matching key in
-        # the same Discord post. One shared clip cannot collapse a larger set.
-        for post, matched_keys in sorted(coverage.values(), key=lambda pair: pair[0].id):
-            covered = sum(bool(member_keys & matched_keys) for member_keys in goyangi.members.values())
-            if goyangi.members and covered == len(goyangi.members):
-                all_shared = sorted(goyangi.keys & post.keys)
-                return post, {'kind': 'shared-media', 'keys': all_shared}
+        source_nodes = sorted(
+            (member, role)
+            for member, roles in goyangi.member_roles.items()
+            for role in roles
+        )
+        # Exact set removal also needs an injective assignment. Without it, a
+        # single Discord clip whose URL aliases two source members could count
+        # twice and incorrectly suppress the rest of a Goyangi set.
+        for post in sorted(self.posts, key=lambda item: item.id):
+            target_nodes = sorted(
+                (member, role)
+                for member, roles in post.member_roles.items()
+                for role in roles
+            )
+            edges = {}
+            shared_by_edge = {}
+            for source_index, (member, role) in enumerate(source_nodes):
+                source_keys = goyangi.members.get(member, set())
+                for target_index, (target_member, target_role) in enumerate(target_nodes):
+                    if role != target_role:
+                        continue
+                    shared = source_keys & post.members.get(target_member, set())
+                    if shared:
+                        edges.setdefault(source_index, []).append(target_index)
+                        shared_by_edge[(source_index, target_index)] = shared
+
+            owner = {}
+
+            def assign(source_index, seen):
+                for target_index in edges.get(source_index, ()):
+                    if target_index in seen:
+                        continue
+                    seen.add(target_index)
+                    previous = owner.get(target_index)
+                    if previous is None or assign(previous, seen):
+                        owner[target_index] = source_index
+                        return True
+                return False
+
+            if source_nodes and all(assign(index, set()) for index in range(len(source_nodes))):
+                assignments = {source_index: target_index
+                               for target_index, source_index in owner.items()}
+                shared_keys = sorted({key for edge, keys in shared_by_edge.items()
+                                      if assignments.get(edge[0]) == edge[1]
+                                      for key in keys})
+                return post, {'kind': 'shared-media', 'keys': shared_keys}
         return None
 
     def candidate_posts(self, goyangi):
@@ -124,6 +162,8 @@ def media_signature(media: MediaSet) -> tuple:
         tuple(sorted(media.urls)),
         tuple(sorted(media.keys)),
         tuple(sorted((member, tuple(sorted(keys))) for member, keys in media.members.items())),
+        tuple(sorted((member, tuple(sorted(roles))) for member, roles in media.member_roles.items())),
+        tuple(sorted((member, tuple(sorted(urls))) for member, urls in media.member_urls.items())),
         tuple(sorted(date.isoformat() for date in media.dates)),
     )
 

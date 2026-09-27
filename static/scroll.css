@@ -782,7 +782,7 @@
   .reel-action-group { gap: 3px; }
   .reel-action-label { color: rgba(255, 255, 255, .66); }
   .reel-score { color: rgba(255, 255, 255, .76); }
-  .scroll-status { bottom: max(16px, calc(env(safe-area-inset-bottom) + 8px)); }
+  .scroll-status { bottom: max(78px, calc(env(safe-area-inset-bottom) + 70px)); }
   .autoplay {
     top: calc(max(54px, env(safe-area-inset-top)) + 10px);
     right: 12px;
@@ -807,9 +807,9 @@
     color: #fff;
   }
   .autoplay-menu {
-    top: calc(100% + 8px);
+    top: auto;
     right: 0;
-    bottom: auto;
+    bottom: calc(100% + 8px);
     left: auto;
     border-color: rgba(255, 255, 255, .18);
     background: rgba(37, 27, 32, .82);

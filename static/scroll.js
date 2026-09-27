@@ -19,6 +19,8 @@ const state = {
   autoplayRaf: 0,
   autoplayStart: 0,
   autoplayDurationMs: 0,
+  lastScrollAt: 0,
+  settleTimer: null,
   seenQueue: [],
   seenUrls: new Set(),
   spacer: null,
@@ -400,6 +402,10 @@ function clearAutoplayTimers() {
     window.clearTimeout(state.autoplayTimer);
     state.autoplayTimer = null;
   }
+  if (state.settleTimer !== null) {
+    window.clearTimeout(state.settleTimer);
+    state.settleTimer = null;
+  }
   if (state.autoplayRaf) {
     window.cancelAnimationFrame(state.autoplayRaf);
     state.autoplayRaf = 0;
@@ -425,17 +431,41 @@ function tickAutoplayProgress() {
   state.autoplayRaf = window.requestAnimationFrame(tickAutoplayProgress);
 }
 
+const SETTLE_MS = 240;
+
+function feedIsSettling() {
+  return Date.now() - state.lastScrollAt < SETTLE_MS;
+}
+
 function advanceAutoplay() {
   state.autoplayTimer = null;
   if (!autoplayEnabled() || document.hidden) return;
+  // A swipe landed just as the timer expired — don't fire a smooth glide
+  // into live momentum (iOS snap + smooth + momentum jumps several reels).
+  // Rescheduling restarts a fresh countdown once the feed is at rest.
+  if (feedIsSettling()) {
+    scheduleAutoplay();
+    return;
+  }
   navigateBy(1);
   state.autoplayStart = window.performance.now();
-  state.autoplayTimer = window.setTimeout(advanceAutoplay, state.autoplayDurationMs);
+  // The glide itself emits scroll events, which settle-restart this timer on
+  // arrival; at the end of the feed (no movement) this keeps the chain alive.
+  scheduleAutoplay();
 }
 
 function scheduleAutoplay() {
   clearAutoplayTimers();
   if (!autoplayEnabled() || !state.activeCard || document.hidden) return;
+  if (feedIsSettling()) {
+    // A swipe is in flight — the countdown must start at rest, not mid-glide.
+    if (state.settleTimer !== null) window.clearTimeout(state.settleTimer);
+    state.settleTimer = window.setTimeout(() => {
+      state.settleTimer = null;
+      scheduleAutoplay();
+    }, SETTLE_MS);
+    return;
+  }
   state.autoplayStart = window.performance.now();
   state.autoplayTimer = window.setTimeout(advanceAutoplay, state.autoplayDurationMs);
   state.autoplayRaf = window.requestAnimationFrame(tickAutoplayProgress);
@@ -763,6 +793,12 @@ function scheduleMountedCardTrim() {
   if (state.trimTimer !== null) window.clearTimeout(state.trimTimer);
   state.trimTimer = window.setTimeout(() => {
     state.trimTimer = null;
+    // Never pull rows out from under a live glide: vanishing snap points
+    // mid-momentum lets a fling fly through reels without stopping.
+    if (feedIsSettling()) {
+      scheduleMountedCardTrim();
+      return;
+    }
     trimMountedCards();
   }, 900);
 }
@@ -885,6 +921,8 @@ function resetFeed(query) {
   state.loading = false;
   state.activeCard = null;
   clearAutoplayTimers();
+  if (state.settleTimer !== null) window.clearTimeout(state.settleTimer);
+  state.settleTimer = null;
   state.query = query;
   state.seenQueue = [];
   state.seenUrls.clear();
@@ -955,9 +993,20 @@ $("reel-feed").addEventListener(
   "scroll",
   () => {
     if (!state.hintDismissed && $("reel-feed").scrollTop > 40) dismissScrollHint();
+    // Any glide — manual or autoplay's own — restarts the countdown at rest,
+    // so a tick can never fire into live momentum. Skipped while a settle
+    // is already pending to avoid per-event timer churn during momentum.
+    state.lastScrollAt = Date.now();
+    if (autoplayEnabled() && state.settleTimer === null) scheduleAutoplay();
   },
   { passive: true },
 );
+
+$("reel-feed").addEventListener("touchstart", () => {
+  // Mark the touch so an armed tick defers instead of firing into it. The
+  // timer itself stays armed — a tap without a swipe must not stall autoplay.
+  state.lastScrollAt = Date.now();
+}, { passive: true });
 
 $("reel-feed").addEventListener("click", (event) => {
   const mediaHit = event.target.closest(".reel-media");

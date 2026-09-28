@@ -582,6 +582,61 @@ def test_media_asset_proxies_range_response(monkeypatch):
     assert response.headers["content-range"] == "bytes 0-3/20"
 
 
+def test_media_asset_marks_dead_on_upstream_404(monkeypatch):
+    from src.services.media import MediaUpstreamError
+
+    monkeypatch.setattr(web_app, "get_live_content_url", lambda content_link_id: "https://i.imgur.com/gone.mp4")
+    monkeypatch.setattr(
+        web_app,
+        "resolve_media_url_cached",
+        lambda url: ResolvedMedia("video", "https://i.imgur.com/gone.mp4"),
+    )
+
+    def fake_open_media_stream(url, range_header):
+        raise MediaUpstreamError("Upstream host returned HTTP 404", status_code=404)
+
+    monkeypatch.setattr(web_app, "open_media_stream", fake_open_media_stream)
+    recorded = []
+    monkeypatch.setattr(
+        web_app, "record_upstream_gone", lambda **kwargs: recorded.append(kwargs) or 1
+    )
+
+    async def request():
+        transport = httpx.ASGITransport(app=web_app.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            return await client.get("/api/feed/42/asset")
+
+    response = asyncio.run(request())
+
+    assert response.status_code == 404
+    assert recorded == [{"content_link_id": 42, "error": "Upstream host returned HTTP 404"}]
+
+
+def test_media_asset_keeps_transient_upstream_errors_unchanged(monkeypatch):
+    from src.services.media import MediaUpstreamError
+
+    monkeypatch.setattr(web_app, "get_live_content_url", lambda content_link_id: "https://i.imgur.com/busy.mp4")
+    monkeypatch.setattr(
+        web_app,
+        "resolve_media_url_cached",
+        lambda url: ResolvedMedia("video", "https://i.imgur.com/busy.mp4"),
+    )
+
+    def fake_open_media_stream(url, range_header):
+        raise MediaUpstreamError("Upstream host returned HTTP 429", status_code=429)
+
+    monkeypatch.setattr(web_app, "open_media_stream", fake_open_media_stream)
+
+    async def request():
+        transport = httpx.ASGITransport(app=web_app.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            return await client.get("/api/feed/42/asset")
+
+    response = asyncio.run(request())
+
+    assert response.status_code == 503
+
+
 def test_homepage_renders_menu_with_wholesome_and_nsfw():
     async def request():
         transport = httpx.ASGITransport(app=web_app.app)

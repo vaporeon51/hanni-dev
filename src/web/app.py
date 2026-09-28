@@ -34,6 +34,7 @@ from src.db.bias import (  # noqa: E402
     visitor_key,
 )
 from src.db.feedback import ContentFeedback, add_content_report, add_content_vote  # noqa: E402
+from src.db.dead_links import record_upstream_gone  # noqa: E402
 from src.db.media import get_live_content_url  # noqa: E402
 from src.services.feed import load_feed, load_role_suggestions  # noqa: E402
 from src.services.feed_history import feed_history, link_history, scroll_history  # noqa: E402
@@ -808,6 +809,15 @@ def media_asset(content_link_id: int, request: Request) -> StreamingResponse:
     try:
         upstream = open_media_stream(resolved.url, range_header=request.headers.get("range"))
     except MediaUpstreamError as error:
+        if error.status_code == 404:
+            # Definitive: the file is gone upstream. Mark dead immediately
+            # (same as an explicit article-embed failure) so the feed stops
+            # serving it; the recovery pipeline can still revive it.
+            try:
+                record_upstream_gone(content_link_id=content_link_id, error=str(error)[:500])
+            except Exception:
+                logger.warning("dead-link marking failed for %s", content_link_id, exc_info=True)
+            raise HTTPException(status_code=404, detail="Media asset is unavailable") from error
         status_code = 503 if error.status_code in TRANSIENT_UPSTREAM_STATUSES else 502
         headers = {"Retry-After": str(error.retry_after_seconds)} if status_code == 503 else None
         raise HTTPException(status_code=status_code, detail=str(error), headers=headers) from error

@@ -218,3 +218,39 @@ def record_check(*, url: str, status: str, error: str | None = None) -> int:
                 (CONTENT_RECOVERY_MAX_GENERATION, url),
             )
         return cursor.rowcount
+
+
+def record_upstream_gone(
+    *, content_link_id: int | None = None, url: str | None = None, error: str | None = None
+) -> int:
+    """Mark content dead after its upstream host returns HTTP 404.
+
+    A 404 is definitive (unlike 429/5xx, which stay transient): the file is
+    gone, so retrying on every page view only serves errors. Same immediate
+    semantics as an explicit ``article``-embed failure, feeding the same
+    recovery pipeline. Exactly one of content_link_id / url is required.
+    """
+
+    if (content_link_id is None) == (url is None):
+        raise ValueError("Pass exactly one of content_link_id or url")
+    if url is not None:
+        return record_check(url=url, status="dead", error=error or "upstream host returned HTTP 404")
+    safe_error = (error or "upstream host returned HTTP 404")[:2000]
+    with POOL.connection() as connection, connection.cursor() as cursor:
+        cursor.execute(
+            """
+            UPDATE content_links
+            SET last_checked_at = NOW(),
+                last_check_status = 'dead',
+                last_check_error = %s,
+                dead_check_failures = dead_check_failures + 1,
+                is_dead = TRUE,
+                is_recovery_exhausted = (
+                    COALESCE(recovery_generation, 0) >= %s
+                )
+            WHERE content_link_id = %s
+              AND is_dead = FALSE
+            """,
+            (safe_error, CONTENT_RECOVERY_MAX_GENERATION, content_link_id),
+        )
+        return cursor.rowcount

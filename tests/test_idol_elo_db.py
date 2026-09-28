@@ -43,8 +43,8 @@ def test_catalog_has_stable_identity_for_every_idol():
 
 def test_small_k_keeps_fractional_information():
     assert bias.calculate_elo_delta(1200, 1200, 1) == (.5, -.5)
-    delta = bias.bounded_delta(1200, 1200, 8, Decimal('11.75'), Decimal('10'))
-    assert delta == Decimal('.25')
+    delta = bias.ballot_deltas({'a': 1200, 'b': 1200}, [('a', 'b', 1)], {'a': Decimal('11.75'), 'b': Decimal('10')})
+    assert delta['a'] == Decimal('.25')
 
 
 @pytest.fixture
@@ -73,6 +73,7 @@ def db(monkeypatch):
             conn.execute((ROOT / 'migrations/table_updates37.sql').read_text())
         with pool.connection() as conn:
             conn.execute(MIGRATION)
+            conn.execute((ROOT / 'migrations/table_updates46.sql').read_text())
         with pool.connection() as conn:
             sync_catalog_ratings(conn, CATALOG_ROWS)
         monkeypatch.setattr(bias, '_pool', lambda: pool)
@@ -81,6 +82,10 @@ def db(monkeypatch):
         pool.close()
         with psycopg.connect(url, autocommit=True) as conn:
             conn.execute(f'DROP SCHEMA {schema} CASCADE')
+
+
+def record_vote(winner, loser, visitor, day):
+    return bias.record_sorter_ballot(str(uuid.uuid4()), [(winner, loser, 1)], visitor, day)
 
 
 def row(db, idol='r0'):
@@ -96,7 +101,7 @@ def test_migration_and_sync_preserve_displayed_score_and_register_catalog(db):
     for e in entries:
         if e['kind'] == 'idol':
             assert row(db, e['leaderboard_id']) is not None
-    bias.record_sorter_vote('r0', 'r1', 'alice', DAY)
+    record_vote('r0', 'r1', 'alice', DAY)
     before = row(db)
     with db.connection() as conn:
         conn.execute(MIGRATION)
@@ -105,21 +110,21 @@ def test_migration_and_sync_preserve_displayed_score_and_register_catalog(db):
         sync_catalog_ratings(conn, CATALOG_ROWS)
         assert conn.execute("SELECT global_elo FROM role_info WHERE role_id='779828161319534595'").fetchone()[0] == 1360
     assert row(db) == before
-    assert bias.record_sorter_vote('sorter:0', 'r0', 'new-person', DAY)['recorded']
+    assert record_vote('sorter:0', 'r0', 'new-person', DAY)['recorded']
 
 
 def test_repeat_is_noop_and_next_day_has_new_budget(db):
-    assert bias.record_sorter_vote('r0', 'r1', 'alice', DAY)['recorded']
+    assert record_vote('r0', 'r1', 'alice', DAY)['recorded']
     before = row(db)
-    assert not bias.record_sorter_vote('r1', 'r0', 'alice', DAY)['recorded']
+    assert not record_vote('r1', 'r0', 'alice', DAY)['recorded']
     assert row(db) == before
-    bias.record_sorter_vote('r0', 'r1', 'alice', DAY + datetime.timedelta(days=1))
+    record_vote('r0', 'r1', 'alice', DAY + datetime.timedelta(days=1))
     assert row(db)[1] == 2
 
 
 def test_many_opponents_share_daily_absolute_cap(db):
     for i in range(1, 20):
-        bias.record_sorter_vote('r0', f'r{i}', 'alice', DAY)
+        record_vote('r0', f'r{i}', 'alice', DAY)
     assert row(db)[0] == 1212
     with db.connection() as conn:
         assert conn.execute("SELECT MAX(spent) FROM visitor_idol_budget").fetchone()[0] == 12
@@ -127,32 +132,32 @@ def test_many_opponents_share_daily_absolute_cap(db):
 
 
 def test_budget_is_absolute_and_respects_both_sides(db):
-    bias.record_sorter_vote('r0', 'r1', 'alice', DAY)
-    bias.record_sorter_vote('r2', 'r0', 'alice', DAY)
+    record_vote('r0', 'r1', 'alice', DAY)
+    record_vote('r2', 'r0', 'alice', DAY)
     for i in range(3, 20):
-        bias.record_sorter_vote('r0', f'r{i}', 'alice', DAY)
+        record_vote('r0', f'r{i}', 'alice', DAY)
     with db.connection() as conn:
         spent = conn.execute("SELECT spent FROM visitor_idol_budget WHERE visitor_token=%s AND role_id='r0'", (bias.visitor_key("alice"),)).fetchone()[0]
     assert spent == 12
     assert abs(row(db)[0] - 1200) < 12
     # An exhausted loser also blocks a fresh winner; no extra counts.
     before = row(db, 'r19')
-    assert not bias.record_sorter_vote('r19', 'r0', 'alice', DAY)['recorded']
+    assert not record_vote('r19', 'r0', 'alice', DAY)['recorded']
     assert row(db, 'r19') == before
 
 
 def test_concurrent_votes_cannot_exceed_budget_or_double_count(db):
     with ThreadPoolExecutor(max_workers=10) as executor:
-        list(executor.map(lambda i: bias.record_sorter_vote('r0', f'r{i}', 'alice', DAY), range(1, 20)))
+        list(executor.map(lambda i: record_vote('r0', f'r{i}', 'alice', DAY), range(1, 20)))
     assert row(db)[0] == 1212
     with ThreadPoolExecutor(max_workers=10) as executor:
-        results = list(executor.map(lambda _: bias.record_sorter_vote('r18', 'r19', 'bob', DAY), range(10)))
+        results = list(executor.map(lambda _: record_vote('r18', 'r19', 'bob', DAY), range(10)))
     assert sum(r['recorded'] for r in results) == 1
 
 
 def test_opposite_concurrent_votes_are_zero_sum(db):
     with ThreadPoolExecutor(max_workers=10) as executor:
-        list(executor.map(lambda i: bias.record_sorter_vote(*(('r0','r1') if i % 2 else ('r1','r0')), f'user-{i}', DAY), range(20)))
+        list(executor.map(lambda i: record_vote(*(('r0','r1') if i % 2 else ('r1','r0')), f'user-{i}', DAY), range(20)))
     assert row(db)[0] + row(db, 'r1')[0] == 2400
     assert row(db)[1] == 20
 
@@ -163,17 +168,17 @@ def test_failed_vote_rolls_back_pair_budget_counts_and_rating(db):
             BEGIN IF NEW.role_id = 'r1' THEN RAISE EXCEPTION 'test failure'; END IF; RETURN NEW; END $$""")
         conn.execute('CREATE TRIGGER fail_vote BEFORE UPDATE ON idol_ratings FOR EACH ROW EXECUTE FUNCTION reject_test_update()')
     with pytest.raises(psycopg.Error):
-        bias.record_sorter_vote('r0', 'r1', 'alice', DAY)
+        record_vote('r0', 'r1', 'alice', DAY)
     assert row(db) == (1200, 0)
     with db.connection() as conn:
-        for table in ('visitor_pair_votes', 'visitor_idol_budget'):
+        for table in ('visitor_pair_votes', 'visitor_idol_budget', 'sorter_ballots'):
             assert conn.execute(f'SELECT COUNT(*) FROM {table}').fetchone()[0] == 0
         conn.execute('DROP TRIGGER fail_vote ON idol_ratings')
-    assert bias.record_sorter_vote('r0', 'r1', 'alice', DAY)['recorded']
+    assert record_vote('r0', 'r1', 'alice', DAY)['recorded']
 
 
 def test_ranked_limit_and_snapshots_use_same_eligibility(db):
-    bias.record_sorter_vote('r0', 'r1', 'user-0', DAY)
+    record_vote('r0', 'r1', 'user-0', DAY)
     # High-scoring but provisional idol must not displace eligible ranks.
     with db.connection() as conn:
         conn.execute("UPDATE idol_ratings SET global_elo=2000,global_match_count=0 WHERE role_id='r2'")
@@ -192,7 +197,7 @@ def test_ranked_limit_and_snapshots_use_same_eligibility(db):
 
 
 def test_invalid_id_does_not_consume_budget(db):
-    assert bias.record_sorter_vote('r0', 'not-an-idol', 'alice', DAY)['reason'] == 'unknown_id'
+    assert record_vote('r0', 'not-an-idol', 'alice', DAY)['reason'] == 'unknown_id'
     with db.connection() as conn:
         assert conn.execute('SELECT COUNT(*) FROM visitor_pair_votes').fetchone()[0] == 0
 
@@ -201,7 +206,7 @@ def test_win_cannot_lower_legacy_score(db):
     with db.connection() as conn:
         conn.execute("UPDATE idol_ratings SET global_elo=1100,global_match_count=15 WHERE role_id='r0'")
     before = row(db)[0]
-    bias.record_sorter_vote('r0', 'r1', 'alice', DAY)
+    record_vote('r0', 'r1', 'alice', DAY)
     assert row(db)[0] > before
     board = bias.get_global_leaderboard(100, include_provisional=False)
     assert next(e for e in board.entries if e.role_id == 'r0').elo >= round(before)
@@ -217,7 +222,7 @@ def test_fresh_faces_have_their_own_limit(db):
 
 
 def test_only_hashed_visitor_keys_are_written(db):
-    bias.record_sorter_vote('r0', 'r1', 'private-cookie', DAY)
+    record_vote('r0', 'r1', 'private-cookie', DAY)
     with db.connection() as conn:
         for table in ('visitor_pair_votes', 'visitor_idol_budget'):
             keys = conn.execute(f'SELECT DISTINCT visitor_token FROM {table}').fetchall()
@@ -235,7 +240,7 @@ def test_catalog_check_detects_missing_sync(db):
 
 def test_simultaneous_snapshots_do_not_partial_fill(db):
     for i in range(1, 5):
-        bias.record_sorter_vote('r0', f'r{i}', f'user-{i}', DAY)
+        record_vote('r0', f'r{i}', f'user-{i}', DAY)
     with ThreadPoolExecutor(max_workers=2) as executor:
         results = list(executor.map(lambda _: bias.create_weekly_global_snapshot(DAY), range(2)))
     assert sorted(results) == [False, True]
@@ -266,3 +271,64 @@ def test_shared_identity_metadata_is_independent_of_catalog_order():
              'short': 'Example', 'group': 'Group', 'local': 'photo'}
     with pytest.raises(ValueError, match='canonical catalog entry'):
         catalog_rating_rows([other, {**other, 'id': 9002}])
+
+
+def test_completed_ballot_includes_later_answers_and_ties(db):
+    pairs = [('r0', 'r1', 1), ('r0', 'r2', 1), ('r0', 'r3', 0), ('r0', 'r4', 0), ('r0', 'r5', .5)]
+    assert bias.record_sorter_ballot(str(uuid.uuid4()), pairs, 'alice', DAY)['recorded']
+    assert row(db) == (1200, 5)
+    assert row(db, 'r1')[0] < 1200 < row(db, 'r4')[0]
+
+
+def test_ballot_receipt_survives_day_change_and_other_visitor(db):
+    ballot = str(uuid.uuid4())
+    pairs = [('r0', 'r1', 1)]
+    assert bias.record_sorter_ballot(ballot, pairs, 'alice', DAY)['recorded']
+    before = row(db)
+    assert bias.record_sorter_ballot(ballot, pairs, 'bob', DAY + datetime.timedelta(days=1))['reason'] == 'repeat_ballot'
+    assert row(db) == before
+
+
+def test_concurrent_same_ballot_different_visitors_counts_once(db):
+    ballot = str(uuid.uuid4())
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        results = list(executor.map(lambda i: bias.record_sorter_ballot(ballot, [('r0', 'r1', 1)], str(i), DAY), range(5)))
+    assert sum(r['recorded'] for r in results) == 1
+    assert row(db) == (1204, 1)
+
+
+def test_ballot_last_answer_replaces_prior_answer(db):
+    result = bias.record_sorter_ballot(str(uuid.uuid4()), [('r0', 'r1', 1), ('r1', 'r0', .5)], 'alice', DAY)
+    assert result['comparisons'] == 1
+    assert row(db) == (1200, 1)
+
+
+def test_long_completed_ballot_is_normalized(db):
+    bias.record_sorter_ballot(str(uuid.uuid4()), [('r0', f'r{i}', 1) for i in range(1, 20)], 'alice', DAY)
+    assert row(db) == (1204, 19)
+    with db.connection() as conn:
+        assert conn.execute("SELECT SUM(global_elo) FROM idol_ratings WHERE role_id LIKE 'r%'").fetchone()[0] == 24000
+
+
+def test_ranks_use_unrounded_scores_for_board_cutoff_and_snapshots(db):
+    with db.connection() as conn:
+        conn.execute("UPDATE idol_ratings SET global_match_count=0")
+        conn.execute("UPDATE idol_ratings SET member_name='Alpha',global_elo=1300.1,global_match_count=1 WHERE role_id='r0'")
+        conn.execute("UPDATE idol_ratings SET member_name='Zulu',global_elo=1300.4,global_match_count=1 WHERE role_id='r1'")
+    board = bias.get_global_leaderboard(1, include_provisional=False)
+    assert [(e.role_id, e.elo) for e in board.entries] == [('r1', 1300)]
+    with db.connection() as conn:
+        with conn.cursor() as cur:
+            snapshot = bias._fetch_global_snapshot_rows(cur, 1)
+    assert snapshot[0][:3] == ('r1', 1, 1300)
+
+
+def test_group_ranks_use_unrounded_average(db):
+    with db.connection() as conn:
+        conn.execute("UPDATE role_info SET image_url=NULL")
+        conn.execute("UPDATE role_info SET group_name='Alpha',image_url='photo' WHERE role_id='r0'")
+        conn.execute("UPDATE role_info SET group_name='Zulu',image_url='photo' WHERE role_id='r1'")
+        conn.execute("UPDATE idol_ratings SET global_elo=1300.1,global_match_count=50 WHERE role_id='r0'")
+        conn.execute("UPDATE idol_ratings SET global_elo=1300.4,global_match_count=50 WHERE role_id='r1'")
+    board = bias.get_global_group_leaderboard(1)
+    assert [(e.group_name, e.elo) for e in board.entries] == [('Zulu', 1300)]

@@ -162,7 +162,7 @@ async function browserFixture(saved = null, boardFails = false, hash = "") {
       id, value: id === "result-images" ? "10" : "", hidden: false, disabled: false,
       dataset: {}, classList: { toggle() {}, add() {}, remove() {} },
       innerHTML: "", textContent: "", setAttribute() {}, removeAttribute() {},
-      addEventListener(type, fn) { if (type === "click") this.onclick = fn; }, querySelectorAll() { return []; }, querySelector() { return null; },
+      addEventListener(type, fn) { if (type === "click") this.onclick = fn; }, querySelectorAll() { return []; }, querySelector() { return { append() {} }; },
       contains() { return false; }, focus() {}, appendChild() {},
       click() { this.onclick?.({ currentTarget: this }); },
     });
@@ -181,15 +181,20 @@ async function browserFixture(saved = null, boardFails = false, hash = "") {
     createElement() { return element("created"); },
   };
   const beacons = [];
+  const ballots = [];
   const context = vm.createContext({
-    document, console, URL, Blob, AbortController,
+    document, console, URL, Blob, AbortController, crypto,
     localStorage: { getItem: (key) => storage.get(key) || null, setItem: (key, value) => storage.set(key, value), removeItem: (key) => storage.delete(key) },
     location: { hash, search: "", pathname: "/sorter", origin: "https://example.test" },
     history: { replaceState() { context.location.hash = ""; } },
     window: { scrollTo() {}, matchMedia: () => ({ matches: true }) },
     navigator: { sendBeacon(url, payload) { beacons.push({ url, payload }); return true; }, clipboard: { async writeText(url) { context.copiedURL = url; } } },
     Image: class {}, setTimeout() { return 0; }, clearTimeout() {},
-    fetch: async (url) => {
+    fetch: async (url, options) => {
+      if (url === "/api/sorter/ballot") {
+        ballots.push(JSON.parse(options.body));
+        return { ok: true, json: async () => ({ recorded: true, comparisons: ballots.at(-1).comparisons.length }) };
+      }
       if (url.includes("leaderboard")) {
         if (boardFails) throw new Error("offline");
         return { ok: true, json: async () => ({ entries: [] }) };
@@ -201,7 +206,7 @@ async function browserFixture(saved = null, boardFails = false, hash = "") {
   vm.runInContext(readFileSync(new URL("../static/sorter/lz-string.min.js", import.meta.url), "utf8"), context);
   vm.runInContext(readFileSync(new URL("../static/sorter/sorter.js", import.meta.url), "utf8"), context);
   for (let i = 0; i < 30; i++) await Promise.resolve();
-  return { element, storage, ids, context, document, catalog, beacons,
+  return { element, storage, ids, context, document, catalog, beacons, ballots,
     session: () => JSON.parse(storage.get("bias-club-session-v1")) };
 }
 
@@ -320,16 +325,24 @@ Deno.test("completed rankings survive expiry and remain available until a new so
   assert.equal(ui.storage.has("bias-club-session-v1"), false);
 });
 
-Deno.test("idols without Discord roles still submit leaderboard votes", async () => {
+Deno.test("completed sorts submit all evidence once, including ties and undo", async () => {
   const ui = await browserFixture();
-  assert.ok(ui.ids.every((id) => !ui.catalog.entries.find((e) => e.id === id).role_id));
   ui.element("start").click();
   ui.element("pick-left").click();
-  assert.equal(ui.beacons.length, 1);
-  const payload = JSON.parse(await ui.beacons[0].payload.text());
-  const pair = ui.session().matchups[0];
-  assert.equal(payload.winner_role_id, ui.catalog.entries.find((e) => e.id === pair[0]).leaderboard_id);
-  assert.equal(payload.loser_role_id, ui.catalog.entries.find((e) => e.id === pair[1]).leaderboard_id);
+  ui.element("undo").click();
   ui.element("tie").click();
-  assert.equal(ui.beacons.length, 1, "ties still only affect the personal ranking");
+  assert.equal(ui.ballots.length, 0);
+  assert.equal(ui.beacons.length, 0);
+  for (let i = 0; i < 200 && !ui.session().finished; i++) ui.element("pick-left").click();
+  assert.ok(ui.session().finished);
+  assert.equal(ui.ballots.length, 1);
+  const payload = ui.ballots[0];
+  assert.equal(payload.comparisons.length, ui.session().choices.length);
+  assert.equal(payload.comparisons[0][2], 0.5);
+  const pair = ui.session().matchups[0];
+  assert.equal(payload.comparisons[0][0], ui.catalog.entries.find(e => e.id === pair[0]).leaderboard_id);
+  for (let i = 0; i < 20; i++) await Promise.resolve();
+  assert.ok(ui.session().ballotDone);
+  const resumed = await browserFixture(ui.session());
+  assert.equal(resumed.ballots.length, 0);
 });

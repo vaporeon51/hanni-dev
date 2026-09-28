@@ -13,6 +13,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
+from uuid import UUID
 
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, Body, FastAPI, HTTPException, Query, Request, Response
@@ -30,7 +31,7 @@ from src.db.bias import (  # noqa: E402
     LEADERBOARD_SNAPSHOT_LIMIT,
     get_global_group_leaderboard,
     get_global_leaderboard,
-    record_sorter_vote,
+    record_sorter_ballot,
     visitor_key,
 )
 from src.db.feedback import ContentFeedback, add_content_report, add_content_vote  # noqa: E402
@@ -910,33 +911,46 @@ async def report(
 
 
 @app.post("/api/sorter/vote")
-async def sorter_vote(
-    request: Request,
-    response: Response,
-    payload: Any = Body(default=None),
-) -> dict[str, Any]:
-    """Best-effort vote; all influence and evidence checks are atomic in SQL."""
+async def sorter_vote() -> dict[str, Any]:
+    # Cached clients must not keep spending the budget one click at a time.
+    return {"recorded": False, "reason": "completed_sort_required"}
+
+
+@app.post("/api/sorter/ballot")
+async def sorter_ballot(request: Request, response: Response,
+                        payload: Any = Body(default=None)) -> dict[str, Any]:
+    invalid = {"recorded": False, "reason": "invalid_payload"}
     if not isinstance(payload, dict):
-        return {"recorded": False, "reason": "invalid_payload"}
+        return invalid
+    try:
+        ballot_id = str(UUID(payload.get("ballot_id", "")))
+    except (ValueError, TypeError, AttributeError):
+        return invalid
+    comparisons = payload.get("comparisons")
+    if not isinstance(comparisons, list) or not 1 <= len(comparisons) <= 20000:
+        return invalid
+    for pair in comparisons:
+        if not isinstance(pair, list) or len(pair) != 3:
+            return invalid
+        a, b, score = pair
+        if (not isinstance(a, str) or not isinstance(b, str) or not a or not b
+                or a == b or max(len(a), len(b)) > 128
+                or isinstance(score, bool) or not isinstance(score, (float, int))
+                or score not in (0, .5, 1)):
+            return invalid
+    if len({i for a, b, _ in comparisons for i in (a, b)}) > 1500:
+        return invalid
     visitor_token = _ensure_visitor_cookie(request, response)
-    winner_id = payload.get("winner_role_id")
-    loser_id = payload.get("loser_role_id")
-    if (not isinstance(winner_id, str) or not isinstance(loser_id, str)
-            or not winner_id or not loser_id or winner_id == loser_id
-            or max(len(winner_id), len(loser_id)) > 128):
-        return {"recorded": False, "reason": "invalid_payload"}
     if not _sorter_burst_limiter.allow(visitor_key(visitor_token)):
         return {"recorded": False, "reason": "rate_limited"}
     try:
-        result = await asyncio.to_thread(record_sorter_vote, winner_id, loser_id, visitor_token)
+        result = await asyncio.to_thread(record_sorter_ballot, ballot_id, comparisons, visitor_token)
+        if result.get("reason") == "unknown_id":
+            logger.warning("Sorter ballot rejected: unknown idol ID; check catalog sync")
+        return result
     except Exception:
-        logger.exception("Could not record sorter vote")
+        logger.exception("Could not record completed sorter ballot")
         return {"recorded": False, "reason": "unavailable"}
-    if result and result.get("reason") == "unknown_id":
-        # Do not log visitor cookies or untrusted payloads; this is usually
-        # a catalog deployed before its metadata sync.
-        logger.warning("Sorter vote rejected: unknown idol ID; check catalog sync")
-    return result if result is not None else {"recorded": False, "reason": "invalid_payload"}
 
 
 @app.get("/api/leaderboard")

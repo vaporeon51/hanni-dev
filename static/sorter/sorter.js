@@ -3,8 +3,7 @@
  * Differences from the original:
  * - lineup data comes from /static/sorter/catalog.json (kpopping overwrites
  *   baked in at build time) instead of inline data.js + photo-cache.js
- * - every non-tie matchup with two known idols is beaconed to
- *   POST /api/sorter/vote so the global/personal ELO boards stay live
+ * - completed idol sorts submit one normalized, daily-budgeted Elo ballot
  * - adaptive sessions give everyone coverage, then focus on favorites
  * - lightly seeded opening pairs use consensus only to choose opponents
  * - double-check rounds adapt to new answers and refit the personal ranking
@@ -94,33 +93,6 @@
     setTimeout(() => heart.remove(), 900);
   }
 
-  function logVote(leftItem, rightItem, choice, session) {
-    if (choice === "tie") return; // ties never touch ELO
-    const winner = choice === "left" ? leftItem : rightItem;
-    const loser = choice === "left" ? rightItem : leftItem;
-    const winnerId = winner.leaderboard_id || winner.role_id;
-    const loserId = loser.leaderboard_id || loser.role_id;
-    if (!winnerId || !loserId || winnerId === loserId) return;
-    session.counted = (session.counted || 0) + 1;
-    const payload = JSON.stringify({
-      winner_role_id: winnerId,
-      loser_role_id: loserId,
-    });
-    try {
-      if (navigator.sendBeacon) {
-        navigator.sendBeacon("/api/sorter/vote", new Blob([payload], { type: "application/json" }));
-      } else {
-        fetch("/api/sorter/vote", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: payload,
-          keepalive: true,
-        }).catch(() => {});
-      }
-    } catch {
-      /* votes are best-effort; the ranking is what matters */
-    }
-  }
 
   function preload(item) {
     if (!item) return;
@@ -822,7 +794,7 @@
         const j = Math.floor(Math.random() * (i + 1));
         [ids[i], ids[j]] = [ids[j], ids[i]];
       }
-      session = { version: dataSetVersion, mode, ids, algorithm: newAlgorithm(ids), matchups: [], choices: [], verifyRounds: [], verify: null, counted: 0, started: Date.now() };
+      session = { ballotId: crypto.randomUUID(), version: dataSetVersion, mode, ids, algorithm: newAlgorithm(ids), matchups: [], choices: [], verifyRounds: [], verify: null, counted: 0, started: Date.now() };
       sorter = BiasSorter.create(ids, session.algorithm);
       showFull = false;
       save();
@@ -830,12 +802,81 @@
       pushedFromSetup = true;
       renderBattle();
     };
+    // Submit the finished evidence, never clicks. Keep a stable ID and frozen
+    // payload until acknowledged so retries cannot accidentally submit edits.
+    const ballotsInFlight = new Set();
+    let ballotRetryTimer = null;
+    const ballotRetryDelays = [2000, 5000, 15000];
+    async function submitBallot(attempt = 0) {
+      const current = session;
+      if (current.mode !== "idols" || !current.ballotId || current.ballotDone ||
+          ballotsInFlight.has(current.ballotId)) return;
+      if (!current.ballotPayload) {
+        const replay = current.algorithm ? null : BiasSorter.create(current.ids);
+        const comparisons = [];
+        current.choices.forEach((choice, index) => {
+          const pair = current.algorithm ? current.matchups[index] : replay.pair();
+          if (!current.algorithm) replay.choose(choice);
+          const a = byId.get(pair[0]);
+          const b = byId.get(pair[1]);
+          const aId = a.leaderboard_id || a.role_id;
+          const bId = b.leaderboard_id || b.role_id;
+          if (aId && bId && aId !== bId) comparisons.push([
+            aId, bId, choice === "tie" ? 0.5 : choice === "left" ? 1 : 0,
+          ]);
+        });
+        current.ballotPayload = { ballot_id: current.ballotId, comparisons };
+        save();
+      }
+      if (!current.ballotPayload.comparisons.length) return;
+      clearTimeout(ballotRetryTimer);
+      ballotRetryTimer = null;
+      ballotsInFlight.add(current.ballotId);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      let retryable = false;
+      try {
+        const response = await fetch("/api/sorter/ballot", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(current.ballotPayload), signal: controller.signal,
+        });
+        if (!response.ok) {
+          retryable = response.status === 408 || response.status === 429 || response.status >= 500;
+          return;
+        }
+        const result = await response.json();
+        retryable = ["unavailable", "rate_limited"].includes(result.reason);
+        if (result.recorded || ["repeat_ballot", "repeat", "budget_exhausted"].includes(result.reason)) {
+          current.ballotDone = true;
+          current.counted = result.recorded ? result.comparisons : 0;
+          if (session === current) {
+            save();
+            if (view === "results") renderResults();
+          }
+        }
+      } catch {
+        retryable = true; // Network failure, timeout, or interrupted response.
+      } finally {
+        clearTimeout(timeout);
+        ballotsInFlight.delete(current.ballotId);
+        if (retryable && attempt < ballotRetryDelays.length &&
+            session === current && view === "results" && !current.ballotDone) {
+          ballotRetryTimer = setTimeout(() => {
+            ballotRetryTimer = null;
+            if (session === current && view === "results" && !current.ballotDone) {
+              submitBallot(attempt + 1);
+            }
+          }, ballotRetryDelays[attempt]);
+        }
+      }
+    }
     function renderBattle() {
       if (sorter.result) {
         session.finished ||= Date.now();
         save();
         if (view !== "results") goView("results", "replace");
         renderResults();
+        submitBallot();
         return;
       }
       const pair = sorter.pair();
@@ -889,7 +930,6 @@
       if (view !== "sorting" || sorter.result) return;
       const pair = sorter.pair();
       if (button) burst(button);
-      logVote(byId.get(pair[0]), byId.get(pair[1]), choice, session);
       if (session.algorithm) session.matchups.push(pair);
       session.choices.push(choice);
       sorter.choose(choice);
@@ -1158,7 +1198,6 @@
       const leftId = verify.shown[pos][0] === 0 ? aId : bId;
       const rightId = verify.shown[pos][0] === 0 ? bId : aId;
       if (button) burst(button);
-      logVote(byId.get(leftId), byId.get(rightId), choice, session);
       verify.picks.push({
         a: aId,
         b: bId,

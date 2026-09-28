@@ -80,3 +80,9 @@ vote limits, and atomic snapshots. All 12 sorter tests also passed. The broader
 Python suite has three pre-existing homepage/scroll UI failures, reproduced
 on the unchanged baseline. Before deployment, verify migration 39 and catalog
 coverage on the target database with `python scripts/sync_sorter_idols.py --check`.
+
+## Completed-sort ballots (46)
+
+Apply `table_updates46.sql` before deploying the completed-sort writer. It only
+adds durable submission receipts; existing Elo and daily budgets are preserved.
+The old per-click API becomes a no-op, so refresh open sorter tabs after rollout.

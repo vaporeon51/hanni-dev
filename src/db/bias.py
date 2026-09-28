@@ -9,8 +9,9 @@ from __future__ import annotations
 
 import datetime
 import hashlib
+from collections import Counter, defaultdict
 from dataclasses import dataclass
-from decimal import Decimal, ROUND_DOWN
+from decimal import Decimal
 
 
 _KST = datetime.timezone(datetime.timedelta(hours=9))
@@ -45,13 +46,6 @@ def calculate_elo_delta(winner_elo: float, loser_elo: float, k: float = 8) -> tu
     delta = k * (1 - expected_winner)
     return delta, -delta
 
-
-def bounded_delta(winner_elo, loser_elo, k, winner_spent, loser_spent) -> Decimal:
-    """Equal transfer bounded by both idols' remaining absolute movement."""
-    proposed = Decimal(str(calculate_elo_delta(winner_elo, loser_elo, k)[0]))
-    return max(Decimal(0), min(proposed, DAILY_IDOL_BUDGET - winner_spent,
-                               DAILY_IDOL_BUDGET - loser_spent)).quantize(
-        Decimal("0.0000000001"), rounding=ROUND_DOWN)
 
 
 @dataclass(frozen=True)
@@ -173,22 +167,6 @@ def _pool():
     return POOL
 
 
-# Distinct pairings per visitor-day at which the global K-factor halves.
-DAILY_DECAY_TAU = 250
-
-
-def scaled_global_k(distinct_pairs: int) -> int:
-    """Global K for a visitor's next new pairing after `distinct_pairs` today.
-
-    K decreases hyperbolically (8 at 0, 4 at 250, 2 at 750; floor 1), so
-    marathon sessions keep full local effect while their marginal global
-    weight fades. Variable K is sound ELO: each matchup stays zero-sum.
-    """
-    if distinct_pairs < 0:
-        distinct_pairs = 0
-    return max(1, round(GLOBAL_ELO_K * DAILY_DECAY_TAU / (DAILY_DECAY_TAU + distinct_pairs)))
-
-
 def pair_key_for(winner_id: str, loser_id: str) -> str:
     """Order-independent key for a matchup pair."""
     return f"{winner_id}/{loser_id}" if winner_id < loser_id else f"{loser_id}/{winner_id}"
@@ -219,53 +197,95 @@ def visitor_key(visitor_token: str) -> str:
     return hashlib.sha256(visitor_token.encode("utf-8")).hexdigest()
 
 
-def record_sorter_vote(winner_id: str, loser_id: str, visitor_token: str = "",
-                       day: datetime.date | None = None) -> dict | None:
-    """Atomically accept one budgeted pair vote (or a no-op)."""
-    if not winner_id or not loser_id or winner_id == loser_id or not visitor_token:
-        return None
-    visitor_token = visitor_key(visitor_token)
+def ballot_deltas(ratings, comparisons, spent):
+    """Combine a ballot before capping its net movement. No click-order effects.
+
+    Each pair is weighted by the larger endpoint degree, bounding each idol's
+    uncapped movement by K. Clip net gains/losses to remaining daily budgets,
+    then shrink the larger side to keep the update zero-sum. Integer units
+    avoid rounding drift and never spend beyond a budget.
+    """
+    degree = Counter(i for a, b, _ in comparisons for i in (a, b))
+    net = defaultdict(Decimal)
+    for a, b, score in sorted(comparisons):
+        expected = 1 / (1 + 10 ** ((float(ratings[b]) - float(ratings[a])) / 400))
+        delta = Decimal(str(GLOBAL_ELO_K * (score - expected))) / max(degree[a], degree[b])
+        net[a] += delta
+        net[b] -= delta
+    unit = Decimal('0.0000000001')
+    # Round the combined proposal once before clipping; repeated division can
+    # otherwise turn an exact 4-point result into 3.9999999999.
+    sides = []
+    for sign in (1, -1):
+        sides.append({i: int(min(abs(d).quantize(unit), max(Decimal(0), DAILY_IDOL_BUDGET - spent.get(i, Decimal(0)))) / unit)
+                      for i, d in net.items() if d * sign > 0})
+    target = min(sum(side.values()) for side in sides)
+    result = {i: Decimal(0) for i in degree}
+    for sign, side in zip((1, -1), sides):
+        total = sum(side.values())
+        if not total or not target:
+            continue
+        allocated = {i: value * target // total for i, value in side.items()}
+        # Largest remainders give an exact equal transfer, with stable tie-breaking.
+        order = sorted(side, key=lambda i: (-(side[i] * target % total), i))
+        for i in order[:target - sum(allocated.values())]:
+            allocated[i] += 1
+        for i, value in allocated.items():
+            result[i] = sign * value * unit
+    return result
+
+
+def record_sorter_ballot(ballot_id, comparisons, visitor_token, day=None):
+    """Commit a completed ballot, daily pair dedup and net budgets atomically."""
+    token = visitor_key(visitor_token)
     day = day or datetime.datetime.now(datetime.timezone.utc).date()
-    ids = sorted((winner_id, loser_id))
+    # Last answer to a pair wins within the submitted ballot, including ties.
+    pairs = {}
+    for a, b, score in comparisons:
+        if a > b:
+            a, b, score = b, a, 1 - score
+        pairs[pair_key_for(a, b)] = (a, b, score)
+    ids = sorted({i for a, b, _ in pairs.values() for i in (a, b)})
     with _pool().connection() as conn:
         with conn.cursor() as cur:
-            # Serialize a visitor's daily accounting; lock idol rows in a
-            # stable order so different visitors cannot deadlock on A/B.
-            cur.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0));", (visitor_token,))
-            cur.execute("""SELECT role_id, global_elo FROM idol_ratings
-                           WHERE role_id = ANY(%s) AND TRIM(member_name) <> ''
-                           ORDER BY role_id FOR UPDATE;""", (ids,))
-            elos = dict(cur.fetchall())
-            if len(elos) != 2:
+            cur.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0));", (token,))
+            cur.execute("SELECT 1 FROM sorter_ballots WHERE ballot_id = %s;", (ballot_id,))
+            if cur.fetchone():
+                return {"recorded": False, "reason": "repeat_ballot"}
+            cur.execute("SELECT role_id, global_elo FROM idol_ratings WHERE role_id = ANY(%s) AND TRIM(member_name) <> '' ORDER BY role_id FOR UPDATE;", (ids,))
+            ratings = dict(cur.fetchall())
+            if len(ratings) != len(ids):
                 return {"recorded": False, "reason": "unknown_id"}
-            cur.execute("""INSERT INTO visitor_pair_votes (visitor_token, day, pair_key)
-                           VALUES (%s, %s, %s) ON CONFLICT DO NOTHING RETURNING 1;""",
-                        (visitor_token, day, pair_key_for(*ids)))
-            if cur.fetchone() is None:
-                return {"recorded": False, "reason": "repeat", "global_k": 0}
-            cur.execute("""SELECT COUNT(*) FROM visitor_pair_votes
-                           WHERE visitor_token = %s AND day = %s;""", (visitor_token, day))
-            k = scaled_global_k(cur.fetchone()[0] - 1)
-            cur.execute("""SELECT role_id, spent FROM visitor_idol_budget
-                           WHERE visitor_token = %s AND day = %s AND role_id = ANY(%s);""",
-                        (visitor_token, day, ids))
-            spent = dict(cur.fetchall())
-            delta = bounded_delta(elos[winner_id], elos[loser_id], k,
-                                  spent.get(winner_id, Decimal(0)), spent.get(loser_id, Decimal(0)))
-            if not delta:
-                return {"recorded": False, "reason": "budget_exhausted", "global_k": 0}
-            for role_id in ids:
+            cur.execute("INSERT INTO sorter_ballots (ballot_id) VALUES (%s) ON CONFLICT DO NOTHING RETURNING 1;", (ballot_id,))
+            if not cur.fetchone():
+                return {"recorded": False, "reason": "repeat_ballot"}
+            cur.execute("""SELECT pair_key FROM visitor_pair_votes
+                           WHERE visitor_token = %s AND day = %s AND pair_key = ANY(%s);""",
+                        (token, day, list(pairs)))
+            seen = {r[0] for r in cur.fetchall()}
+            fresh = [pair for key, pair in pairs.items() if key not in seen]
+            if not fresh:
+                return {"recorded": False, "reason": "repeat"}
+            cur.execute("SELECT role_id, spent FROM visitor_idol_budget WHERE visitor_token = %s AND day = %s AND role_id = ANY(%s);", (token, day, ids))
+            deltas = ballot_deltas(ratings, fresh, dict(cur.fetchall()))
+            cur.executemany("INSERT INTO visitor_pair_votes (visitor_token, day, pair_key) VALUES (%s, %s, %s);",
+                            [(token, day, pair_key_for(a, b)) for a, b, _ in fresh])
+            if not any(deltas.values()) and any(ballot_deltas(ratings, fresh, {}).values()):
+                return {"recorded": False, "reason": "budget_exhausted"}
+            # Counts represent accepted evidence, including ties and balanced results.
+            counts = Counter(i for a, b, _ in fresh for i in (a, b))
+            wins = Counter(a if score == 1 else b for a, b, score in fresh if score != .5)
+            for i in sorted(counts):
+                delta = deltas[i]
                 cur.execute("""INSERT INTO visitor_idol_budget (visitor_token, day, role_id, spent)
-                               VALUES (%s, %s, %s, %s)
-                               ON CONFLICT (visitor_token, day, role_id)
+                               VALUES (%s, %s, %s, %s) ON CONFLICT (visitor_token, day, role_id)
                                DO UPDATE SET spent = visitor_idol_budget.spent + EXCLUDED.spent;""",
-                            (visitor_token, day, role_id, delta))
+                            (token, day, i, abs(delta)))
                 cur.execute("""UPDATE idol_ratings SET global_elo = global_elo + %s,
-                               global_match_count = global_match_count + 1,
+                               global_match_count = global_match_count + %s,
                                global_win_count = global_win_count + %s WHERE role_id = %s;""",
-                            (delta if role_id == winner_id else -delta,
-                             int(role_id == winner_id), role_id))
-            return {"recorded": True, "reason": "accepted", "global_k": k}
+                            (delta, counts[i], wins[i], i))
+            return {"recorded": True, "reason": "accepted", "comparisons": len(fresh)}
 
 
 def get_global_leaderboard(limit: int = LEADERBOARD_SNAPSHOT_LIMIT,
@@ -288,7 +308,7 @@ def get_global_leaderboard(limit: int = LEADERBOARD_SNAPSHOT_LIMIT,
                     FROM idol_ratings r WHERE {_ACTIVE_IDOL_PREDICATE}
                 ), selected AS (
                     (SELECT * FROM candidates WHERE global_match_count > 0
-                     ORDER BY score DESC, member_name, role_id LIMIT %s)
+                     ORDER BY global_elo DESC, member_name, role_id LIMIT %s)
                     UNION ALL
                     (SELECT * FROM candidates WHERE global_match_count = 0
                      ORDER BY md5(role_id || %s), role_id LIMIT %s)
@@ -299,7 +319,7 @@ def get_global_leaderboard(limit: int = LEADERBOARD_SNAPSHOT_LIMIT,
                 FROM selected r CROSS JOIN previous_snapshot ps
                 LEFT JOIN idol_leaderboard_snapshots p
                     ON p.role_id = r.role_id AND p.snapshot_date = ps.snapshot_date
-                ORDER BY (r.global_match_count > 0) DESC, r.score DESC, r.member_name, r.role_id;
+                ORDER BY (r.global_match_count > 0) DESC, r.global_elo DESC, r.member_name, r.role_id;
                 """,
                 (limit, datetime.datetime.now(datetime.timezone.utc).date().isoformat(),
                  FRESH_FACE_LIMIT if include_provisional else 0),
@@ -344,7 +364,7 @@ def get_global_group_leaderboard(limit: int = 15, top_n: int = 3) -> GroupLeader
                 FROM idol_scores
                 WHERE member_rank <= %s
                 GROUP BY group_name
-                ORDER BY elo DESC, group_name
+                ORDER BY AVG(score) DESC, group_name
                 LIMIT %s;
                 """,
                 (top_n, top_n, limit),
@@ -388,13 +408,13 @@ def _fetch_global_snapshot_rows(cur, limit: int) -> list:
     cur.execute(
         f"""
         WITH scores AS (
-            SELECT r.role_id, r.member_name,
+            SELECT r.role_id, r.member_name, r.global_elo,
                    ROUND(r.global_elo)::int AS elo
             FROM idol_ratings r
             WHERE {_ACTIVE_IDOL_PREDICATE} AND r.global_match_count > 0
         ), ranked AS (
             SELECT role_id, elo, ROW_NUMBER() OVER (
-                ORDER BY elo DESC, member_name, role_id) AS rank
+                ORDER BY global_elo DESC, member_name, role_id) AS rank
             FROM scores
         )
         SELECT role_id, rank::int, elo,

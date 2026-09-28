@@ -70,36 +70,54 @@ happens through `scripts/sync_sorter_idols.py`, not embedded migration data.
 
 There is one live Elo score per idol. Existing idols start from their previous
 displayed score; new idols start at 1200. Scores retain fractional precision
-and are rounded for display. One recorded matchup is enough to join the ranks.
+and are rounded for display. Idol ranks, group ranks, and snapshot ranks use
+unrounded scores; alphabetical ordering only breaks exact ties. One recorded
+matchup is enough to join the ranks.
 There is no confidence multiplier or lifetime contributor tracking.
 
-Votes use K=8 with the existing daily volume decay. Each visitor can move each
-idol by at most 12 Elo points per UTC day, counting gains and losses together.
-A pair transfers the same amount in both directions, limited by the remaining
-budget of both idols, and counts at most once per visitor per day. Repeats and
-exhausted budgets add neither points nor match counts. All accounting commits
-atomically, with stable lock order for simultaneous requests.
+New idol sorts submit their actual comparisons once on completion, using
+K=8 without daily volume decay. Ties count as half-wins; Undo before completion
+removes the answer from the ballot. Each distinct pair uses its last answer
+within the ballot. Daily pair deduplication still applies across ballots.
 
-A process-local token bucket allows 12 immediate requests and replenishes four
-per second, with a maximum of 2,048 tracked visitor keys. It is a cheap burst
-backstop, not the authoritative vote limit. Requests beyond it are rejected;
-ordinary fast choices are no longer subject to a two-second cooldown. The
-API distinguishes invalid payloads, unknown IDs, repeats, exhausted budgets,
-and rate limiting. Unknown IDs produce a diagnostic log without visitor data.
+All eligible comparisons use the same pre-update ratings. Each comparison is
+weighted by one divided by the larger endpoint comparison count. Contributions
+are combined per idol before applying the remaining 12-point visitor/idol/UTC-day
+budget. Budgets count absolute net movement per ballot, not individual clicks.
+If clipping leaves unequal total gains and losses, the larger side is scaled
+down to preserve total Elo. Integer decimal units preserve exact zero-sum
+updates. This bounds an idol's uncapped movement below 8 points per ballot;
+a two-idol win against an equal-rated opponent moves the winner 4 points.
 
-New daily accounting rows store hashes instead of raw cookies and expire via
-the existing worker cleanup. Cookies are anonymous, not verified people.
-Clearing cookies can bypass visitor-level limits. The daily cap limits Elo
-movement, not how many leaderboard positions can change.
+Migration 46 adds durable UUID ballot receipts. Receipts, pair deduplication,
+budgets, counters and ratings commit atomically. Refreshes, retries and shared
+copies of the same ballot cannot count again, even on another day. Failed
+submissions retain a frozen payload. Temporary network/server failures and rate
+limits retry up to three times after 2, 5, and 15 seconds while the same results
+remain open. Each request times out after 15 seconds. Invalid submissions do not
+automatically retry; reopening results can retry an unacknowledged ballot.
+Only newly started sessions carry ballot IDs; existing saved sessions are not
+retroactively submitted. Cached clients' old per-click endpoint returns a no-op.
+
+The first completed result submits automatically. Refinement and Undo after
+submission affect the personal ranking only; they do not retract or replace a
+submitted ballot. Unfinished sorts and group sorts do not submit global ballots.
+The leaderboard UI is unchanged.
+
+A process-local burst limiter remains as a cheap backstop. Anonymous cookies
+are not verified people; clearing cookies can bypass visitor-level limits.
+Daily accounting stores hashed visitor keys and expires through the worker.
+Ballot receipts remain durable. Match counts represent newly accepted unique
+comparisons, including ties and balanced results; fully budget-blocked ballots
+add no counts. These are not unique-voter counts.
 
 The board requests up to 45 ranked idols plus five fresh faces, selected
 independently and rotated by UTC date. `include_provisional=false` suppresses
 the extra sample for sorter seeding. Snapshots include only ranked idols,
 serialize by week, and commit as a whole; unexpected rank collisions fail.
 
-Selection, omitted idols, ties, and personal sorting are unchanged. Global
-votes remain immediate; personal Undo does not retract a submitted global
-vote. The first global answer for a pair on a given day still stands.
+Selection, omitted idols, and personal sorting are unchanged. The first
+submitted global answer for a pair on a given day still stands.
 
 Groups retain the original Discord-mapped population and top-three average,
 now using the single live idol score without another shrinkage calculation.

@@ -90,10 +90,10 @@ def test_clean_wholesome_still_served(monkeypatch):
 
 def test_clean_sorter_votes_still_count(monkeypatch):
     recorded = {}
-    def record(winner_id, loser_id, token):
-        recorded["args"] = (winner_id, loser_id, token)
-        return {"recorded": True, "global_k": 8}
-    monkeypatch.setattr(web_app, "record_sorter_vote", record)
+    def record(ballot_id, comparisons, token):
+        recorded["args"] = (ballot_id, comparisons, token)
+        return {"recorded": True, "comparisons": 1}
+    monkeypatch.setattr(web_app, "record_sorter_ballot", record)
 
     async def request():
         transport = httpx.ASGITransport(app=web_app.app)
@@ -103,14 +103,15 @@ def test_clean_sorter_votes_still_count(monkeypatch):
             headers={"host": CLEAN_HOST},
         ) as client:
             return await client.post(
-                "/api/sorter/vote",
-                json={"winner_role_id": "role-a", "loser_role_id": "role-b"},
+                "/api/sorter/ballot",
+                json={"ballot_id": "f2b630f5-c018-4bfd-a8b5-268f4064858b",
+                      "comparisons": [["role-a", "role-b", 1]]},
             )
 
     response = asyncio.run(request())
     assert response.status_code == 200
-    assert response.json() == {"recorded": True, "global_k": 8}
-    assert recorded["args"][:2] == ("role-a", "role-b")
+    assert response.json() == {"recorded": True, "comparisons": 1}
+    assert recorded["args"][1] == [["role-a", "role-b", 1]]
     assert recorded["args"][2]
 
 

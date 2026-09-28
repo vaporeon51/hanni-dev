@@ -147,8 +147,17 @@ class Fingerprinter:
         raise Unverified('unsupported media host')
 
     def fingerprint(self, url):
-        with POOL.connection() as connection:
-            row = connection.execute('SELECT fingerprint FROM content_fingerprints WHERE url=%s', (url,)).fetchone()
+        # The fingerprint table is a cache: a dead/stressed database must
+        # degrade to compute-without-cache, never crash a multi-hour backfill.
+        # (2026-09-28: 3h run died on an uncaught connection error here with
+        # zero output after 1000+ successful fingerprints.)
+        try:
+            with POOL.connection() as connection:
+                row = connection.execute(
+                    'SELECT fingerprint FROM content_fingerprints WHERE url=%s', (url,)
+                ).fetchone()
+        except Exception:
+            row = None
         if row and row[0].get('version') == 1:
             return row[0]
         self.check_budget()
@@ -165,10 +174,13 @@ class Fingerprinter:
             result = fingerprint_file(path, deadline=self.deadline)
         if not self.cache_writes:
             return result
-        with POOL.connection() as connection:
-            connection.execute('''INSERT INTO content_fingerprints(url,fingerprint) VALUES(%s,%s)
-                                  ON CONFLICT(url) DO UPDATE SET fingerprint=EXCLUDED.fingerprint,
-                                    created_at=NOW()''', (url, Jsonb(result)))
+        try:
+            with POOL.connection() as connection:
+                connection.execute('''INSERT INTO content_fingerprints(url,fingerprint) VALUES(%s,%s)
+                                      ON CONFLICT(url) DO UPDATE SET fingerprint=EXCLUDED.fingerprint,
+                                        created_at=NOW()''', (url, Jsonb(result)))
+        except Exception:
+            pass
         return result
 
     def match_contents(self, item, candidates, *, visual=True, excluded=frozenset()):

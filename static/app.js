@@ -247,7 +247,7 @@ function externalLink(item, text = "open source") {
   return link;
 }
 
-function createMedia(item) {
+function createMedia(item, onUnavailable = () => {}) {
   const wrapper = document.createElement("div");
   wrapper.className = "card-media is-loading";
   wrapper.textContent = "loading media…";
@@ -309,7 +309,36 @@ function createMedia(item) {
     }, delay);
   };
 
-  const handleMediaError = () => {
+  const hideUnavailable = () => {
+    if (disposed) return;
+    controller.dispose();
+    onUnavailable();
+  };
+
+  const handleMediaError = async () => {
+    if (disposed) return;
+    // Media elements do not expose HTTP status. Confirm a 404 with a tiny
+    // range request before hiding; network/codec errors keep normal retries.
+    const probe = new AbortController();
+    requestController?.abort();
+    requestController = probe;
+    const timeout = window.setTimeout(() => probe.abort(), 15000);
+    try {
+      const response = await fetch(resolved.url, {
+        headers: { Range: "bytes=0-0" }, signal: probe.signal, cache: "no-store",
+      });
+      response.body?.cancel().catch(() => {});
+      if (response.status === 404) {
+        hideUnavailable();
+        return;
+      }
+    } catch (_) {
+      // An inconclusive probe must not hide content.
+    } finally {
+      window.clearTimeout(timeout);
+      if (requestController === probe) requestController = null;
+    }
+    if (disposed) return;
     if (retryCount >= MEDIA_RETRY_DELAYS_MS.length) {
       showSourceLink();
       return;
@@ -364,7 +393,7 @@ function createMedia(item) {
   };
 
   const load = async () => {
-    if (failed || loading || retryTimer !== null) return;
+    if (disposed || failed || loading || retryTimer !== null) return;
     if (resolved) {
       if (!media?.getAttribute("src")) showResolvedMedia(resolved);
       return;
@@ -377,6 +406,10 @@ function createMedia(item) {
         signal: currentController.signal,
       });
       const payload = await response.json().catch(() => ({}));
+      if (response.status === 404) {
+        hideUnavailable();
+        return;
+      }
       if (!response.ok) {
         const error = new Error(payload.detail || "media unavailable");
         error.isTransient = [429, 502, 503, 504].includes(response.status);
@@ -419,6 +452,7 @@ function createMedia(item) {
   const controller = {
     element: wrapper,
     observe() {
+      if (disposed) return;
       wrapper._mediaController = controller;
       if (mediaWindowObserver) mediaWindowObserver.observe(wrapper);
       else {
@@ -482,7 +516,9 @@ function renderCard(item) {
   card.dataset.contentLinkId = String(item.content_link_id);
   card._item = item;
 
-  const media = createMedia(item);
+  const media = createMedia(item, () => {
+    card.remove();
+  });
   if (media) card.appendChild(media.element);
 
   const body = document.createElement("div");

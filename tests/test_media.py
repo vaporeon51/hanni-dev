@@ -585,3 +585,26 @@ def test_media_stream_allows_imgur_gg_mirror():
 
     assert response.status_code == 200
     assert session.requests[0][0] == url
+
+
+def test_goyangi_404_is_temporary_and_retried_on_next_resolution(monkeypatch):
+    from src.services import media
+
+    page_url = "https://goyangi.pics/v/temporarily-missing.webp"
+
+    class MissingResponse(GoyangiPageResponse):
+        status_code = 404
+
+    session = GoyangiPageSession(MissingResponse(page_url))
+    monkeypatch.setattr(media, "_shared_session", lambda: session)
+    media.resolve_media_url_cached.cache_clear()
+    try:
+        with pytest.raises(media.MediaUnavailableError):
+            media.resolve_media_url_cached(page_url)
+        session.response = GoyangiPageResponse("https://cdn.goyangi.pics/restored.webp")
+        assert media.resolve_media_url_cached(page_url) == ResolvedMedia(
+            "image", "https://cdn.goyangi.pics/restored.webp"
+        )
+        assert session.requests == [page_url, page_url]
+    finally:
+        media.resolve_media_url_cached.cache_clear()

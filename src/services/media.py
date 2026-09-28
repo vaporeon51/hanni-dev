@@ -125,6 +125,10 @@ class MediaResolutionError(RuntimeError):
         self.retry_after_seconds = retry_after_seconds
 
 
+class MediaUnavailableError(RuntimeError):
+    """An upstream 404 for this request, not evidence of permanent deletion."""
+
+
 @dataclass(frozen=True)
 class ResolvedMedia:
     kind: MediaKind
@@ -423,6 +427,8 @@ def _resolve_goyangi_page(url: str, *, session: requests.Session | None = None) 
         response = requester.get(url, timeout=(5, 12))
     except requests.RequestException:
         return None
+    if getattr(response, "status_code", 200) == 404:
+        raise MediaUnavailableError("Upstream page is temporarily unavailable")
     final = _safe_proxied_asset(response.url)
     if final is not None and final != url:
         target: str | None = final

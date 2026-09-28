@@ -131,7 +131,7 @@ function itemFilterQuery(item) {
   ).join(" ");
 }
 
-function createMedia(item, onResolved = () => {}) {
+function createMedia(item, onResolved = () => {}, onUnavailable = () => {}) {
   const wrapper = document.createElement("div");
   wrapper.className = "reel-media is-loading";
   wrapper.textContent = "loading…";
@@ -217,7 +217,36 @@ function createMedia(item, onResolved = () => {}) {
     }, delay);
   };
 
-  const handleMediaError = () => {
+  const hideUnavailable = () => {
+    if (disposed) return;
+    dispose();
+    onUnavailable();
+  };
+
+  const handleMediaError = async () => {
+    if (disposed) return;
+    // Media elements do not expose HTTP status. Confirm a 404 with a tiny
+    // range request before hiding; network/codec errors keep normal retries.
+    const probe = new AbortController();
+    requestController?.abort();
+    requestController = probe;
+    const timeout = window.setTimeout(() => probe.abort(), 15000);
+    try {
+      const response = await fetch(resolved.url, {
+        headers: { Range: "bytes=0-0" }, signal: probe.signal, cache: "no-store",
+      });
+      response.body?.cancel().catch(() => {});
+      if (response.status === 404) {
+        hideUnavailable();
+        return;
+      }
+    } catch (_) {
+      // An inconclusive probe must not hide content.
+    } finally {
+      window.clearTimeout(timeout);
+      if (requestController === probe) requestController = null;
+    }
+    if (disposed) return;
     if (retryCount >= MEDIA_RETRY_DELAYS_MS.length) {
       showSourceLink();
       return;
@@ -276,6 +305,10 @@ function createMedia(item, onResolved = () => {}) {
         signal: currentController.signal,
       });
       const payload = await response.json().catch(() => ({}));
+      if (response.status === 404) {
+        hideUnavailable();
+        return;
+      }
       if (!response.ok) {
         const error = new Error(payload.detail || "media unavailable");
         error.isTransient = [429, 502, 503, 504].includes(response.status);
@@ -599,7 +632,7 @@ function createReelCell(item) {
     if (count < 2) return;
     collectionLink.textContent = `view set (${count}) →`;
     collectionLink.hidden = false;
-  });
+  }, () => removeUnavailableCell(cell));
   stage.appendChild(media.element);
   stage.appendChild(progress);
   const message = document.createElement("p");
@@ -777,6 +810,39 @@ async function handleFeedback(card, control) {
   } finally {
     control.disabled = false;
     control.blur();
+  }
+}
+
+function removeUnavailableCell(cell) {
+  const row = cell.closest(".reel");
+  if (!row) return;
+  const index = state.cards.indexOf(row);
+  if (index < 0) return;
+  row._cells = row._cells.filter((candidate) => candidate !== cell);
+  row._progressBars = row._cells.map((candidate) => candidate._progressBar);
+  cell.remove();
+  if (row._cells.length) {
+    const grid = row.querySelector(".reel-grid");
+    grid.classList.remove("is-partial-1", "is-partial-2");
+    if (collageColumns() > 1) grid.classList.add(`is-partial-${row._cells.length}`);
+    row._cells.forEach((candidate, i) => {
+      candidate.classList.toggle("is-first-cell", i === 0);
+      candidate.classList.toggle("is-last-cell", i === row._cells.length - 1);
+    });
+    return;
+  }
+  const wasActive = state.activeCard === row;
+  disposeRow(row);
+  state.cards.splice(index, 1);
+  if (wasActive) state.activeCard = null;
+  const next = state.cards[Math.min(index, state.cards.length - 1)];
+  if (wasActive && next) {
+    setActiveCard(next);
+    $("reel-feed").scrollTo({ top: next.offsetTop, behavior: "instant" });
+  }
+  if (!state.cards.length) {
+    clearAutoplayTimers();
+    announce("media is temporarily unavailable · try again later", { sticky: true });
   }
 }
 

@@ -806,3 +806,63 @@ def test_collections_by_url_rejects_blank_url():
     response = asyncio.run(request())
 
     assert response.status_code == 400
+
+
+def test_temporarily_missing_media_returns_uncached_404_without_db_write(monkeypatch):
+    from src.services.media import MediaUnavailableError
+    from src.db import POOL
+
+    async def preview(_):
+        return CollectionPreview(url="https://goyangi.pics/v/missing.webp", count=1)
+
+    def unavailable(_):
+        raise MediaUnavailableError("upstream 404")
+
+    def unexpected_db_access():
+        raise AssertionError("Temporary media failures must not mutate database state")
+
+    monkeypatch.setattr(web_app, "load_collection_preview", preview)
+    monkeypatch.setattr(web_app, "get_live_content_url", lambda _: "https://goyangi.pics/v/missing.webp")
+    monkeypatch.setattr(web_app, "resolve_media_url_cached", unavailable)
+    monkeypatch.setattr(web_app, "enqueue_priority_url", lambda _: None)
+    monkeypatch.setattr(POOL, "connection", unexpected_db_access)
+
+    async def request():
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=web_app.app), base_url="http://test") as client:
+            for suffix in ("media", "asset"):
+                response = await client.get(f"/api/feed/42/{suffix}")
+                assert response.status_code == 404
+                assert response.headers["cache-control"] == "no-store"
+
+    asyncio.run(request())
+
+
+def test_asset_404_clears_resolution_cache_without_marking_dead(monkeypatch):
+    from src.services.media import MediaUpstreamError
+    from src.db import POOL
+
+    def resolved(_):
+        return ResolvedMedia("image", "https://cdn.goyangi.pics/stale.webp")
+
+    cleared = []
+    resolved.cache_clear = lambda: cleared.append(True)
+
+    def missing(*args, **kwargs):
+        raise MediaUpstreamError("Upstream host returned HTTP 404", status_code=404)
+
+    def unexpected_db_access():
+        raise AssertionError("Temporary media failures must not mutate database state")
+
+    monkeypatch.setattr(web_app, "get_live_content_url", lambda _: "https://goyangi.pics/v/source.webp")
+    monkeypatch.setattr(web_app, "resolve_media_url_cached", resolved)
+    monkeypatch.setattr(web_app, "open_media_stream", missing)
+    monkeypatch.setattr(POOL, "connection", unexpected_db_access)
+
+    async def request():
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=web_app.app), base_url="http://test") as client:
+            return await client.get("/api/feed/42/asset")
+
+    response = asyncio.run(request())
+    assert response.status_code == 404
+    assert response.headers["cache-control"] == "no-store"
+    assert cleared == [True]

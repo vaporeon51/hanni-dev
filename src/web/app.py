@@ -42,6 +42,7 @@ from src.services.dead_link_queue import enqueue_priority_url  # noqa: E402
 from src.services.media import (  # noqa: E402
     TRANSIENT_UPSTREAM_STATUSES,
     MediaResolutionError,
+    MediaUnavailableError,
     MediaUpstreamError,
     open_media_stream,
     resolve_media_url_cached,
@@ -725,6 +726,11 @@ async def media(content_link_id: int, request: Request, response: Response) -> d
     enqueue_priority_url(url)
     try:
         resolved = await asyncio.to_thread(resolve_media_url_cached, url)
+    except MediaUnavailableError as error:
+        raise HTTPException(
+            status_code=404, detail="Media is temporarily unavailable",
+            headers={"Cache-Control": "no-store"},
+        ) from error
     except MediaResolutionError as error:
         raise HTTPException(
             status_code=503,
@@ -796,6 +802,11 @@ def media_asset(content_link_id: int, request: Request) -> StreamingResponse:
         raise HTTPException(status_code=404, detail="Content item not found")
     try:
         resolved = resolve_media_url_cached(url)
+    except MediaUnavailableError as error:
+        raise HTTPException(
+            status_code=404, detail="Media is temporarily unavailable",
+            headers={"Cache-Control": "no-store"},
+        ) from error
     except MediaResolutionError as error:
         raise HTTPException(
             status_code=503,
@@ -808,6 +819,13 @@ def media_asset(content_link_id: int, request: Request) -> StreamingResponse:
     try:
         upstream = open_media_stream(resolved.url, range_header=request.headers.get("range"))
     except MediaUpstreamError as error:
+        if error.status_code == 404:
+            # A viewer page may point to a new CDN filename on the next visit.
+            resolve_media_url_cached.cache_clear()
+            raise HTTPException(
+                status_code=404, detail="Media is temporarily unavailable",
+                headers={"Cache-Control": "no-store"},
+            ) from error
         status_code = 503 if error.status_code in TRANSIENT_UPSTREAM_STATUSES else 502
         headers = {"Retry-After": str(error.retry_after_seconds)} if status_code == 503 else None
         raise HTTPException(status_code=status_code, detail=str(error), headers=headers) from error

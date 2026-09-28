@@ -131,7 +131,7 @@ function externalLink(item) {
   return link;
 }
 
-function createMedia(item) {
+function createMedia(item, onUnavailable = () => {}) {
   const wrapper = document.createElement("div");
   wrapper.className = "card-media is-loading";
   wrapper.textContent = "loading media…";
@@ -193,7 +193,36 @@ function createMedia(item) {
     }, delay);
   };
 
-  const handleMediaError = () => {
+  const hideUnavailable = () => {
+    if (disposed) return;
+    controller.dispose();
+    onUnavailable();
+  };
+
+  const handleMediaError = async () => {
+    if (disposed) return;
+    // Media elements do not expose HTTP status. Confirm a 404 with a tiny
+    // range request before hiding; network/codec errors keep normal retries.
+    const probe = new AbortController();
+    requestController?.abort();
+    requestController = probe;
+    const timeout = window.setTimeout(() => probe.abort(), 15000);
+    try {
+      const response = await fetch(resolved.url, {
+        headers: { Range: "bytes=0-0" }, signal: probe.signal, cache: "no-store",
+      });
+      response.body?.cancel().catch(() => {});
+      if (response.status === 404) {
+        hideUnavailable();
+        return;
+      }
+    } catch (_) {
+      // An inconclusive probe must not hide content.
+    } finally {
+      window.clearTimeout(timeout);
+      if (requestController === probe) requestController = null;
+    }
+    if (disposed) return;
     if (retryCount >= MEDIA_RETRY_DELAYS_MS.length) {
       showSourceLink();
       return;
@@ -247,7 +276,7 @@ function createMedia(item) {
   };
 
   const load = async () => {
-    if (failed || loading || retryTimer !== null) return;
+    if (disposed || failed || loading || retryTimer !== null) return;
     if (resolved) {
       if (!media?.getAttribute("src")) showResolvedMedia(resolved);
       return;
@@ -260,6 +289,10 @@ function createMedia(item) {
         signal: currentController.signal,
       });
       const payload = await response.json().catch(() => ({}));
+      if (response.status === 404) {
+        hideUnavailable();
+        return;
+      }
       if (!response.ok) {
         const error = new Error(payload.detail || "media unavailable");
         error.isTransient = [429, 502, 503, 504].includes(response.status);
@@ -302,6 +335,7 @@ function createMedia(item) {
   const controller = {
     element: wrapper,
     observe() {
+      if (disposed) return;
       wrapper._mediaController = controller;
       if (mediaWindowObserver) mediaWindowObserver.observe(wrapper);
       else {
@@ -406,6 +440,7 @@ function setFeedbackMessage(card, text) {
 
 function activateSlide(card, index) {
   const items = card._setItems;
+  if (!items.length) return;
   const nextIndex = Math.max(0, Math.min(index, items.length - 1));
   const changed = card._setIndex !== nextIndex;
   const item = items[nextIndex];
@@ -421,8 +456,30 @@ function activateSlide(card, index) {
   card.querySelector('[data-set-nav="next"]').disabled = nextIndex === items.length - 1;
 }
 
+function removeUnavailableSetItem(card, media, slide) {
+  const items = card._setItems;
+  const track = card._setTrack;
+  const removedIndex = card._setMedia.indexOf(media);
+  if (removedIndex < 0) return;
+  const currentItem = card._item;
+  card._setMedia.splice(removedIndex, 1);
+  items.splice(removedIndex, 1);
+  slide.remove();
+  if (!items.length) {
+    card.remove();
+    return;
+  }
+  const currentIndex = items.indexOf(currentItem);
+  const nextIndex = currentIndex >= 0 ? currentIndex : Math.min(removedIndex, items.length - 1);
+  Array.from(track.children).forEach((child, i) => {
+    child.setAttribute("aria-label", `${i + 1} of ${items.length}`);
+  });
+  activateSlide(card, nextIndex);
+  track.scrollTo({ left: track.children[nextIndex].offsetLeft, behavior: "instant" });
+}
+
 function renderSetCard(contentSet) {
-  const items = contentSet.items || [];
+  const items = [...(contentSet.items || [])];
   const card = document.createElement("article");
   card.className = "card set-card";
   card._setItems = items;
@@ -438,7 +495,7 @@ function renderSetCard(contentSet) {
     const slide = document.createElement("div");
     slide.className = "set-slide";
     slide.setAttribute("aria-label", `${index + 1} of ${items.length}`);
-    const media = createMedia(item);
+    const media = createMedia(item, () => removeUnavailableSetItem(card, media, slide));
     card._setMedia.push(media);
     slide.appendChild(media.element);
     track.appendChild(slide);

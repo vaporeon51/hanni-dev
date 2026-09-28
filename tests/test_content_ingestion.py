@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.content_ingestion import ContentMessageClassifier, media_urls
+from src.content_ingestion import ContentMessageClassifier, media_items, media_urls
 
 
 def message(message_id: str, timestamp: str, *, content: str = "", roles=None, embeds=None, reference=None):
@@ -77,3 +77,36 @@ def test_ephemeral_discord_attachment_urls_are_not_ingested():
 
     assert media_urls(payload) == []
     assert ContentMessageClassifier().consume(payload) == []
+
+
+def test_imgur_album_embeds_store_playable_file_others_unchanged():
+    links = ContentMessageClassifier().consume(
+        message(
+            "300",
+            "2026-08-28T00:00:00+00:00",
+            roles=["role-1"],
+            embeds=[
+                {
+                    "type": "gifv",
+                    "url": "https://imgur.com/a/album-AbC123x",
+                    "video": {"url": "https://i.imgur.com/AbC123x.mp4"},
+                },
+                {
+                    "type": "gifv",
+                    "url": "https://goyangi.pics/v/some-clip.webp",
+                    "video": {"url": "https://i.imgur.com/AbC123x.mp4"},
+                },
+            ],
+        )
+    )
+    assert [link.url for link in links] == [
+        "https://i.imgur.com/AbC123x.mp4",
+        "https://goyangi.pics/v/some-clip.webp",
+    ]
+    assert media_items(
+        message(
+            "301",
+            "2026-08-28T00:00:00+00:00",
+            embeds=[{"type": "gifv", "url": "https://imgur.com/a/album-AbC123x"}],
+        )
+    ) == [("https://imgur.com/a/album-AbC123x", None)]

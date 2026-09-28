@@ -8,6 +8,7 @@ from typing import Any, Literal
 from urllib.parse import urlsplit
 
 from src.config.constants import EPHEMERAL_MEDIA_HOSTS
+from src.content_dedup import media_key
 
 SUPPORTED_VIDEO_EMBED_TYPES = frozenset({"gifv", "video"})
 ANIMATED_MEDIA_FLAG = 1 << 5
@@ -43,10 +44,32 @@ class ContentContext:
     last_timestamp: datetime
 
 
-def media_urls(message: dict[str, Any]) -> list[str]:
-    """Return unique URLs from video embeds and explicitly animated image embeds."""
+def _playable_url(embed: dict[str, Any]) -> str | None:
+    """Return the embed's direct origin file, if it has a usable one.
 
-    urls: list[str] = []
+    Only origin URLs (e.g. i.imgur.com), never Discord's re-encoded
+    proxy snapshots: proxies add compression noise that hurts fingerprint
+    thresholds, and their host carries no stable identity.
+    """
+    for field in ("video", "image", "thumbnail"):
+        media = embed.get(field)
+        if not isinstance(media, dict):
+            continue
+        url = media.get("url")
+        hostname = (urlsplit(url).hostname or "").lower() if isinstance(url, str) else ""
+        if isinstance(url, str) and url and hostname not in EPHEMERAL_MEDIA_HOSTS:
+            return url
+    return None
+
+
+def media_items(message: dict[str, Any]) -> list[tuple[str, str | None]]:
+    """Return (stored URL, playable file URL or None) for playable embeds.
+
+    Only Imgur album pages resolve to their playable file; every other host
+    keeps its posted URL so feed/dead-link behavior is unchanged elsewhere.
+    """
+
+    items: list[tuple[str, str | None]] = []
     seen: set[str] = set()
     for embed in message.get("embeds", []):
         if not isinstance(embed, dict):
@@ -56,10 +79,20 @@ def media_urls(message: dict[str, Any]) -> list[str]:
             continue
         url = embed.get("url")
         hostname = (urlsplit(url).hostname or "").lower() if isinstance(url, str) else ""
-        if isinstance(url, str) and url and hostname not in EPHEMERAL_MEDIA_HOSTS and url not in seen:
-            seen.add(url)
-            urls.append(url)
-    return urls
+        if not (isinstance(url, str) and url and hostname not in EPHEMERAL_MEDIA_HOSTS):
+            continue
+        direct = _playable_url(embed)
+        stored = direct if direct is not None and media_key(url).startswith("imgur:album:") else url
+        if stored not in seen:
+            seen.add(stored)
+            items.append((stored, direct))
+    return items
+
+
+def media_urls(message: dict[str, Any]) -> list[str]:
+    """Return unique URLs from video embeds and explicitly animated image embeds."""
+
+    return [url for url, _ in media_items(message)]
 
 
 def _is_animated_image_embed(embed: dict[str, Any]) -> bool:

@@ -125,14 +125,6 @@ class MediaResolutionError(RuntimeError):
         self.retry_after_seconds = retry_after_seconds
 
 
-class MediaGoneError(RuntimeError):
-    """The page itself returned HTTP 404: the file is gone, not struggling."""
-
-    def __init__(self, url: str) -> None:
-        super().__init__(f"Upstream page returned HTTP 404: {url}")
-        self.url = url
-
-
 @dataclass(frozen=True)
 class ResolvedMedia:
     kind: MediaKind
@@ -431,8 +423,6 @@ def _resolve_goyangi_page(url: str, *, session: requests.Session | None = None) 
         response = requester.get(url, timeout=(5, 12))
     except requests.RequestException:
         return None
-    if getattr(response, "status_code", 200) == 404:
-        raise MediaGoneError(url)
     final = _safe_proxied_asset(response.url)
     if final is not None and final != url:
         target: str | None = final
@@ -474,8 +464,6 @@ def _resolve_imgur_page_og(url: str) -> ResolvedMedia | None:
         response = _shared_session().get(url, timeout=(5, 12))
     except requests.RequestException:
         return None
-    if response.status_code == 404:
-        raise MediaGoneError(url)
     if getattr(response, "status_code", 200) != 200:
         return None
     text = getattr(response, "text", "") or ""

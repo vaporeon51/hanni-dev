@@ -4,7 +4,6 @@ import pytest
 import requests
 
 from src.services.media import (
-    MediaGoneError,
     MediaResolutionError,
     MediaUpstreamError,
     ResolvedMedia,
@@ -488,26 +487,6 @@ def test_goyangi_unresolvable_page_stays_a_plain_link():
     assert resolve_media_url(page_url, session=off_allowlist) == ResolvedMedia("link", page_url)
 
     assert failing.requests == [page_url]
-
-
-class GonePageResponse(GoyangiPageResponse):
-    status_code = 404
-
-
-def test_goyangi_404_page_raises_gone_not_plain_link():
-    session = GoyangiPageSession(GonePageResponse("https://goyangi.pics/v/gone.webp"))
-    with pytest.raises(MediaGoneError):
-        resolve_media_url("https://goyangi.pics/v/gone.webp", session=session)
-
-
-def test_goyangi_500_page_stays_a_plain_link():
-    page_url = "https://goyangi.pics/v/flaky.webp"
-
-    class FlakyResponse(GoyangiPageResponse):
-        status_code = 500
-
-    session = GoyangiPageSession(FlakyResponse(page_url))
-    assert resolve_media_url(page_url, session=session) == ResolvedMedia("link", page_url)
 
 
 OG_ALBUM_HTML = (

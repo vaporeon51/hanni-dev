@@ -41,7 +41,6 @@ def _cover_mp4(html: str) -> str | None:
 
 def main(argv: list[str]) -> int:
     apply = "--apply" in argv
-    from psycopg import errors
 
     from src.content_dedup import candidate_posts, MediaSetIndex, media_key
     from src.db import POOL
@@ -97,17 +96,30 @@ def main(argv: list[str]) -> int:
                 rewritten += pending
                 continue
             with POOL.connection() as conn, conn.transaction(), conn.cursor() as cur:
-                try:
-                    cur.execute(
-                        "UPDATE content_links SET url = %s "
-                        "WHERE source_message_id IS NOT NULL AND url LIKE %s",
-                        (mp4, "%/a/%" + album + "%"),
+                # Never create a (message, role, url) dupe: if the mp4 row is
+                # already there (e.g. posted directly as well as via album),
+                # leave the /a/ row untouched and report it for pruning.
+                cur.execute(
+                    "UPDATE content_links SET url = %s "
+                    "WHERE source_message_id IS NOT NULL AND url LIKE %s "
+                    "AND NOT EXISTS (SELECT 1 FROM content_links x "
+                    "WHERE x.source_message_id = content_links.source_message_id "
+                    "AND x.role_id = content_links.role_id AND x.url = %s)",
+                    (mp4, "%/a/%" + album + "%", mp4),
+                )
+                rewritten += cur.rowcount
+                cur.execute(
+                    "SELECT count(*) FROM content_links "
+                    "WHERE source_message_id IS NOT NULL AND url LIKE %s",
+                    ("%/a/%" + album + "%",),
+                )
+                still_pending = cur.fetchone()[0]
+                if still_pending:
+                    skipped += still_pending
+                    failures.append(
+                        f"{album}: target mp4 row already exists, "
+                        f"left {still_pending} /a/ row(s) for pruning"
                     )
-                    rewritten += cur.rowcount
-                except errors.UniqueViolation:
-                    conn.rollback()
-                    skipped += pending
-                    failures.append(f"{album}: target mp4 row already exists, skipped")
             if (i + 1) % 50 == 0:
                 print(f"progress {i + 1}/{len(albums)} rewritten={rewritten} "
                       f"skipped={skipped} failed={failed}", flush=True)

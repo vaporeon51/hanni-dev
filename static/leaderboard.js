@@ -138,7 +138,7 @@
     }
     const basis = `Based on ${board.vote_count.toLocaleString()} recorded matchups`;
     const movement = hasBaseline ? ` · Movement since ${escape(board.movement_baseline_date)}` : "";
-    const explain = " · ELO reflects head-to-head preferences; ♡ counts recorded matchups";
+    const explain = " · ELO reflects head-to-head preferences · ♡ counts recorded matchups";
     html += `<p class="board-foot">${basis}${movement}${explain}</p>`;
     return html;
   }

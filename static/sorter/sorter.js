@@ -809,6 +809,7 @@
       session = value;
       session.verifyRounds = session.verifyRounds || [];
       sorter = BiasSorter.replay(session.ids, session.choices, session.algorithm, session.matchups);
+      showFull = false;
       save();
       goView(sorter.result ? "results" : "sorting", historyAction);
       renderBattle();
@@ -823,6 +824,7 @@
       }
       session = { version: dataSetVersion, mode, ids, algorithm: newAlgorithm(ids), matchups: [], choices: [], verifyRounds: [], verify: null, counted: 0, started: Date.now() };
       sorter = BiasSorter.create(ids, session.algorithm);
+      showFull = false;
       save();
       goView("sorting", "push");
       pushedFromSetup = true;
@@ -929,6 +931,9 @@
     };
     let ranked = [];
     let buckets = [];
+    // Display length only — defaults to Top 50 so the finished view is
+    // byte-for-byte identical unless the user opts into the full list.
+    let showFull = false;
     const VERIFY_SLICE = 10;
     const CHALLENGE_TOP = 8;
     function baseBuckets() {
@@ -1010,11 +1015,14 @@
         if (fresh.length) $("verify").textContent = "Continue Sorting ♡";
       }
       const limit = Number($("result-images").value);
-      const visibleRanking = ranked.slice(0, 50);
+      const visibleRanking = showFull ? ranked : ranked.slice(0, 50);
       const featured = visibleRanking.slice(0, limit);
       const remaining = visibleRanking.slice(limit);
+      const headingCount = showFull || ranked.length <= 50
+        ? `${ranked.length} ${escape(session.mode)}`
+        : `Top 50 of ${ranked.length}`;
       $("ranking").innerHTML =
-        `<header class="ranking-heading"><h2>My ranking <span>♡</span></h2><span>${ranked.length > 50 ? `Top 50 of ${ranked.length}` : `${ranked.length} ${escape(session.mode)}`}</span></header>` +
+        `<header class="ranking-heading"><h2>My ranking <span>♡</span></h2><span>${headingCount}</span></header>` +
         (featured.length
           ? `<div class="rank-highlights">${featured
               .map(({ id, rank }) => {
@@ -1037,8 +1045,23 @@
           : "") +
         '<div class="ranking-credit">bias sorter ♡</div>';
       $("leaderboard-cta").hidden = !counted;
+      const more = $("ranking-more");
+      const toggle = $("toggle-full");
+      if (more && toggle) {
+        more.hidden = ranked.length <= 50;
+        toggle.setAttribute("aria-expanded", String(showFull));
+        toggle.textContent = showFull ? "Show top 50 ↑" : `Show full ranking (${ranked.length}) ↓`;
+      }
     }
     $("result-images").onchange = renderResults;
+    const toggleFull = $("toggle-full");
+    if (toggleFull) {
+      toggleFull.onclick = () => {
+        showFull = !showFull;
+        renderResults();
+        if (showFull) $("ranking-more")?.scrollIntoView({ block: "nearest" });
+      };
+    }
     $("undo-final").onclick = () => {
       if (!session.choices.length) return;
       clearVerifyRounds("Verification cleared — ranking changed.");

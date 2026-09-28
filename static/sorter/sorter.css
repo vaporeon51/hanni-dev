@@ -907,6 +907,27 @@ progress::-moz-progress-bar {
   font: 19px Georgia, serif;
   letter-spacing: -0.6px;
 }
+.ranking-more {
+  display: flex;
+  justify-content: center;
+  margin: 16px auto 0;
+  max-width: 1000px;
+}
+.ranking-more button {
+  font-size: 14px;
+  background: var(--light);
+  border-color: var(--pink);
+  color: var(--pink);
+  font-weight: 700;
+  border-radius: 20px;
+  padding: 10px 20px;
+  box-shadow: 0 2px 8px rgb(184 77 121 / 12%);
+}
+@media (hover: hover) and (pointer: fine) {
+  .ranking-more button:hover {
+    background: #f5d4e2;
+  }
+}
 .result-image-label {
   font-size: 14px;
   display: flex;
@@ -1195,6 +1216,9 @@ dialog p {
     gap: 7px;
   }
   .result-actions button {
+    font-size: 12px;
+  }
+  .ranking-more button {
     font-size: 12px;
   }
 }

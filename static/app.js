@@ -586,7 +586,7 @@ function restoreView(snapshot) {
   state.mode = snapshot.mode;
   state.collectionLabel = snapshot.collectionLabel;
   state.query = snapshot.query;
-  state.sort = snapshot.sort === "top" ? "top" : "random";
+  state.sort = ["top", "latest"].includes(snapshot.sort) ? snapshot.sort : "random";
   state.hasMore = snapshot.hasMore;
   state.loadingMore = false;
   state.retryContinuation = false;
@@ -754,7 +754,8 @@ async function loadFeed(event) {
   state.mode = "feed";
   state.collectionLabel = "";
   state.query = $("query").value.trim();
-  state.sort = $("sort").value === "top" ? "top" : "random";
+  const requestedSort = $("sort").value;
+  state.sort = ["top", "latest"].includes(requestedSort) ? requestedSort : "random";
   state.items = [];
   state.hasMore = true;
   state.loadingMore = true;

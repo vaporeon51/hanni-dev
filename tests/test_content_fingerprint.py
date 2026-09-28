@@ -63,3 +63,10 @@ def test_goyangi_viewer_assets_do_not_expand_through_metadata_api():
     media = Fingerprinter(cache_writes=False, seconds=5)
     viewer = 'https://goyangi.pics/v/260925-newjeans-danielle-d0150f1a.webp'
     assert media.assets(viewer) == (viewer,)
+
+
+def test_downloader_does_not_use_default_bot_user_agent():
+    # Imgur 429s the stock python-requests UA while allowing any custom one.
+    media = Fingerprinter(cache_writes=False, seconds=5)
+    ua = media.session.headers.get("User-Agent", "")
+    assert ua and not ua.startswith("python-requests")

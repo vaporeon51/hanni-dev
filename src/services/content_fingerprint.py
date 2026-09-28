@@ -18,6 +18,11 @@ from src.db import POOL
 
 MAX_BYTES = 64 * 1024 * 1024
 
+# Imgur (and some CDNs) 429 the default python-requests User-Agent as bot
+# traffic while allowing identical requests with any custom UA. Every media
+# download in this pipeline must carry ours.
+USER_AGENT = "hanni-dedup/1.0"
+
 # Shared in-process album cache so per-set Fingerprinter instances in the
 # backfill do not re-fetch the same Imgur album. DB table imgur_album_cache
 # (migration 45) is the persistent layer with a 7-day TTL; albums are
@@ -74,6 +79,7 @@ class Fingerprinter:
         self.cache_writes = cache_writes
         self.deadline = time.monotonic() + seconds
         self.session = requests.Session()
+        self.session.headers.update({"User-Agent": USER_AGENT})
         self.rate_limited_until = 0.0
         self._assets_cache = {}
 

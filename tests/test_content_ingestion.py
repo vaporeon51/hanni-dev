@@ -79,6 +79,44 @@ def test_ephemeral_discord_attachment_urls_are_not_ingested():
     assert ContentMessageClassifier().consume(payload) == []
 
 
+def test_non_embedding_hosts_are_not_ingested():
+    payload = message(
+        "201",
+        "2026-08-28T00:00:00+00:00",
+        roles=["role-1"],
+        embeds=[
+            {
+                "type": "video",
+                "url": "https://pixeldrain.com/l/qZCkkUMR",
+            },
+            {
+                "type": "video",
+                "url": "https://d.fixupx.com/nmixxsy/status/2103829041673601034/video/1",
+            },
+            {
+                "type": "video",
+                "url": "https://x.com/nmixxsy/status/2103829041673601034",
+                "video": {
+                    "url": "https://video.twimg.com/amplify_video/2103793618175852544/vid/avc1/720x1280/vfrDHkAa63HjL2Bb.mp4?tag=29"
+                },
+            },
+            {
+                "type": "video",
+                "url": "https://video.twimg.com/amplify_video/2103793618175852544/vid/avc1/720x1280/vfrDHkAa63HjL2Bb.mp4?tag=29",
+            },
+            {
+                "type": "video",
+                "url": "https://i.imgur.com/keep.mp4",
+            },
+        ],
+    )
+
+    assert media_urls(payload) == ["https://i.imgur.com/keep.mp4"]
+    assert [link.url for link in ContentMessageClassifier().consume(payload)] == [
+        "https://i.imgur.com/keep.mp4"
+    ]
+
+
 def test_imgur_album_embeds_store_playable_file_others_unchanged():
     links = ContentMessageClassifier().consume(
         message(

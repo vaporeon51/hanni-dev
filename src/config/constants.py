@@ -24,6 +24,11 @@ MAX_FEED_ITEMS = 30
 # rows for history, but never ingest or expose them as durable web feed media.
 EPHEMERAL_MEDIA_HOSTS = frozenset({"cdn.discordapp.com", "media.discordapp.net"})
 
+# Hosts that Discord does not unfurl as inline gif-like embeds (file lockers,
+# wrapper pages, raw video CDNs). They ingest as bare links or unplayable
+# videos, so skip them at ingestion and exclude them from the feed.
+NON_EMBEDDING_MEDIA_HOSTS = frozenset({"pixeldrain.com", "fixupx.com", "video.twimg.com"})
+
 # Background jobs.
 INGESTION_INTERVAL_SECONDS = int(os.getenv("INGESTION_INTERVAL_SECONDS", str(12 * 60 * 60)))
 GOYANGI_INGEST_INTERVAL_SECONDS = int(os.getenv("GOYANGI_INGEST_INTERVAL_SECONDS", str(12 * 60 * 60)))

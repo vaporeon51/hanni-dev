@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from typing import Any, Literal
 from urllib.parse import urlsplit
 
-from src.config.constants import EPHEMERAL_MEDIA_HOSTS
+from src.config.constants import EPHEMERAL_MEDIA_HOSTS, NON_EMBEDDING_MEDIA_HOSTS
 from src.content_dedup import media_key
 
 SUPPORTED_VIDEO_EMBED_TYPES = frozenset({"gifv", "video"})
@@ -62,11 +62,20 @@ def _playable_url(embed: dict[str, Any]) -> str | None:
     return None
 
 
+def _is_non_embedding_host(hostname: str) -> bool:
+    """Match blocked hosts and their subdomains (e.g. d.fixupx.com)."""
+
+    host = hostname.lower().rstrip(".")
+    return any(host == blocked or host.endswith("." + blocked) for blocked in NON_EMBEDDING_MEDIA_HOSTS)
+
+
 def media_items(message: dict[str, Any]) -> list[tuple[str, str | None]]:
     """Return (stored URL, playable file URL or None) for playable embeds.
 
     Only Imgur album pages resolve to their playable file; every other host
     keeps its posted URL so feed/dead-link behavior is unchanged elsewhere.
+    Hosts Discord cannot unfurl as inline gif-like embeds (file lockers,
+    wrapper pages, raw video CDNs) are skipped entirely.
     """
 
     items: list[tuple[str, str | None]] = []
@@ -81,7 +90,11 @@ def media_items(message: dict[str, Any]) -> list[tuple[str, str | None]]:
         hostname = (urlsplit(url).hostname or "").lower() if isinstance(url, str) else ""
         if not (isinstance(url, str) and url and hostname not in EPHEMERAL_MEDIA_HOSTS):
             continue
+        if _is_non_embedding_host(hostname):
+            continue
         direct = _playable_url(embed)
+        if direct is not None and _is_non_embedding_host((urlsplit(direct).hostname or "").lower()):
+            continue
         stored = direct if direct is not None and media_key(url).startswith("imgur:album:") else url
         if stored not in seen:
             seen.add(stored)

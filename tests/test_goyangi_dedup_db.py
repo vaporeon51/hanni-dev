@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MIGRATION = (ROOT / 'migrations/table_updates42.sql').read_text()
 MIGRATION_GUARD_FIX = (ROOT / 'migrations/table_updates43.sql').read_text()
 MIGRATION_CONTENT_GUARD = (ROOT / 'migrations/table_updates44.sql').read_text()
+MIGRATION_MIRROR_CACHE = (ROOT / 'migrations/table_updates45.sql').read_text()
 
 
 @pytest.fixture
@@ -33,10 +34,11 @@ def db(monkeypatch):
                 role_id TEXT NOT NULL, url TEXT NOT NULL, uploaded_date TIMESTAMP,
                 goyangi_content_id TEXT, goyangi_set_id TEXT,
                 source_kind TEXT, source_message_id TEXT, root_message_id TEXT,
-                original_url TEXT)''')
+                original_url TEXT, mirror_url TEXT)''')
             conn.execute(MIGRATION)
             conn.execute(MIGRATION_GUARD_FIX)
             conn.execute(MIGRATION_CONTENT_GUARD)
+            conn.execute(MIGRATION_MIRROR_CACHE)
         yield pool
     finally:
         pool.close()

@@ -46,9 +46,9 @@ INSERT_GOYANGI_LINK = """
     INSERT INTO content_links
         (role_id, author_id, author, uploaded_date, url, initial_reaction_count,
          num_upvotes, num_reports, processed_date, is_dead, source_kind,
-         goyangi_content_id, goyangi_set_id)
+         goyangi_content_id, goyangi_set_id, original_url, mirror_url)
     VALUES
-        (%s, %s, %s, %s, %s, 0, 0, 0, NOW(), FALSE, 'goyangi', %s, %s)
+        (%s, %s, %s, %s, %s, 0, 0, 0, NOW(), FALSE, 'goyangi', %s, %s, %s, %s)
     ON CONFLICT (goyangi_content_id, role_id)
         WHERE goyangi_content_id IS NOT NULL DO NOTHING;
 """
@@ -227,9 +227,12 @@ def _draft_rows(content: dict, roles: list[str], uploaders: dict[str, str],
         return []
     uploader_id = str(content.get("uploader") or "")
     author = uploaders.get(uploader_id, uploader_id)
+    preview = str(content.get("preview") or "")
+    original = str(content.get("original") or "") or None
+    mirror = str(content.get("mirror") or "") or None
     return [
-        (role_id, uploader_id, author, created, str(content.get("preview")),
-         str(content.get("id")), set_id)
+        (role_id, uploader_id, author, created, preview,
+         str(content.get("id")), set_id, original, mirror)
         for role_id in roles
     ]
 
@@ -336,7 +339,6 @@ def run_pass(*, since: str | None, per_page: int, max_sets: int, apply: bool) ->
                     hydrate_errors[sid] = type(error).__name__
     existing = {item.id: item for item in existing}
     discord_index = MediaSetIndex(discord)
-    fingerprinter = Fingerprinter(cache_writes=apply)
     plans = []
     high_watermark = None
     for item in fetched:
@@ -362,7 +364,12 @@ def run_pass(*, since: str | None, per_page: int, max_sets: int, apply: bool) ->
         verification_complete = True
         if candidates:
             try:
-                member_matches, verification_complete = fingerprinter.match_contents(
+                # Per-set budget: the old shared 45s deadline expired mid-pass
+                # and deferred every later set. Album expansions are now shared
+                # via imgur_album_cache, so per-set instances stay cheap.
+                member_matches, verification_complete = Fingerprinter(
+                    cache_writes=apply, seconds=15,
+                ).match_contents(
                     media, candidates, visual=True, excluded=blocked_contents,
                 )
             except Unverified as error:

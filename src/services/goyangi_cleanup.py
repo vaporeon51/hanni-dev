@@ -110,10 +110,16 @@ def cleanup(*, apply: bool, verify_media: bool = True,
                 )
                 if not unchanged:
                     continue
-                deleted += db.remove_content(
-                    cursor, match['content_id'], match['role_id'],
-                    match['set_id'], match['discord_root_id'], match['evidence'],
-                )
+                try:
+                    deleted += db.remove_content(
+                        cursor, match['content_id'], match['role_id'],
+                        match['set_id'], match['discord_root_id'], match['evidence'],
+                    )
+                except ValueError:
+                    # Concurrent worker suppressed the same clip first, or the
+                    # clip moved sets. First suppression wins; skip without
+                    # aborting the batch.
+                    continue
 
     return {
         'matches': matches,

@@ -18,9 +18,55 @@ from src.db import POOL
 
 MAX_BYTES = 64 * 1024 * 1024
 
+# Shared in-process album cache so per-set Fingerprinter instances in the
+# backfill do not re-fetch the same Imgur album. DB table imgur_album_cache
+# (migration 45) is the persistent layer with a 7-day TTL; albums are
+# effectively immutable.
+_ALBUM_MEM_CACHE: dict[str, tuple[str, ...]] = {}
+
+ALBUM_CACHE_TTL_SECONDS = 7 * 24 * 3600
+RATE_LIMIT_COOLDOWN_SECONDS = 300
+
 
 class Unverified(Exception):
     pass
+
+
+def _album_cache_get(aid: str) -> tuple[str, ...] | None:
+    hit = _ALBUM_MEM_CACHE.get(aid)
+    if hit is not None:
+        return hit
+    try:
+        with POOL.connection() as connection:
+            row = connection.execute(
+                '''SELECT assets FROM imgur_album_cache
+                   WHERE album_id = %s
+                     AND fetched_at > NOW() - make_interval(secs => %s)''',
+                (aid, ALBUM_CACHE_TTL_SECONDS),
+            ).fetchone()
+    except Exception:
+        return None
+    if not row:
+        return None
+    payload = row[0]
+    if isinstance(payload, (list, tuple)) and all(isinstance(x, str) for x in payload):
+        return tuple(payload)
+    return None
+
+
+def _album_cache_put(aid: str, assets: tuple[str, ...]) -> None:
+    _ALBUM_MEM_CACHE[aid] = assets
+    try:
+        with POOL.connection() as connection:
+            connection.execute(
+                '''INSERT INTO imgur_album_cache(album_id, assets)
+                   VALUES (%s, %s)
+                   ON CONFLICT (album_id) DO UPDATE
+                   SET assets = EXCLUDED.assets, fetched_at = NOW()''',
+                (aid, Jsonb(list(assets))),
+            )
+    except Exception:
+        pass
 
 
 class Fingerprinter:
@@ -28,7 +74,7 @@ class Fingerprinter:
         self.cache_writes = cache_writes
         self.deadline = time.monotonic() + seconds
         self.session = requests.Session()
-        self.rate_limited = False
+        self.rate_limited_until = 0.0
         self._assets_cache = {}
 
     def check_budget(self):
@@ -42,12 +88,12 @@ class Fingerprinter:
 
     def get(self, url, **kwargs):
         self.check_budget()
-        if self.rate_limited:
+        if time.monotonic() < self.rate_limited_until:
             raise Unverified('upstream rate limited; retry later')
         kwargs.setdefault('timeout', self.request_timeout())
         r = self.session.get(url, **kwargs)
         if r.status_code == 429:
-            self.rate_limited = True
+            self.rate_limited_until = time.monotonic() + RATE_LIMIT_COOLDOWN_SECONDS
         r.raise_for_status()
         return r
 
@@ -56,10 +102,14 @@ class Fingerprinter:
             return self._assets_cache[url]
         key = media_key(url)
         if key.startswith('imgur:album:'):
+            aid = key.rsplit(':', 1)[-1]
+            cached = _album_cache_get(aid)
+            if cached is not None:
+                self._assets_cache[url] = cached
+                return cached
             client_id = os.getenv('IMGUR_CLIENT_ID', '').strip()
             if not client_id:
                 raise Unverified('IMGUR_CLIENT_ID is required to expand albums')
-            aid = key.rsplit(':', 1)[-1]
             with self.get(f'https://api.imgur.com/3/album/{aid}/images',
                           headers={'Authorization': 'Client-ID ' + client_id}) as r:
                 data = r.json()['data']
@@ -68,8 +118,13 @@ class Fingerprinter:
             urls = [x.get('mp4') or x.get('link') for x in data]
             if any(not x or urlsplit(x).hostname != 'i.imgur.com' for x in urls):
                 raise Unverified('unsupported album asset')
-            self._assets_cache[url] = tuple(urls)
-            return self._assets_cache[url]
+            assets = tuple(urls)
+            self._assets_cache[url] = assets
+            if self.cache_writes:
+                _album_cache_put(aid, assets)
+            else:
+                _ALBUM_MEM_CACHE[aid] = assets
+            return assets
         if key.startswith('imgur:image:'):
             assets = ('https://i.imgur.com/' + key.rsplit(':', 1)[-1] + '.mp4',)
             self._assets_cache[url] = assets

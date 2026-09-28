@@ -14,7 +14,7 @@ def _text(value):
 
 def load_sets(cursor, roots=None):
     query = '''SELECT role_id, url, uploaded_date, goyangi_content_id,
-                            original_url, source_kind, root_message_id,
+                            original_url, mirror_url, source_kind, root_message_id,
                             source_message_id, goyangi_set_id
                      FROM content_links
                      WHERE source_kind = 'goyangi' OR source_message_id IS NOT NULL'''
@@ -28,9 +28,9 @@ def load_sets(cursor, roots=None):
         params = (list(roots),)
     cursor.execute(query, params)
     discord, goyangi = {}, {}
-    for role, url, created, cid, original, kind, root, message, sid in cursor.fetchall():
-        role, url, cid, original, kind, root, message, sid = map(
-            _text, (role, url, cid, original, kind, root, message, sid)
+    for role, url, created, cid, original, mirror, kind, root, message, sid in cursor.fetchall():
+        role, url, cid, original, mirror, kind, root, message, sid = map(
+            _text, (role, url, cid, original, mirror, kind, root, message, sid)
         )
         if kind == 'goyangi':
             if not sid:
@@ -38,14 +38,14 @@ def load_sets(cursor, roots=None):
             # Stored links can be a subset of the upstream set, so they are
             # useful for shortlisting but never enough to prove set equality.
             goyangi.setdefault(sid, MediaSet(sid, complete=False)).add(
-                role, url, created, cid, original
+                role, url, created, cid, original, mirror
             )
             continue
         elif message:
             target, key = discord, root or message
         else:
             continue
-        target.setdefault(key, MediaSet(key)).add(role, url, created, cid, original)
+        target.setdefault(key, MediaSet(key)).add(role, url, created, cid, original, mirror)
     return list(discord.values()), list(goyangi.values())
 
 

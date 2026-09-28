@@ -932,9 +932,9 @@ progress::-moz-progress-bar {
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  padding-bottom: 22px;
-  margin-bottom: 16px;
-  border-bottom: 1px solid var(--line);
+  padding-top: 22px;
+  margin-top: 16px;
+  border-top: 1px solid var(--line);
 }
 .result-refine h3 {
   margin: 0 0 6px;

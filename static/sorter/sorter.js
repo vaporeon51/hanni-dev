@@ -1008,12 +1008,15 @@
       if (pending) {
         $("verify").hidden = false;
         $("verify").textContent =
-          `Continue Sorting (${(session.verify.limit || session.verify.pairs.length) - pending} left) ♡`;
+          `Resume refining · ${(session.verify.limit || session.verify.pairs.length) - pending} left →`;
       } else {
         const fresh = buildVerifyPairs();
         $("verify").hidden = fresh.length === 0;
-        if (fresh.length) $("verify").textContent = "Continue Sorting ♡";
+        if (fresh.length) $("verify").textContent = "Refine ranking →";
       }
+      $("result-refine").hidden = $("verify").hidden;
+      const appearance = $("ranking-appearance");
+      const leaderboard = $("leaderboard-cta");
       const limit = Number($("result-images").value);
       const visibleRanking = showFull ? ranked : ranked.slice(0, 50);
       const featured = visibleRanking.slice(0, limit);
@@ -1044,13 +1047,14 @@
               .join("")}</div>`
           : "") +
         '<div class="ranking-credit">bias sorter ♡</div>';
-      $("leaderboard-cta").hidden = !counted;
+      $("ranking").querySelector(".ranking-heading").append(appearance);
+      leaderboard.hidden = !counted;
       const more = $("ranking-more");
       const toggle = $("toggle-full");
       if (more && toggle) {
         more.hidden = ranked.length <= 50;
         toggle.setAttribute("aria-expanded", String(showFull));
-        toggle.textContent = showFull ? "Show top 50 ↑" : `Show full ranking (${ranked.length}) ↓`;
+        toggle.textContent = showFull ? "Show top 50 ↑" : `View all ${ranked.length} ↓`;
       }
     }
     $("result-images").onchange = renderResults;
@@ -1237,13 +1241,10 @@
       document.querySelectorAll("[data-mode]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.mode === mode));
       updateResumeBanner();
       refresh();
-      if (pushedFromSetup && histState() === "results") {
-        pushedFromSetup = false;
-        goBack();
-      } else {
-        pushedFromSetup = false;
-        goView("setup", "replace");
-      }
+      // Open the lineup directly: restored results can have another results
+      // entry behind them, so browser Back may leave this screen unchanged.
+      pushedFromSetup = false;
+      goView("setup", "replace");
     };
     function download(blob, filename) {
       const url = URL.createObjectURL(blob),

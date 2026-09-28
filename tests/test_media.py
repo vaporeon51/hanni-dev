@@ -610,36 +610,33 @@ def test_goyangi_404_is_temporary_and_retried_on_next_resolution(monkeypatch):
         media.resolve_media_url_cached.cache_clear()
 
 
-def giphy_session(url, text="", status=200):
-    from types import SimpleNamespace
-    return GoyangiPageSession(SimpleNamespace(url=url, text=text, status_code=status, headers={}))
-
-
 @pytest.mark.parametrize("gif_id", ["aFe4uWAswqEiklweDt", "IT6KwAJScnD70ZANab", "title-slug-IT6KwAJScnD70ZANab"])
-def test_giphy_page_prefers_embed_video(gif_id):
+def test_giphy_page_resolves_through_cdn_without_fetching_html(gif_id):
     url = f"https://giphy.com/gifs/{gif_id}"
-    target = "https://media0.giphy.com/media/v1.token/IT6KwAJScnD70ZANab/giphy.mp4?x=1&y=2"
-    session = giphy_session(url,
-        '<meta property="og:image" content="https://media0.giphy.com/media/id/giphy.gif"/>'
-        f'<meta property="og:video" content="{target.replace("&", "&amp;")}"/>')
+    target = f"https://media.giphy.com/media/{gif_id.rsplit('-', 1)[-1]}/giphy.mp4"
+    response = FakeStreamResponse(url=target)
+    session = FakeStreamSession([response])
     assert resolve_media_url(url, session=session) == ResolvedMedia("video", target)
-    assert session.requests == [url]
+    assert session.requests[0][0] == target
+    assert session.requests[0][1]["headers"]["Range"] == "bytes=0-0"
+    assert response.closed
 
 
-@pytest.mark.parametrize("video", ["https://evil.example/a.mp4", "https://media0.giphy.com.evil.example/a.mp4", "http://media0.giphy.com/a.mp4", "https://media0.giphy.com:bad/a.mp4", "https://media0.giphy.com/a.html"])
-def test_giphy_rejects_unsafe_video_and_falls_back_to_gif(video):
-    url = "https://giphy.com/gifs/abc"
-    gif = "https://media.giphy.com/media/abc/giphy.gif"
-    session = giphy_session(url, f'<meta property="og:video" content="{video}"><meta property="og:image" content="{gif}">')
-    assert resolve_media_url(url, session=session) == ResolvedMedia("image", gif)
+def test_giphy_falls_back_to_gif_when_mp4_missing():
+    target = "https://media.giphy.com/media/abc/giphy.gif"
+    responses = [FakeStreamResponse(status_code=404), FakeStreamResponse(url=target, content_type="image/gif")]
+    session = FakeStreamSession(responses)
+    assert resolve_media_url("https://giphy.com/gifs/abc", session=session) == ResolvedMedia("image", target)
+    assert all(response.closed for response in responses)
 
 
 @pytest.mark.parametrize("status", [404, 429, 503])
 def test_giphy_failures_raise_without_caching_a_plain_link(status):
     from src.services.media import MediaUnavailableError
-    url = "https://giphy.com/gifs/abc"
+    responses = [FakeStreamResponse(status_code=status), FakeStreamResponse(status_code=status)]
     with pytest.raises(MediaUnavailableError if status == 404 else MediaResolutionError):
-        resolve_media_url(url, session=giphy_session(url, status=status))
+        resolve_media_url("https://giphy.com/gifs/abc", session=FakeStreamSession(responses))
+    assert responses[0].closed
 
 
 @pytest.mark.parametrize("host", ["media.giphy.com", *(f"media{i}.giphy.com" for i in range(5))])
@@ -652,6 +649,16 @@ def test_giphy_cdn_assets_can_be_proxied_with_range(host):
     assert session.requests[0][1]["headers"]["Range"] == "bytes=0-1023"
 
 
-def test_giphy_page_without_embed_stays_link():
-    url = "https://giphy.com/gifs/abc"
-    assert resolve_media_url(url, session=giphy_session(url)) == ResolvedMedia("link", url)
+@pytest.mark.parametrize("url", ["https://giphy.com/search/cats", "https://giphy.com/gifs/abc/extra", "https://giphy.com/gifs/abc-", "https://giphy.com/gifs/abc%2Fdef"])
+def test_giphy_unsupported_pages_stay_links_without_requests(url):
+    session = FakeStreamSession([])
+    assert resolve_media_url(url, session=session) == ResolvedMedia("link", url)
+    assert not session.requests
+
+
+@pytest.mark.parametrize("url,content_type", [("https://evil.example/a.mp4", "video/mp4"), ("https://media.giphy.com/a.mp4", "text/html")])
+def test_giphy_rejects_unexpected_cdn_response(url, content_type):
+    response = FakeStreamResponse(url=url, content_type=content_type)
+    with pytest.raises(MediaResolutionError):
+        resolve_media_url("https://giphy.com/gifs/abc", session=FakeStreamSession([response]))
+    assert response.closed

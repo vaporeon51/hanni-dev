@@ -466,42 +466,36 @@ OG_PAGE_SCAN_LIMIT = 131072
 
 
 def _resolve_giphy_page(url: str, *, session: requests.Session | None = None) -> ResolvedMedia | None:
-    """Use Giphy's published embed metadata, preferring video over the larger GIF."""
+    """Resolve a Giphy ID through its CDN; the HTML site times out from Heroku."""
 
     parsed = urlsplit(url)
     if parsed.scheme not in {"http", "https"} or not re.fullmatch(r"/gifs/[A-Za-z0-9-]+/?", parsed.path):
         return None
-    requester = session if session is not None else _shared_session()
-    try:
-        response = requester.get(url, timeout=(5, 12))
-    except requests.RequestException as error:
-        raise MediaResolutionError("Giphy metadata request temporarily failed") from error
-    if response.status_code == 404:
-        raise MediaUnavailableError("Giphy page is temporarily unavailable")
-    if response.status_code != 200:
-        raise MediaResolutionError(
-            f"Giphy metadata returned HTTP {response.status_code}",
-            retry_after_seconds=_retry_after_seconds(response, 3),
-        )
-    if (urlsplit(response.url).hostname or "").lower() not in GIPHY_PAGE_HOSTS:
+    media_id = parsed.path.rstrip("/").rsplit("/", 1)[-1].rsplit("-", 1)[-1]
+    if not media_id or not media_id.isalnum():
         return None
-    text = response.text or ""
-    for pattern, kind, extensions in (
-        (OG_VIDEO_PATTERN, "video", VIDEO_EXTENSIONS),
-        (OG_IMAGE_PATTERN, "image", IMAGE_EXTENSIONS),
-    ):
-        for match in pattern.finditer(text[:OG_PAGE_SCAN_LIMIT]):
-            target = html.unescape(match.group(1))
-            try:
-                asset = urlsplit(target)
-                port = asset.port
-            except ValueError:
+    requester = session if session is not None else _shared_session()
+    for filename, kind, mime in (("giphy.mp4", "video", "video/"), ("giphy.gif", "image", "image/")):
+        target = f"https://media.giphy.com/media/{media_id}/{filename}"
+        try:
+            response = requester.get(target, headers={"Range": "bytes=0-0"}, stream=True, timeout=(5, 12))
+        except requests.RequestException as error:
+            raise MediaResolutionError("Giphy media request temporarily failed") from error
+        try:
+            if response.status_code == 404:
                 continue
-            if (asset.scheme == "https" and asset.hostname in GIPHY_ASSET_HOSTS
-                    and not asset.username and not asset.password and port in {None, 443}
-                    and _extension(target) in extensions):
+            if response.status_code not in {200, 206}:
+                raise MediaResolutionError(
+                    f"Giphy media returned HTTP {response.status_code}",
+                    retry_after_seconds=_retry_after_seconds(response, 3),
+                )
+            if ((urlsplit(response.url).hostname or "").lower() in GIPHY_ASSET_HOSTS
+                    and response.headers.get("Content-Type", "").lower().startswith(mime)):
                 return ResolvedMedia(kind, target)
-    return None
+            raise MediaResolutionError("Giphy returned an unexpected media response")
+        finally:
+            response.close()
+    raise MediaUnavailableError("Giphy media is temporarily unavailable")
 
 
 def _resolve_imgur_page_og(url: str) -> ResolvedMedia | None:

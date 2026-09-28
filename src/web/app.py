@@ -42,6 +42,7 @@ from src.services.collections import load_collection, load_collection_feed, load
 from src.services.dead_link_queue import enqueue_priority_url  # noqa: E402
 from src.services.media import (  # noqa: E402
     TRANSIENT_UPSTREAM_STATUSES,
+    MediaGoneError,
     MediaResolutionError,
     MediaUpstreamError,
     open_media_stream,
@@ -732,6 +733,12 @@ async def media(content_link_id: int, request: Request, response: Response) -> d
             detail="Media host is catching up. Please retry shortly.",
             headers={"Retry-After": str(error.retry_after_seconds)},
         ) from error
+    except MediaGoneError as error:
+        try:
+            record_upstream_gone(content_link_id=content_link_id, error=str(error)[:500])
+        except Exception:
+            logger.warning("dead-link marking failed for %s", content_link_id, exc_info=True)
+        raise HTTPException(status_code=404, detail="Media asset is unavailable") from error
     if resolved.kind in {"video", "image"}:
         return {
             "kind": resolved.kind,
@@ -803,6 +810,12 @@ def media_asset(content_link_id: int, request: Request) -> StreamingResponse:
             detail="Media host is catching up. Please retry shortly.",
             headers={"Retry-After": str(error.retry_after_seconds)},
         ) from error
+    except MediaGoneError as error:
+        try:
+            record_upstream_gone(content_link_id=content_link_id, error=str(error)[:500])
+        except Exception:
+            logger.warning("dead-link marking failed for %s", content_link_id, exc_info=True)
+        raise HTTPException(status_code=404, detail="Media asset is unavailable") from error
     if resolved.kind not in {"video", "image"}:
         raise HTTPException(status_code=404, detail="Media asset is unavailable")
 

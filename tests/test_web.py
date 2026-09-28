@@ -637,6 +637,37 @@ def test_media_asset_keeps_transient_upstream_errors_unchanged(monkeypatch):
     assert response.status_code == 503
 
 
+def test_media_endpoint_marks_dead_when_page_is_gone(monkeypatch):
+    from src.db.collections import CollectionPreview
+    from src.services.media import MediaGoneError
+
+    monkeypatch.setattr(web_app, "get_live_content_url", lambda content_link_id: "https://goyangi.pics/v/gone.webp")
+
+    async def fake_preview(content_link_id):
+        return CollectionPreview(url="https://goyangi.pics/v/gone.webp", count=1)
+
+    monkeypatch.setattr(web_app, "load_collection_preview", fake_preview)
+    monkeypatch.setattr(
+        web_app,
+        "resolve_media_url_cached",
+        lambda url: (_ for _ in ()).throw(MediaGoneError(url)),
+    )
+    recorded = []
+    monkeypatch.setattr(
+        web_app, "record_upstream_gone", lambda **kwargs: recorded.append(kwargs) or 1
+    )
+
+    async def request():
+        transport = httpx.ASGITransport(app=web_app.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            return await client.get("/api/feed/42/media")
+
+    response = asyncio.run(request())
+
+    assert response.status_code == 404
+    assert recorded and recorded[0]["content_link_id"] == 42
+
+
 def test_homepage_renders_menu_with_wholesome_and_nsfw():
     async def request():
         transport = httpx.ASGITransport(app=web_app.app)

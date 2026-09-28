@@ -20,10 +20,12 @@ MediaKind = Literal["video", "image", "link"]
 IMGUR_IMAGE_API = "https://api.imgur.com/3/image/{media_id}"
 IMGUR_ALBUM_IMAGES_API = "https://api.imgur.com/3/album/{media_id}/images"
 IMGUR_HOSTS = {"imgur.com", "www.imgur.com", "i.imgur.com"}
+GIPHY_PAGE_HOSTS = {"giphy.com", "www.giphy.com"}
+GIPHY_ASSET_HOSTS = {"media.giphy.com", *(f"media{i}.giphy.com" for i in range(5))}
 # These durable CDN hosts may be streamed through the public feed asset endpoint.
 # Keep this narrower than the worker's URL-check allowlist: every host here is an
 # SSRF boundary for a user-accessible proxy.
-PROXIED_MEDIA_HOSTS = IMGUR_HOSTS | {"cdn.goyangi.pics", "cdn.kpopping.com", "i.imgur.gg"}
+PROXIED_MEDIA_HOSTS = IMGUR_HOSTS | GIPHY_ASSET_HOSTS | {"cdn.goyangi.pics", "cdn.kpopping.com", "i.imgur.gg"}
 VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".m4v"}
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif"}
 TRANSIENT_UPSTREAM_STATUSES = {429, 502, 503, 504}
@@ -223,6 +225,10 @@ def resolve_media_url(
     A single authenticated metadata request replaces the old browser behavior
     of probing several possible file extensions for every item.
     """
+
+    if (urlsplit(url).hostname or "").lower() in GIPHY_PAGE_HOSTS:
+        resolved_page = _resolve_giphy_page(url, session=session)
+        return resolved_page if resolved_page is not None else ResolvedMedia("link", url)
 
     if (urlsplit(url).hostname or "").lower() == GOYANGI_PAGE_HOST:
         resolved_page = _resolve_goyangi_page(url, session=session)
@@ -457,6 +463,45 @@ OG_IMAGE_PATTERN = re.compile(
     re.IGNORECASE,
 )
 OG_PAGE_SCAN_LIMIT = 131072
+
+
+def _resolve_giphy_page(url: str, *, session: requests.Session | None = None) -> ResolvedMedia | None:
+    """Use Giphy's published embed metadata, preferring video over the larger GIF."""
+
+    parsed = urlsplit(url)
+    if parsed.scheme not in {"http", "https"} or not re.fullmatch(r"/gifs/[A-Za-z0-9-]+/?", parsed.path):
+        return None
+    requester = session if session is not None else _shared_session()
+    try:
+        response = requester.get(url, timeout=(5, 12))
+    except requests.RequestException as error:
+        raise MediaResolutionError("Giphy metadata request temporarily failed") from error
+    if response.status_code == 404:
+        raise MediaUnavailableError("Giphy page is temporarily unavailable")
+    if response.status_code != 200:
+        raise MediaResolutionError(
+            f"Giphy metadata returned HTTP {response.status_code}",
+            retry_after_seconds=_retry_after_seconds(response, 3),
+        )
+    if (urlsplit(response.url).hostname or "").lower() not in GIPHY_PAGE_HOSTS:
+        return None
+    text = response.text or ""
+    for pattern, kind, extensions in (
+        (OG_VIDEO_PATTERN, "video", VIDEO_EXTENSIONS),
+        (OG_IMAGE_PATTERN, "image", IMAGE_EXTENSIONS),
+    ):
+        for match in pattern.finditer(text[:OG_PAGE_SCAN_LIMIT]):
+            target = html.unescape(match.group(1))
+            try:
+                asset = urlsplit(target)
+                port = asset.port
+            except ValueError:
+                continue
+            if (asset.scheme == "https" and asset.hostname in GIPHY_ASSET_HOSTS
+                    and not asset.username and not asset.password and port in {None, 443}
+                    and _extension(target) in extensions):
+                return ResolvedMedia(kind, target)
+    return None
 
 
 def _resolve_imgur_page_og(url: str) -> ResolvedMedia | None:

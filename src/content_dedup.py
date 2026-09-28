@@ -202,8 +202,11 @@ def fingerprint_equal(a: dict, b: dict) -> bool:
     distances = [(int(x, 16) ^ int(y, 16)).bit_count() for x, y in zip(a['frames'], b['frames'])]
     # 256-bit dHash. Reject low-information frames; require comparable color
     # statistics as an independent check against similar silhouettes.
+    # Calibrated 2026-09-28 on 8 user-verified cross-host dupes (worst max 13,
+    # sum 45, all durations identical) vs 6 cross-idol negatives (best max 141,
+    # sum 624): keeps ~1.5x headroom over positives, ~7x clear of negatives.
     return (all(24 <= int(x, 16).bit_count() <= 232 for x in a['frames'] + b['frames'])
-            and max(distances) <= 12 and sum(distances) <= 35
+            and max(distances) <= 20 and sum(distances) <= 60
             and all(abs(x - y) <= 10 for x, y in zip(a['colors'], b['colors']))
             and len(a['colors']) == len(b['colors']) == 15)
 

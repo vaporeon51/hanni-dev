@@ -30,6 +30,34 @@ def test_visual_match_requires_all_goyangi_clips_and_injective_matches():
     assert not full_media_match([a, different], [b])
 
 
+def _near_miss_frames(base, distances):
+    """Build frame hashes at exact Hamming distances from base (calibration)."""
+    frames = []
+    for i, distance in enumerate(distances):
+        flip = sum(1 << ((i * 37 + j * 11) % 256) for j in range(distance))
+        frames.append(f'{(base ^ flip) % (1 << 256):064x}')
+    return frames
+
+
+def test_recalibrated_thresholds_hold_verified_dupes_and_reject_others():
+    # Worst verified cross-host dupes, 2026-09-28: max 13 / sum 37 and
+    # max 12 / sum 45, durations identical, healthy popcounts.
+    base = int('ab' * 32, 16)
+    a = {'version': 1, 'duration': 9.533, 'frames': [f'{base:064x}'] * 5, 'colors': [100] * 15}
+    near1 = {**a, 'frames': _near_miss_frames(base, [3, 8, 13, 4, 9])}
+    near2 = {**a, 'frames': _near_miss_frames(base, [10, 12, 6, 11, 6])}
+    assert fingerprint_equal(a, near1)
+    assert fingerprint_equal(a, near2)
+    # Cross-idol negatives sit at max 141+ / sum 624+; duration differs too.
+    far = {'version': 1, 'duration': 12.0,
+           'frames': _near_miss_frames(base, [130, 128, 125, 129, 127]),
+           'colors': [150] * 15}
+    assert not fingerprint_equal(a, far)
+    # Silence is not evidence: low-information frames never match.
+    black = {**a, 'frames': ['0' * 64] * 5}
+    assert not fingerprint_equal(a, black)
+
+
 def test_nearby_shortlist_requires_shared_role_and_within_one_day():
     now = datetime.now(timezone.utc)
     source = MediaSet('g')

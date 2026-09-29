@@ -803,12 +803,29 @@ progress::-moz-progress-bar {
   font: bold 14px Arial, sans-serif;
   text-align: center;
 }
+.rank-highlight[data-rank="1"], .rank-row[data-rank="1"] { --medal-border: #e8c96a; --medal-start: #f8e7b2; --medal-end: #edcc77; --medal-ink: #806021; --medal-glow: #c99a2e18; }
+.rank-highlight[data-rank="2"], .rank-row[data-rank="2"] { --medal-border: #c4c7d0; --medal-start: #f4f5f8; --medal-end: #dce0e8; --medal-ink: #606574; --medal-glow: #79839814; }
+.rank-highlight[data-rank="3"], .rank-row[data-rank="3"] { --medal-border: #d8b49c; --medal-start: #f7e9df; --medal-end: #e7c8b3; --medal-ink: #805b43; --medal-glow: #b9805716; }
 .rank-badge-top {
-  background: #fbe8f0;
-  box-shadow: 0 0 0 1px #dfa8bf, 0 2px 8px #49343e18;
+  background: linear-gradient(135deg, var(--medal-start), #fffaf2 48%, var(--medal-end));
+  color: var(--medal-ink);
+  box-shadow: inset 0 0 0 1px #ffffffb3, 0 0 0 1px var(--medal-border), 0 3px 10px #49343e18;
 }
-.rank-number-top {
-  font-weight: bold;
+.rank-photo:has(.rank-badge-top) {
+  border-radius: 12px;
+  box-shadow: 0 8px 22px var(--medal-glow);
+}
+.rank-photo:has(.rank-badge-top) img {
+  outline: 1px solid var(--medal-border);
+  outline-offset: 3px;
+}
+.rank-photo:has(.rank-badge-top)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px #ffffff80;
+  pointer-events: none;
 }
 .rank-thumbnail {
   width: 44px;
@@ -860,6 +877,14 @@ progress::-moz-progress-bar {
   min-width: 24px;
   color: var(--pink);
   flex: none;
+}
+.rank-row .rank-number-top {
+  color: var(--medal-ink);
+}
+.rank-row:has(.rank-number-top) .rank-thumbnail {
+  outline: 1px solid var(--medal-border);
+  outline-offset: 2px;
+  box-shadow: 0 3px 10px var(--medal-glow);
 }
 .rank-row strong {
   font-size: 13px;

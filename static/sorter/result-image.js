@@ -2,6 +2,11 @@
 async function createRankingImage(
   { entries, photoCount = 10, mode = "idols" },
 ) {
+  const medals = {
+    1: { border: "#e8c96a", start: "#f8e7b2", end: "#edcc77", ink: "#806021", glow: "#c99a2e18" },
+    2: { border: "#c4c7d0", start: "#f4f5f8", end: "#dce0e8", ink: "#606574", glow: "#79839814" },
+    3: { border: "#d8b49c", start: "#f7e9df", end: "#e7c8b3", ink: "#805b43", glow: "#b9805716" },
+  };
   const visibleEntries = entries.slice(0, 50);
   const featured = visibleEntries.slice(0, photoCount);
   const remaining = visibleEntries.slice(photoCount);
@@ -96,6 +101,7 @@ async function createRankingImage(
       batch.map((entry) => loadImage(entry.image)),
     );
     batch.forEach((entry, offset) => {
+      const medal = medals[entry.rank];
       const index = start + offset, image = images[offset];
       const x = margin + (index % 5) * (cardWidth + gap);
       const y = 110 + Math.floor(index / 5) * (cardHeight + 16);
@@ -125,15 +131,39 @@ async function createRankingImage(
           colors.pink,
         );}
       ctx.restore();
-      ctx.fillStyle = entry.rank <= 3 ? colors.light : colors.paper;
+      if (medal) {
+        ctx.save();
+        ctx.strokeStyle = medal.border;
+        ctx.lineWidth = 1;
+        ctx.shadowColor = medal.glow;
+        ctx.shadowBlur = 16;
+        ctx.shadowOffsetY = 5;
+        rounded(x - 3.5, y - 3.5, cardWidth + 7, photoHeight + 7, 15.5);
+        ctx.stroke();
+        ctx.restore();
+        ctx.save();
+        ctx.strokeStyle = "#ffffff80";
+        ctx.lineWidth = 1;
+        rounded(x + .5, y + .5, cardWidth - 1, photoHeight - 1, 11.5);
+        ctx.stroke();
+        ctx.restore();
+      }
+      ctx.fillStyle = colors.paper;
+      if (medal) {
+        const gradient = ctx.createLinearGradient(x + 8, y + 8, x + 42, y + 38);
+        gradient.addColorStop(0, medal.start);
+        gradient.addColorStop(.48, "#fffaf2");
+        gradient.addColorStop(1, medal.end);
+        ctx.fillStyle = gradient;
+      }
       rounded(x + 8, y + 8, 34, 30, 8);
       ctx.fill();
-      if (entry.rank <= 3) {
-        ctx.strokeStyle = "#dfa8bf";
+      if (medal) {
+        ctx.strokeStyle = medal.border;
         ctx.stroke();
       }
       ctx.textAlign = "center";
-      text(entry.rank, x + 25, y + 29, "bold 16px Arial", colors.pink);
+      text(entry.rank, x + 25, y + 29, "bold 16px Arial", medal ? medal.ink : colors.pink);
       ctx.textAlign = "left";
       text(
         entry.name,
@@ -158,10 +188,11 @@ async function createRankingImage(
     const batch = remaining.slice(start, start + 10);
     const images = await Promise.all(batch.map((entry) => loadImage(entry.image)));
     batch.forEach((entry, offset) => {
+      const medal = medals[entry.rank];
       const index = start + offset, image = images[offset];
       const x = margin + (index % 4) * (columnWidth + 20);
       const y = listTop + Math.floor(index / 4) * listRowHeight;
-      text(entry.rank, x, y + 33, "18px Georgia", colors.pink);
+      text(entry.rank, x, y + 33, "18px Georgia", medal ? medal.ink : colors.pink);
       ctx.save();
       rounded(x + 30, y + 4, 44, 52, 8);
       ctx.clip();
@@ -175,6 +206,17 @@ async function createRankingImage(
         text("♡", x + 41, y + 38, "24px Georgia", colors.pink);
       }
       ctx.restore();
+      if (medal) {
+        ctx.save();
+        ctx.strokeStyle = medal.border;
+        ctx.lineWidth = 1;
+        ctx.shadowColor = medal.glow;
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetY = 3;
+        rounded(x + 27.5, y + 1.5, 49, 57, 10.5);
+        ctx.stroke();
+        ctx.restore();
+      }
       text(
         entry.name,
         x + 84,

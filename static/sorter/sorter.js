@@ -1070,7 +1070,7 @@
           ? `<div class="rank-highlights">${featured
               .map(({ id, rank }) => {
                 const item = byId.get(id);
-                return `<div class="rank-highlight"><div class="rank-photo">${photo(item)}<span class="rank-badge${rank <= 3 ? " rank-badge-top" : ""}">${rank}</span></div><strong>${escape(
+                return `<div class="rank-highlight" data-rank="${rank}"><div class="rank-photo">${photo(item)}<span class="rank-badge${rank <= 3 ? " rank-badge-top" : ""}">${rank}</span></div><strong>${escape(
                   shortName(item),
                 )}</strong><small>${escape(groupName(item))}</small></div>`;
               })
@@ -1080,7 +1080,7 @@
           ? `<div class="rank-list">${remaining
               .map(({ id, rank }) => {
                 const item = byId.get(id);
-                return `<div class="rank-row"><span class="rank-number${rank <= 3 ? " rank-number-top" : ""}">${rank}</span>${photo(item, "rank-thumbnail")}<div><strong>${escape(
+                return `<div class="rank-row" data-rank="${rank}"><span class="rank-number${rank <= 3 ? " rank-number-top" : ""}">${rank}</span>${photo(item, "rank-thumbnail")}<div><strong>${escape(
                   shortName(item),
                 )}</strong><small>${escape(groupName(item))}</small></div></div>`;
               })

@@ -67,7 +67,7 @@
   }
 
   function podiumCard(entry, rank) {
-    return `<div class="podium-card${rank === 1 ? " first" : ""}"><div class="podium-photo">${imgTag(
+    return `<div class="podium-card${rank === 1 ? " first" : ""}" data-rank="${rank}"><div class="podium-photo">${imgTag(
       entry,
       "",
     )}<span class="podium-rank">#${rank}</span></div><strong>${escape(

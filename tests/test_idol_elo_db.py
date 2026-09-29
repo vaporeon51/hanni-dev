@@ -294,7 +294,7 @@ def test_concurrent_same_ballot_different_visitors_counts_once(db):
     with ThreadPoolExecutor(max_workers=5) as executor:
         results = list(executor.map(lambda i: bias.record_sorter_ballot(ballot, [('r0', 'r1', 1)], str(i), DAY), range(5)))
     assert sum(r['recorded'] for r in results) == 1
-    assert row(db) == (1204, 1)
+    assert row(db) == (1206, 1)
 
 
 def test_ballot_last_answer_replaces_prior_answer(db):
@@ -305,7 +305,7 @@ def test_ballot_last_answer_replaces_prior_answer(db):
 
 def test_long_completed_ballot_is_normalized(db):
     bias.record_sorter_ballot(str(uuid.uuid4()), [('r0', f'r{i}', 1) for i in range(1, 20)], 'alice', DAY)
-    assert row(db) == (1204, 19)
+    assert row(db) == (1206, 19)
     with db.connection() as conn:
         assert conn.execute("SELECT SUM(global_elo) FROM idol_ratings WHERE role_id LIKE 'r%'").fetchone()[0] == 24000
 

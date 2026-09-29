@@ -18,7 +18,7 @@ _KST = datetime.timezone(datetime.timedelta(hours=9))
 
 LEADERBOARD_SNAPSHOT_LIMIT = 45
 LEADERBOARD_PAGE_SIZE = 15
-GLOBAL_ELO_K = 8
+GLOBAL_ELO_K = 12
 
 RANKED_MIN_MATCHES = 15  # Existing group-board eligibility only.
 DAILY_IDOL_BUDGET = Decimal("12")
@@ -41,7 +41,7 @@ def _week_start_kst(date: datetime.date | None = None) -> datetime.date:
     return date - datetime.timedelta(days=date.weekday())
 
 
-def calculate_elo_delta(winner_elo: float, loser_elo: float, k: float = 8) -> tuple[float, float]:
+def calculate_elo_delta(winner_elo: float, loser_elo: float, k: float = 12) -> tuple[float, float]:
     expected_winner = 1 / (1 + 10 ** ((float(loser_elo) - float(winner_elo)) / 400))
     delta = k * (1 - expected_winner)
     return delta, -delta

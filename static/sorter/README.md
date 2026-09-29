@@ -76,7 +76,7 @@ matchup is enough to join the ranks.
 There is no confidence multiplier or lifetime contributor tracking.
 
 New idol sorts submit their actual comparisons once on completion, using
-K=8 without daily volume decay. Ties count as half-wins; Undo before completion
+K=12 without daily volume decay. Ties count as half-wins; Undo before completion
 removes the answer from the ballot. Each distinct pair uses its last answer
 within the ballot. Daily pair deduplication still applies across ballots.
 
@@ -86,8 +86,8 @@ are combined per idol before applying the remaining 12-point visitor/idol/UTC-da
 budget. Budgets count absolute net movement per ballot, not individual clicks.
 If clipping leaves unequal total gains and losses, the larger side is scaled
 down to preserve total Elo. Integer decimal units preserve exact zero-sum
-updates. This bounds an idol's uncapped movement below 8 points per ballot;
-a two-idol win against an equal-rated opponent moves the winner 4 points.
+updates. This bounds an idol's uncapped movement below 12 points per ballot;
+a two-idol win against an equal-rated opponent moves the winner 6 points.
 
 Migration 46 adds durable UUID ballot receipts. Receipts, pair deduplication,
 budgets, counters and ratings commit atomically. Refreshes, retries and shared

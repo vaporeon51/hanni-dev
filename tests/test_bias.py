@@ -11,8 +11,8 @@ from src.web import app as web_app
 
 def test_calculate_elo_delta_equal_ratings():
     winner, loser = bias.calculate_elo_delta(1200, 1200, bias.GLOBAL_ELO_K)
-    assert winner == 4
-    assert loser == -4
+    assert winner == 6
+    assert loser == -6
 
 
 def test_calculate_elo_delta_upset_moves_more():
@@ -88,7 +88,7 @@ def test_ballot_combines_late_losses_before_cap():
 def test_long_ballots_do_not_buy_more_influence():
     ratings = {str(i): 1200 for i in range(101)}
     result = bias.ballot_deltas(ratings, [("0", str(i), 1) for i in range(1, 101)], {})
-    assert result["0"] == 4
+    assert result["0"] == 6
     assert sum(result.values()) == 0
 
 
@@ -104,7 +104,7 @@ def test_ballot_caps_net_movement_and_balances_exactly():
         result = bias.ballot_deltas(ratings, pairs, spent)
         assert sum(result.values()) == 0
         assert result["0"] == 0
-        assert all(abs(d) <= min(8, 12 - spent[i]) for i, d in result.items())
+        assert all(abs(d) <= min(12, 12 - spent[i]) for i, d in result.items())
 
 
 def test_ties_move_unequal_ratings_toward_each_other():

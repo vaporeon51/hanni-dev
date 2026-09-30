@@ -88,6 +88,7 @@ IDOL_PHOTO_OVERRIDES = {
     # https://wimg.heraldcorp.com/news/cms/2026/03/31/news-p.v1.20260331.93dd06d29c144fb2988bd39cd3c1923c_P1.jpg
     "Kwon Eunbi": "/static/sorter/idols/kwon-eunbi-herald-20260331.jpg",
     "Hearts2Hearts Stella": "/static/sorter/idols/hearts2hearts-stella.jpg",
+    "PURPLE KISS Chaein": "/static/sorter/idols/purple-kiss-chaein.jpg",
 }
 
 
@@ -117,6 +118,12 @@ MANUAL_IDOLS = [
         "name": "LOOSSEMBLE Hyunjin",
         "img": "",
         "groups": ["LOOSSEMBLE"],
+        "gen": ["gen4"],
+    },
+    {
+        "name": "PURPLE KISS Chaein",
+        "img": "",
+        "groups": ["PURPLE KISS"],
         "gen": ["gen4"],
     },
 ]

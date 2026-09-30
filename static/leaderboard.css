@@ -116,7 +116,8 @@ body {
 .row-thumb { width: 44px; height: 48px; border-radius: 10px; object-fit: cover; object-position: center 20%; background: var(--light); flex: none; }
 .row-names { min-width: 0; flex: 1; }
 .row-names strong { display: block; font-size: 14px; overflow-wrap: anywhere; }
-.row-names small { display: block; color: var(--muted); font-size: 12px; }
+.row-names small { display: block; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.row .row-rank, .row .row-move, .row .row-elo, .row .row-votes { flex-shrink: 0; }
 .row-move { display: inline-flex; align-items: center; font-family: ui-monospace, Menlo, monospace; font-size: 11px; font-weight: 700; line-height: 1.3; border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
 .move-up { background: #e5f2e9; color: var(--green); }
 .move-down { background: #fbe7ea; color: var(--red); }
@@ -154,7 +155,7 @@ body {
   .podium-card strong { font-size: 18px; }
   .row { gap: 9px; padding: 8px 12px 8px 8px; }
   .row-thumb { width: 38px; height: 42px; }
-  .row .row-votes { font-size: 10px; padding: 3px 6px; }
+  .row .row-votes { display: none; }
   .group-list { grid-template-columns: minmax(0, 1fr); }
   .group-card { gap: 12px; padding: 12px; }
   .group-photo { width: 64px; height: 70px; border-radius: 12px; }

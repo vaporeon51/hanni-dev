@@ -971,7 +971,7 @@ async def leaderboard(
     """Global consensus board. The Mine tab renders the visitor's own sorter
     ranking client-side, so it never hits this endpoint.
 
-    `limit` caps ranked idols (default 45) or group entries (default 15).
+    `limit` caps ranked idols (default 50) or group entries (default 15).
     Idol requests also include up to five fresh faces unless disabled.
     The sorter passes a large limit so every group gets a peak score for lineup ordering — the
     default caps would strand off-board groups in alphabetical order.

@@ -16,7 +16,7 @@ from decimal import Decimal
 
 _KST = datetime.timezone(datetime.timedelta(hours=9))
 
-LEADERBOARD_SNAPSHOT_LIMIT = 45
+LEADERBOARD_SNAPSHOT_LIMIT = 50
 LEADERBOARD_PAGE_SIZE = 15
 GLOBAL_ELO_K = 12
 

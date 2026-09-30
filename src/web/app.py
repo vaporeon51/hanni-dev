@@ -334,6 +334,15 @@ async def clean_host_gate(request: Request, call_next):
     return await call_next(request)
 
 
+@app.middleware("http")
+async def redirect_forwarded_http(request: Request, call_next):
+    # Heroku terminates TLS at its router and sets the original protocol.
+    # Requests without this header (including local development) stay as-is.
+    if request.headers.get("x-forwarded-proto", "").strip().lower() == "http":
+        return RedirectResponse(url=str(request.url.replace(scheme="https")), status_code=308)
+    return await call_next(request)
+
+
 def _static_version() -> str:
     """Change asset URLs whenever local CSS, JavaScript, or data changes."""
 

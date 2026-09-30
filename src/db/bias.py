@@ -61,6 +61,8 @@ class LeaderboardEntry:
     rank: int | None = None
     provisional: bool = False
 
+    wins: int = 0
+
 
 @dataclass(frozen=True)
 class Leaderboard:
@@ -126,6 +128,7 @@ def _build_leaderboard(rows, vote_count: int) -> Leaderboard:
                 votes=votes,
                 rank=rank if not provisional else None,
                 provisional=provisional,
+                wins=int(row[9] or 0) if len(row) > 9 else 0,
             )
         )
     return Leaderboard(
@@ -303,7 +306,7 @@ def get_global_leaderboard(limit: int = LEADERBOARD_SNAPSHOT_LIMIT,
                     WHERE captured_at <= NOW() - INTERVAL '24 hours'
                 ), candidates AS (
                     SELECT r.role_id, r.member_name, r.group_name, r.global_elo,
-                           r.image_url, r.global_match_count,
+                           r.image_url, r.global_match_count, r.global_win_count,
                            ROUND(r.global_elo)::int AS score
                     FROM idol_ratings r WHERE {_ACTIVE_IDOL_PREDICATE}
                 ), selected AS (
@@ -315,7 +318,7 @@ def get_global_leaderboard(limit: int = LEADERBOARD_SNAPSHOT_LIMIT,
                 )
                 SELECT r.role_id, r.member_name, r.group_name, r.global_elo,
                        r.image_url, p.rank, r.global_match_count,
-                       ps.snapshot_date, r.score
+                       ps.snapshot_date, r.score, r.global_win_count
                 FROM selected r CROSS JOIN previous_snapshot ps
                 LEFT JOIN idol_leaderboard_snapshots p
                     ON p.role_id = r.role_id AND p.snapshot_date = ps.snapshot_date

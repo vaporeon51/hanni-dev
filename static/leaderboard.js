@@ -29,9 +29,15 @@
     return `<span class="row-elo"><span class="elo-tag">ELO</span><span class="elo-num">${elo}</span></span>`;
   }
 
-  function votesPill(votes) {
+  function votesPill(votes, wins) {
     const full = (Number(votes) || 0).toLocaleString();
-    return `<span class="row-votes" title="${full} recorded matchups">♡ ${formatVotes(votes)}</span>`;
+    if (wins == null) {
+      return `<span class="row-votes" title="${full} recorded matchups">♡ ${formatVotes(votes)}</span>`;
+    }
+    const rate = votes > 0 ? `${Math.round(100 * wins / votes)}%` : "—";
+    const label = votes > 0 ? `${rate} win rate` : "No matchups yet";
+    const detail = `${Number(wins).toLocaleString()} wins · ${full} matchups`;
+    return `<button type="button" class="row-votes win-rate-trigger" data-rate="${escape(label)}" data-detail="${escape(detail)}" aria-label="${escape(`${label}. ${detail}.`)}">♡ ${formatVotes(wins)}</button>`;
   }
 
   function movementPill(entry, hasBaseline) {
@@ -74,7 +80,7 @@
       entry.member_name,
     )}</strong><small>${escape(entry.group_name || "")}</small><div class="podium-stats">${eloPill(
       entry.elo,
-    )}${votesPill(entry.votes)}</div></div>`;
+    )}${votesPill(entry.votes, entry.wins)}</div></div>`;
   }
 
   function miniCard(entry) {
@@ -85,7 +91,7 @@
       entry.member_name,
     )}</strong><small>${escape(entry.group_name || "")}</small><div class="mini-stats">${eloPill(
       entry.elo,
-    )}${votesPill(entry.votes)}</div></div>`;
+    )}${votesPill(entry.votes, entry.wins)}</div></div>`;
   }
 
   function listRow(entry, hasBaseline) {
@@ -95,9 +101,59 @@
     )}<div class="row-names"><strong>${escape(entry.member_name)}</strong><small>${escape(
       entry.group_name || "",
     )}</small></div>${movementPill(entry, hasBaseline)}${eloPill(entry.elo)}${votesPill(
-      entry.votes,
+      entry.votes, entry.wins,
     )}</div>`;
   }
+
+  const tip = document.createElement("div");
+  tip.id = "win-rate-tooltip";
+  tip.className = "win-rate-tooltip";
+  tip.setAttribute("role", "tooltip");
+  tip.hidden = true;
+  document.body.append(tip);
+  let tipTrigger = null;
+
+  function hideTip() {
+    if (tipTrigger) tipTrigger.removeAttribute("aria-describedby");
+    tipTrigger = null;
+    tip.hidden = true;
+  }
+
+  function showTip(trigger) {
+    hideTip();
+    tipTrigger = trigger;
+    trigger.setAttribute("aria-describedby", tip.id);
+    tip.innerHTML = `<strong>${escape(trigger.dataset.rate)}</strong><span>${escape(trigger.dataset.detail)}</span>`;
+    tip.hidden = false;
+    const rect = trigger.getBoundingClientRect();
+    const left = Math.max(8, Math.min(rect.left + rect.width / 2 - tip.offsetWidth / 2, window.innerWidth - tip.offsetWidth - 8));
+    const above = rect.top - tip.offsetHeight - 8;
+    tip.style.left = `${left}px`;
+    tip.style.top = `${above >= 8 ? above : rect.bottom + 8}px`;
+  }
+
+  $("board").addEventListener("pointerover", (event) => {
+    const trigger = event.target.closest(".win-rate-trigger");
+    if (trigger && event.pointerType !== "touch") showTip(trigger);
+  });
+  $("board").addEventListener("pointerout", (event) => {
+    if (event.target.closest(".win-rate-trigger") && !event.target.contains(event.relatedTarget)) hideTip();
+  });
+  $("board").addEventListener("focusin", (event) => {
+    const trigger = event.target.closest(".win-rate-trigger");
+    if (trigger) showTip(trigger);
+  });
+  $("board").addEventListener("focusout", hideTip);
+  document.addEventListener("click", (event) => {
+    const trigger = event.target.closest(".win-rate-trigger");
+    if (trigger) showTip(trigger);
+    else hideTip();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") hideTip();
+  });
+  window.addEventListener("scroll", hideTip, true);
+  window.addEventListener("resize", hideTip);
 
   function renderIdols(board) {
     const hasBaseline = !!board.movement_baseline_date;
@@ -138,7 +194,7 @@
     }
     const basis = `Based on ${board.vote_count.toLocaleString()} recorded matchups`;
     const movement = hasBaseline ? ` · Movement since ${escape(board.movement_baseline_date)}` : "";
-    const explain = " · ELO reflects head-to-head preferences · ♡ counts recorded matchups";
+    const explain = " · ELO reflects head-to-head preferences · ♡ counts wins";
     html += `<p class="board-foot">${basis}${movement}${explain}</p>`;
     return html;
   }
@@ -203,6 +259,7 @@
 
   async function load() {
     const board = $("board");
+    hideTip();
     board.innerHTML = '<div class="loading">Gathering idols</div>';
     try {
       const response = await fetch(`/api/leaderboard?kind=${kind}&include_provisional=false`, {

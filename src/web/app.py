@@ -1000,6 +1000,7 @@ async def leaderboard(
                         "image_url": _board_image(entry.role_id, entry.image_url),
                         "previous_rank": entry.previous_rank,
                         "votes": entry.votes,
+                        "wins": entry.wins,
                         "provisional": entry.provisional,
                     }
                     for entry in board.entries

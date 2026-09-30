@@ -184,7 +184,7 @@ def test_leaderboard_rejects_bad_kind_but_ignores_legacy_scope(monkeypatch):
 def test_global_idol_leaderboard_serializes_movement(monkeypatch):
     board = bias.Leaderboard(
         entries=[
-            bias.LeaderboardEntry("role-1", "Hanni", "NewJeans", 1284, "https://img/1.jpg", None, 420, 1),
+            bias.LeaderboardEntry("role-1", "Hanni", "NewJeans", 1284, "https://img/1.jpg", None, 420, 1, wins=300),
             bias.LeaderboardEntry("role-2", "Minji", "NewJeans", 1270, "https://img/2.jpg", 1, 380, 2),
         ],
         vote_count=1234,
@@ -212,6 +212,7 @@ def test_global_idol_leaderboard_serializes_movement(monkeypatch):
     assert payload["entries"][0]["rank"] == 1
     assert payload["entries"][0]["previous_rank"] is None
     assert payload["entries"][0]["votes"] == 420
+    assert payload["entries"][0]["wins"] == 300
     assert payload["entries"][0]["provisional"] is False
     assert payload["entries"][1]["rank"] == 2
     assert payload["entries"][1]["previous_rank"] == 1
@@ -364,7 +365,7 @@ def test_prune_visitor_pair_votes_deletes_only_stale_days(monkeypatch):
 def test_idol_board_uses_recorded_matchups_for_eligibility():
     board = bias._build_leaderboard(
         [
-            ("r-hot", "Hot", "G", 1500, "img", None, 200, None, 1500),
+            ("r-hot", "Hot", "G", 1500, "img", None, 200, None, 1500, 150),
             ("r-new", "New", "G", 1200, "img", None, 0, None, 1200),
             ("r-solid", "Solid", "G", 1300, "img", None, 1, None, 1300),
         ],
@@ -372,6 +373,7 @@ def test_idol_board_uses_recorded_matchups_for_eligibility():
     )
     assert [e.member_name for e in board.entries] == ["Hot", "New", "Solid"]
     assert board.entries[0].rank == 1
+    assert board.entries[0].wins == 150
     assert board.entries[1].provisional is True
     assert board.entries[1].rank is None
     # Ranked-only numbering skips the fresh entry.

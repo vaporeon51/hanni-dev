@@ -63,7 +63,8 @@ def add_content_report(content_link_id: int, reason: str) -> ContentFeedback | N
             cursor.execute(
                 """
                 UPDATE content_links
-                SET num_reports = num_reports + 1
+                SET num_reports = num_reports + 1,
+                    disambiguated = FALSE
                 WHERE content_link_id = %s
                 RETURNING num_upvotes, num_downvotes, num_reports, dead_link_reports, is_dead;
                 """,

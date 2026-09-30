@@ -1,0 +1,32 @@
+.review-shell { padding-top: 24px; width: min(1080px, calc(100% - 32px)); }
+.review-shell h1 { font: normal 30px/1.2 Georgia, serif; color: var(--pink-dark); }
+.review-shell a { color: var(--pink-dark); }
+.review-shell button { border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--text); padding: 9px 12px; }
+#set-list { display: grid; gap: 8px; }
+.set-choice { text-align: left; overflow-wrap: anywhere; }
+.set-choice small { display: block; color: var(--muted); margin-top: 4px; }
+#search { width: min(420px, 100%); margin-bottom: 16px; border: 1px solid var(--line); border-radius: 24px; padding: 12px 18px; }
+.review-toolbar { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; position: sticky; top: 0; z-index: 1; background: var(--page); padding: 8px 0; }
+#progress { color: var(--muted); margin: 0; }
+.photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; align-items: start; }
+.review-card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.card-body { padding: 12px; }
+.card-title { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; margin-bottom: 10px; }
+.card-roles { display: flex; flex-wrap: wrap; gap: 6px; }
+.card-roles label { cursor: pointer; display: flex; align-items: center; gap: 5px; padding: 6px 9px; border-radius: 20px; background: var(--pink-soft); font-size: 12px; }
+.card-roles label:has(input:checked) { outline: 1px solid var(--pink-dark); }
+.review-shell input[type=checkbox] { accent-color: var(--pink-dark); }
+.none-choice { display: block; font-size: 12px; margin-top: 12px; }
+.card-actions { display: flex; gap: 8px; margin-top: 12px; }
+.card-actions .save { background: var(--pink-dark); color: white; }
+.card-actions .broken { color: var(--red); }
+.card-status { font-size: 12px; color: var(--muted); min-height: 1.5em; margin: 8px 0 0; }
+.review-card.saved { border-color: var(--green); }
+.review-card.dead .card-media { opacity: .45; }
+#status { min-height: 1.5em; }
+@media (max-width: 540px) { .photo-grid { grid-template-columns: 1fr; } }
+.review-card .card-media { min-height: 180px; }
+.review-card .card-media img, .review-card .card-media video { max-width: 100%; max-height: 420px; }
+
+.preview-status { font-size: 12px; color: var(--muted); margin: 0 0 8px; }
+.preview-status:empty { display: none; }

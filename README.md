@@ -74,3 +74,19 @@ For the smallest first deployment, run one web dyno and set `RUN_BACKGROUND_TASK
 ## Database history
 
 The existing numbered migrations were copied into this repository so the new app can share the current Postgres data. Do not reset or recreate production. See `migrations/README.md` and apply `table_updates30.sql` after the prior schema history.
+
+Idol-label review lives at `/disambiguation`, with no navigation link or password.
+The queue ranks exact Discord/Goyangi sets by unresolved wrong-idol reports,
+unique image count, then newest upload. Dead links and completed images leave the
+queue. Each set opens as a photo wall with lazy previews and per-photo idol
+choices. Select every idol present, explicitly choose none, or leave a photo
+unsaved for later. Loaded sets stay in memory while navigating back to the queue.
+Direct images avoid metadata lookups and use the proxy if hotlinking fails.
+Videos use the feed/set player setup and same-origin proxy with Range support.
+Saving uses
+the existing bot semantics: mark URL assignments disambiguated, clear wrong-idol
+reports on retained labels, and suppress other labels at the report threshold
+without deleting their rows or changing dead-link reports. Admin previews include
+reported labels. “Mark as broken” marks all assignments of the current URL dead
+and leaves the existing recovery process available. No new migration is
+needed (existing migrations 27 and 41 provide the review flag and set key).

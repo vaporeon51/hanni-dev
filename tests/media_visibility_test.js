@@ -38,6 +38,7 @@ function harness(view, responses) {
     },
     onUnavailable() { hidden++; },
   });
+  vm.runInContext(Deno.readTextFileSync("static/media-player.js"), context);
   vm.runInContext(source.slice(start, end), context);
   const args = view === "scroll" ? ", () => {}, onUnavailable" : ", onUnavailable";
   const controller = vm.runInContext(`createMedia({content_link_id: 42, url: "https://goyangi.pics/v/test.webp"}${args})`, context);

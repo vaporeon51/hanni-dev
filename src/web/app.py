@@ -67,8 +67,9 @@ _GROUP_ALIASES = {"idle": "gidle", "ohmygirl": "omg"}
 # home, content APIs 404. Override with CLEAN_HOST="" to disable.
 CLEAN_HOST = os.getenv("CLEAN_HOST", "bias.hannibee.art").strip().lower()
 
-_CLEAN_PAGE_PATHS = {"/feed", "/sets", "/scroll"}
+_CLEAN_PAGE_PATHS = {"/feed", "/sets", "/scroll", "/disambiguation"}
 _CLEAN_BLOCKED_API_PREFIXES = (
+    "/api/disambiguation",
     "/api/feed",
     "/api/sets",
     "/api/scroll",
@@ -321,6 +322,9 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="Hanni", description="A web feed for ingested and recovered content.", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=str(REPO_ROOT / "static")), name="static")
+from src.web.disambiguation import router as disambiguation_router  # noqa: E402
+
+app.include_router(disambiguation_router)
 
 
 @app.middleware("http")

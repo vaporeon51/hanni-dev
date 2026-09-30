@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>review labels · hanni♡</title>
+  <link rel="stylesheet" href="/static/app.css?v={{ static_version }}" />
+  <link rel="stylesheet" href="/static/disambiguation.css?v={{ static_version }}" />
+</head>
+<body>
+  <main class="shell review-shell">
+    <a href="/">← homepage</a>
+    <h1>Review idol labels</h1>
+    <p>Choose every idol in a photo, then save. Leave unsure photos for later.</p>
+    <p id="status" role="status" aria-live="polite"></p>
+    <section id="queue" aria-label="Sets awaiting review">
+      <p>Wrong-idol reports first, then largest sets, then newest.</p>
+      <input id="search" type="search" placeholder="Find a set" aria-label="Find a set" />
+      <div id="set-list"></div>
+    </section>
+    <section id="review" aria-label="Review image" hidden>
+      <div class="review-toolbar"><button id="back" type="button">← sets</button><p id="progress" role="status"></p></div>
+      <div id="wall" class="photo-grid" aria-label="Set photos"></div>
+    </section>
+  </main>
+  <script src="/static/media-player.js?v={{ static_version }}" defer></script>
+  <script src="/static/disambiguation.js?v={{ static_version }}" defer></script>
+</body>
+</html>

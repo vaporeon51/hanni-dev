@@ -239,21 +239,7 @@ function createMedia(item, onUnavailable = () => {}) {
     resolved = payload;
     if (disposed || !nearViewport) return;
     if (!media || (media.tagName === "VIDEO") !== (resolved.kind === "video")) {
-      media = document.createElement(resolved.kind === "video" ? "video" : "img");
-      media.referrerPolicy = "no-referrer";
-      if (resolved.kind === "video") {
-        media.autoplay = true;
-        media.controls = false;
-        media.defaultMuted = true;
-        media.loop = true;
-        media.muted = true;
-        media.preload = "auto";
-        media.playsInline = true;
-      } else {
-        media.alt = item.label || "Set item";
-        media.loading = "eager";
-        media.decoding = "async";
-      }
+      media = window.HanniMedia.create(resolved.kind, item.label || "Set item");
     }
     wrapper.replaceChildren(media);
     wrapper.className = "card-media is-loading";

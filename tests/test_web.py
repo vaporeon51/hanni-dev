@@ -596,7 +596,8 @@ def test_homepage_renders_menu_with_wholesome_and_nsfw():
     assert "nsfw</h2>" in response.text
     for path in ("/sorter", "/leaderboard", "/feed", "/sets", "/scroll"):
         assert f'<a class="menu-card" href="{path}">' in response.text
-    assert '<footer class="site-credit">made by glaceon</footer>' in response.text
+    assert '<footer class="site-credit">made by glaceon' in response.text
+    assert '/disambiguation' not in response.text
     assert '/static/home.css?v=' in response.text
     # Emoji are banned from chrome; iconography goes through icons.svg.
     for banned in ("😇", "😈", "💘", "🏆", "🎲", "🗂", "🌀"):

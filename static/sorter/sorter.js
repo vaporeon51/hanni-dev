@@ -304,6 +304,11 @@
     function idsFor(g) {
       return mode === "idols" ? g.members.map((i) => i.id) : g.gen?.length && g.photo ? [g.photo.id] : [];
     }
+    function matchesGroupSearch(g, query) {
+      const normalizedQuery = resolve(query);
+      return g.name.toLowerCase().includes(query) ||
+        (normalizedQuery.length > 0 && resolve(g.name).includes(normalizedQuery));
+    }
     function visibleGroups() {
       const query = $("search").value.trim().toLowerCase();
       return groups.filter(
@@ -315,7 +320,7 @@
               : g.gen?.includes(generation) ||
                 g.members.some((m) => (m.gen || []).includes(generation)))) &&
           (!query ||
-            g.name.toLowerCase().includes(query) ||
+            matchesGroupSearch(g, query) ||
             (mode === "idols" && g.members.some((m) => m.name.toLowerCase().includes(query)))),
       );
     }
@@ -353,7 +358,7 @@
             ids = idsFor(g),
             count = ids.filter((id) => selected.has(id)).length;
           const query = $("search").value.trim().toLowerCase();
-          const matchedMember = query && !g.name.toLowerCase().includes(query);
+          const matchedMember = query && !matchesGroupSearch(g, query);
           const open = expanded.has(index) || matchedMember;
           return `<article data-card="${index}" class="group-card ${
             count ? "has-selection" : ""

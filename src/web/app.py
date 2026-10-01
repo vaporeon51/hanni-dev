@@ -1027,6 +1027,7 @@ async def leaderboard(
                         "top_members": _serialize_top_members(entry),
                         "image_url": _group_image(entry.group_name, entry.image_url),
                         "votes": entry.votes,
+                        "wins": entry.wins,
                         "provisional": entry.provisional,
                     }
                     for entry in group_board.entries

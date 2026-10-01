@@ -273,7 +273,7 @@ def test_global_group_board_resolves_photos_and_members(monkeypatch):
                 "aespa", 1495, 4, 3, ["Karina", "Winter", "NingNing"],
                 "https://legacy.kpopping.com/top.jpg", 3844,
                 ["https://legacy.kpopping.com/k.jpg", "https://legacy.kpopping.com/w.jpg", None],
-                1520, 1,
+                1520, 1, wins=2400,
             ),
         ],
         vote_count=74712,
@@ -299,6 +299,7 @@ def test_global_group_board_resolves_photos_and_members(monkeypatch):
     entry = response.json()["entries"][0]
     assert entry["image_url"] == "/static/sorter/idols/group-aespa.jpg"
     assert entry["votes"] == 3844
+    assert entry["wins"] == 2400
     assert entry["peak_elo"] == 1520
     assert entry["rank"] == 1
     assert entry["provisional"] is False
@@ -311,11 +312,12 @@ def test_global_group_board_resolves_photos_and_members(monkeypatch):
 
 def test_group_board_maps_peak_elo():
     board = bias._build_group_leaderboard(
-        [("aespa", 1495, 4, 3, ["Karina"], "img", ["img"], 100, 1520)],
+        [("aespa", 1495, 4, 3, ["Karina"], "img", ["img"], 100, 1520, 60)],
         50,
         3,
     )
 
+    assert board.entries[0].wins == 60
     assert board.entries[0].peak_elo == 1520
     assert board.entries[0].elo == 1495
     assert board.entries[0].rank == 1

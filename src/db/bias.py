@@ -82,10 +82,11 @@ class GroupLeaderboardEntry:
     votes: int = 0
     top_member_images: list[str] | None = None
     # Highest member score in the group. The sorter lineup orders groups by
-    # this; the Groups board itself ranks by the top-3 average (elo).
+    # this; the Groups board itself ranks by the top-three average (elo).
     peak_elo: int = 0
     rank: int | None = None
     provisional: bool = False
+    wins: int = 0
 
 
 @dataclass(frozen=True)
@@ -157,6 +158,7 @@ def _build_group_leaderboard(rows, vote_count: int, top_n: int) -> GroupLeaderbo
                 votes=votes,
                 top_member_images=list(row[6] or []) if len(row) > 6 else [],
                 peak_elo=int(row[8]) if len(row) > 8 and row[8] is not None else 0,
+                wins=int(row[9] or 0) if len(row) > 9 else 0,
                 rank=rank if not provisional else None,
                 provisional=provisional,
             )
@@ -344,33 +346,38 @@ def get_global_group_leaderboard(limit: int = 15, top_n: int = 3) -> GroupLeader
                            -- idol score rather than applying shrinkage twice.
                            r.global_elo AS score,
                            r.global_match_count AS matches,
+                           r.global_win_count AS wins,
                            COUNT(*) OVER (PARTITION BY r.group_name) AS member_count,
                            ROW_NUMBER() OVER (
                                PARTITION BY r.group_name
                                ORDER BY r.global_elo DESC, r.member_name
                            ) AS member_rank
                     FROM (SELECT legacy.role_id, legacy.member_name, legacy.group_name,
-                                 legacy.image_url, rating.global_elo, rating.global_match_count
+                                 legacy.image_url, rating.global_elo, rating.global_match_count,
+                                 rating.global_win_count
                           FROM role_info legacy JOIN idol_ratings rating USING (role_id)) r
                     WHERE {_ACTIVE_IDOL_PREDICATE}
                       AND r.group_name IS NOT NULL
                       AND TRIM(r.group_name) != ''
                 )
-                SELECT group_name, ROUND(AVG(score))::int AS elo,
+                SELECT group_name,
+                       ROUND(AVG(score) FILTER (WHERE member_rank <= %s))::int AS elo,
                        MAX(member_count)::int AS member_count,
-                       COUNT(*)::int AS ranked_member_count,
-                       ARRAY_AGG(member_name ORDER BY score DESC, member_name) AS top_members,
+                       COUNT(*) FILTER (WHERE matches >= {RANKED_MIN_MATCHES})::int AS ranked_member_count,
+                       ARRAY_AGG(member_name ORDER BY score DESC, member_name)
+                           FILTER (WHERE member_rank <= %s) AS top_members,
                        (ARRAY_AGG(image_url ORDER BY score DESC, member_name))[1] AS image_url,
-                       ARRAY_AGG(image_url ORDER BY score DESC, member_name) AS member_images,
-                       SUM(CASE WHEN member_rank <= %s THEN matches ELSE 0 END)::int AS votes,
-                       MAX(score)::int AS peak_elo
+                       ARRAY_AGG(image_url ORDER BY score DESC, member_name)
+                           FILTER (WHERE member_rank <= %s) AS member_images,
+                       SUM(matches)::int AS votes,
+                       MAX(score)::int AS peak_elo,
+                       SUM(wins)::int AS wins
                 FROM idol_scores
-                WHERE member_rank <= %s
                 GROUP BY group_name
-                ORDER BY AVG(score) DESC, group_name
+                ORDER BY AVG(score) FILTER (WHERE member_rank <= %s) DESC, group_name
                 LIMIT %s;
                 """,
-                (top_n, top_n, limit),
+                (top_n, top_n, top_n, top_n, limit),
             )
             return _build_group_leaderboard(cur.fetchall(), vote_count, top_n)
 

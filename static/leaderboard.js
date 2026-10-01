@@ -31,13 +31,10 @@
     return `<span class="row-elo"><span class="elo-tag">ELO</span><span class="elo-num">${elo}</span></span>`;
   }
 
-  function votesPill(votes, wins) {
+  function votesPill(votes, wins, combined = false) {
     const full = (Number(votes) || 0).toLocaleString();
-    if (wins == null) {
-      return `<span class="row-votes" title="${full} recorded matchups">♡ ${formatVotes(votes)}</span>`;
-    }
     const rate = votes > 0 ? `${Math.round(100 * wins / votes)}%` : "—";
-    const label = votes > 0 ? `${rate} win rate` : "No matchups yet";
+    const label = votes > 0 ? `${rate} ${combined ? "combined win rate" : "win rate"}` : "No matchups yet";
     const detail = `${Number(wins).toLocaleString()} wins · ${full} matchups`;
     return `<button type="button" class="row-votes win-rate-trigger" data-rate="${escape(label)}" data-detail="${escape(detail)}" aria-label="${escape(`${label}. ${detail}.`)}">♡ ${formatVotes(wins)}</button>`;
   }
@@ -196,7 +193,7 @@
     }
     const basis = `Based on ${board.vote_count.toLocaleString()} recorded matchups`;
     const movement = hasBaseline ? ` · Movement since ${escape(board.movement_baseline_date)}` : "";
-    const explain = " · ELO reflects head-to-head preferences · ♡ counts wins";
+    const explain = " · ELO reflects head-to-head preferences · ♡ counts matchup wins";
     html += `<p class="board-foot">${basis}${movement}${explain}</p>`;
     return html;
   }
@@ -218,7 +215,7 @@
     const photo = entry.image_url
       ? `<img src="${escape(entry.image_url)}" alt="${escape(entry.group_name)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='${fallbackImage()}'" class="group-photo">`
       : "";
-    return `<div class="group-card"><div class="group-photo-wrap">${photo}<span class="mini-rank">#${entry.rank}</span><div class="fan">${fans}</div></div><div class="group-info"><strong>${escape(entry.group_name)}</strong><small>${entry.member_count} members · top ${escape(tops)}</small><span class="group-stats">${eloPill(entry.elo)}${votesPill(entry.votes)}</span></div></div>`;
+    return `<div class="group-card"><div class="group-photo-wrap">${photo}<span class="mini-rank">#${entry.rank}</span><div class="fan">${fans}</div></div><div class="group-info"><strong>${escape(entry.group_name)}</strong><small>${entry.member_count} members · top ${escape(tops)}</small><span class="group-stats">${eloPill(entry.elo)}${votesPill(entry.votes, entry.wins, true)}</span></div></div>`;
   }
 
   function groupHero(entry) {
@@ -238,7 +235,7 @@
     const photo = entry.image_url
       ? `<img src="${escape(entry.image_url)}" alt="${escape(entry.group_name)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='${fallbackImage()}'" class="group-photo">`
       : "";
-    return `<div class="group-hero"><div class="group-photo-wrap hero-photo-wrap">${photo}<span class="hero-rank">#1</span><div class="fan">${fans}</div></div><div class="group-hero-info"><div class="hero-eyebrow">top group ♡</div><strong>${escape(entry.group_name)}</strong><small>${entry.member_count} members · top ${escape(tops)}</small><span class="group-stats">${eloPill(entry.elo)}${votesPill(entry.votes)}</span></div></div>`;
+    return `<div class="group-hero"><div class="group-photo-wrap hero-photo-wrap">${photo}<span class="hero-rank">#1</span><div class="fan">${fans}</div></div><div class="group-hero-info"><div class="hero-eyebrow">top group ♡</div><strong>${escape(entry.group_name)}</strong><small>${entry.member_count} members · top ${escape(tops)}</small><span class="group-stats">${eloPill(entry.elo)}${votesPill(entry.votes, entry.wins, true)}</span></div></div>`;
   }
 
   function renderGroups(board) {
@@ -255,7 +252,7 @@
       html += "</div>";
     }
     const basis = `Based on ${board.vote_count.toLocaleString()} recorded matchups`;
-    html += `<p class="board-foot">${basis} · Group rankings cover the original member catalog; ELO averages the top ${board.top_n} scores · ♡ counts their matchups</p>`;
+    html += `<p class="board-foot">${basis} · Group rankings cover the original member catalog · ELO averages the top ${board.top_n} member scores · ♡ counts all members’ combined matchup wins</p>`;
     return html;
   }
 

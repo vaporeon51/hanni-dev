@@ -206,7 +206,7 @@
       return { ...adaptiveDefaults, seedOrder: seeded.map((entry) => entry.id) };
     }
     // Lineup order follows the mode: idols mode ranks groups by their peak
-    // member ELO; groups mode mirrors the Groups leaderboard tab (top-3
+    // member ELO; groups mode mirrors the Groups leaderboard tab (top-three
     // average) so the two orders deliberately differ.
     function orderGroups() {
       if (!eloBoard) return;

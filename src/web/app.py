@@ -519,7 +519,7 @@ def _decode_set_cursor(value: str) -> tuple[datetime, int]:
 async def feed(
     request: Request,
     response: Response,
-    query: str | None = Query(default=None, max_length=100),
+    query: str | None = Query(default=None, max_length=100, alias="q"),
     sort: str = Query(default="random"),
     limit: int = Query(default=5, ge=1, le=30),
     continuation: bool = Query(default=False),
@@ -578,7 +578,7 @@ async def feed(
 async def sets(
     request: Request,
     response: Response,
-    query: str | None = Query(default=None, max_length=100),
+    query: str | None = Query(default=None, max_length=100, alias="q"),
     sort: str = Query(default="latest"),
     limit: int = Query(default=5, ge=1, le=30),
     cursor: str | None = Query(default=None, max_length=100),
@@ -629,7 +629,7 @@ async def sets(
 async def scroll_feed(
     request: Request,
     response: Response,
-    query: str | None = Query(default=None, max_length=100),
+    query: str | None = Query(default=None, max_length=100, alias="q"),
     limit: int = Query(default=8, ge=1, le=12),
 ) -> dict[str, Any]:
     """Return a small random batch for the continuously prefetched reel view."""

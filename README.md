@@ -3,7 +3,7 @@
 This repository is the web-only version of Hanni. It has four responsibilities:
 
 1. Read content from the configured Discord channel with `USER_AUTH` and store it in Postgres.
-2. Serve a searchable, single-page feed at `/` and `/api/feed`.
+2. Serve browsing views at `/feed`, `/sets`, and `/scroll`, plus the sorter and leaderboard.
 3. Check whether media URLs embed in Discord and mark confirmed failures as dead.
 4. Recover dead Imgur media, upload a trimmed replacement, and update the related rows.
 
@@ -90,3 +90,18 @@ without deleting their rows or changing dead-link reports. Admin previews includ
 reported labels. “Mark as broken” marks all assignments of the current URL dead
 and leaves the existing recovery process available. No new migration is
 needed (existing migrations 27 and 41 provide the review flag and set key).
+
+## Page and URL conventions
+
+Public searches use `q` in page URLs, native form names, and API requests.
+`sort` controls ordering on feed and sets; `kind` selects the leaderboard tab.
+`collection` identifies a set opened from the feed. Keep page-specific keys
+only where they have meaning; scroll always samples randomly.
+
+Use `static/site-navigation.js` for reading, validating, building, and updating
+page URLs. Searches and discrete filter/tab changes push history entries;
+live typing replaces the current entry so Back does not step through each
+keystroke. Pagination stays out of browser history. Every page reads its URL
+on initial load and Back/Forward. Sorter ranking/session links retain their
+existing hash format, and private selections and playback preferences remain
+in local storage.

@@ -235,6 +235,7 @@
   gap: 12px;
 }
 .reel-title {
+  text-decoration: none;
   text-shadow: 0 1px 6px rgba(0, 0, 0, .3);
   text-wrap: pretty;
   min-width: 0;

@@ -10,21 +10,22 @@
     <link rel="stylesheet" href="/static/app.css?v={{ static_version }}" />
     <link rel="stylesheet" href="/static/scroll.css?v={{ static_version }}" />
     <link rel="stylesheet" href="/static/nsfw.css?v={{ static_version }}" />
+    <script src="/static/site-navigation.js?v={{ static_version }}" defer></script>
   </head>
   <body class="scroll-page nsfw">
     <header class="scroll-topbar">
       {% set active = "scroll" %}{% include "_nav.html" %}
       <div class="scroll-filterbar">
       <form id="scroll-form" class="scroll-search" role="search">
-        <label class="sr-only" for="query">Filter by idol or group</label>
+        <label class="sr-only" for="query">Search idols or groups</label>
         <svg class="scroll-filter-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <path d="M4 5h16l-6.25 7.1v5.15l-3.5 1.75v-6.9L4 5Z"></path>
         </svg>
         <input
           id="query"
-          name="query"
+          name="q"
           type="search"
-          placeholder="search a member or group"
+          placeholder="search an idol or group"
           autocomplete="off"
           autocapitalize="none"
           autocorrect="off"
@@ -82,7 +83,7 @@
         <button id="lightbox-close" class="lightbox-close" type="button" aria-label="Close expanded view">✕</button>
         <div id="lightbox-stage" class="lightbox-stage"></div>
         <div class="lightbox-caption">
-          <div class="reel-title-row"><button id="lightbox-title" class="reel-title" type="button" data-filter-query=""></button><a id="lightbox-collection" class="reel-collection-link" hidden></a></div>
+          <div class="reel-title-row"><a id="lightbox-title" class="reel-title" data-filter-query=""></a><a id="lightbox-collection" class="reel-collection-link" hidden></a></div>
           <div id="lightbox-meta" class="reel-meta"></div>
           <p id="lightbox-message" class="reel-message"></p>
         </div>

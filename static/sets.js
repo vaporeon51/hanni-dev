@@ -1,11 +1,11 @@
 const BATCH_SIZE = 5;
-const ALLOWED_SORTS = new Set(["latest", "oldest"]);
 const MEDIA_PRELOAD_MARGIN = "550px 0px";
 const FIRST_MEDIA_HEAD_START_MS = 360;
 const MEDIA_STAGGER_MS = 110;
 const MEDIA_RETRY_DELAYS_MS = [1500, 4000, 9000];
 const state = {
   sets: [],
+  historyKey: "",
   navigationToken: 0,
   nextCursor: null,
   requestParams: null,
@@ -17,6 +17,90 @@ const pendingMediaStarts = new Set();
 const $ = (id) => document.getElementById(id);
 const dateFormatter = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
 const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+const viewCache = new Map();
+
+const navigation = window.SiteNavigation;
+const filterOptions = { sorts: ["latest", "oldest"], defaultSort: "latest" };
+navigation.normalize(filterOptions);
+
+function filtersFromLocation() {
+  return navigation.readFilters(filterOptions);
+}
+
+function filterUrl(filters) {
+  return navigation.filterUrl(filters, { remove: ["collection"] });
+}
+
+function applyFilters(filters) {
+  $("query").value = filters.query;
+  $("sort").value = filters.sort;
+}
+
+function storeCurrentView() {
+  if (state.loadingMore && !state.sets.length) return;
+  cancelPendingMediaStarts();
+  const snapshot = {
+    nodes: Array.from($("feed").childNodes),
+    sets: state.sets,
+    nextCursor: state.nextCursor,
+    requestParams: state.requestParams,
+    statusText: $("status").textContent,
+    scrollY: window.scrollY,
+  };
+  snapshot.nodes.forEach((node) => node.remove());
+  // Keep the preceding view, including its carousel positions and scroll offset.
+  viewCache.forEach((view) => view.nodes.forEach((node) => {
+    node._setMedia?.forEach((media) => media.dispose());
+  }));
+  viewCache.clear();
+  viewCache.set(state.historyKey, snapshot);
+}
+
+function restoreView(snapshot) {
+  clearFeed();
+  $("sets-form").querySelector('button[type="submit"]').disabled = false;
+  state.sets = snapshot.sets;
+  state.nextCursor = snapshot.nextCursor;
+  state.requestParams = snapshot.requestParams;
+  state.loadingMore = false;
+  state.retryContinuation = false;
+  applyFilters(filtersFromLocation());
+  $("feed").append(...snapshot.nodes);
+  $("feed").querySelectorAll(".set-card").forEach(observeSetCard);
+  setStatus(snapshot.statusText);
+  setSentinel(state.nextCursor ? "" : "end of results");
+  updateTimelineTools();
+  refreshSetSentinelObserver();
+  window.requestAnimationFrame(() => window.scrollTo({ top: snapshot.scrollY, behavior: "auto" }));
+}
+
+function navigateSets(filters) {
+  const url = filterUrl(filters);
+  if (url.href !== window.location.href) {
+    storeCurrentView();
+    state.historyKey = navigation.newKey();
+    window.history.pushState({ viewKey: state.historyKey }, "", url.href);
+  }
+  applyFilters(filters);
+  loadSets();
+  window.scrollTo({ top: 0, behavior: "auto" });
+}
+
+function submitSetFilters(event) {
+  event.preventDefault();
+  const query = $("query").value.trim();
+  navigateSets({
+    query,
+    sort: $("sort").value,
+  });
+}
+
+function loadViewFromLocation() {
+  const filters = filtersFromLocation();
+  applyFilters(filters);
+  loadSets();
+}
 
 function lockMobileMediaHeight() {
   if (!window.matchMedia("(max-width: 620px)").matches) {
@@ -384,9 +468,14 @@ function createSetBody(contentSet, item) {
 
   const header = document.createElement("div");
   header.className = "card-header";
-  const title = document.createElement("div");
-  title.className = "card-title";
-  title.textContent = contentSet.label || item.label || "content set";
+  const title = document.createElement("a");
+  title.className = "card-title filter-link";
+  title.dataset.filterQuery = contentSet.label || item.label || "content set";
+  title.href = filterUrl({
+    query: title.dataset.filterQuery,
+    sort: $("sort").value,
+  }).href;
+  title.textContent = title.dataset.filterQuery;
   const position = document.createElement("span");
   position.className = "set-position";
   position.dataset.setPosition = "";
@@ -614,8 +703,7 @@ function isUrlLike(value) {
   return /^(https?:\/\/\S+|\S+\.\S+\/\S+)$/i.test(value.trim());
 }
 
-async function loadSets(event) {
-  if (event) event.preventDefault();
+async function loadSets() {
   const navigationToken = ++state.navigationToken;
   $("query").blur();
   clearFeed();
@@ -627,7 +715,7 @@ async function loadSets(event) {
   setStatus("finding little sets…");
 
   const requestedSort = $("sort").value;
-  const sort = ALLOWED_SORTS.has(requestedSort) ? requestedSort : "latest";
+  const sort = filterOptions.sorts.includes(requestedSort) ? requestedSort : filterOptions.defaultSort;
   const query = $("query").value.trim();
   const urlMode = isUrlLike(query);
   state.requestParams = { limit: String(BATCH_SIZE), sort, query };
@@ -636,7 +724,7 @@ async function loadSets(event) {
     endpoint = `/api/collections/by-url?url=${encodeURIComponent(query)}`;
   } else {
     const params = new URLSearchParams({ limit: String(BATCH_SIZE), sort });
-    if (query) params.set("query", query);
+    if (query) params.set("q", query);
     endpoint = `/api/sets?${params.toString()}`;
   }
   const submit = $("sets-form").querySelector('button[type="submit"]');
@@ -689,7 +777,7 @@ async function loadMoreSets() {
     sort: state.requestParams.sort,
     cursor: state.nextCursor,
   });
-  if (state.requestParams.query) params.set("query", state.requestParams.query);
+  if (state.requestParams.query) params.set("q", state.requestParams.query);
   state.loadingMore = true;
   setSentinel("finding more little sets…", "is-loading");
   setStatus("finding more sets…");
@@ -724,7 +812,22 @@ async function loadMoreSets() {
   }
 }
 
-$("sets-form").addEventListener("submit", loadSets);
+window.addEventListener("popstate", (event) => {
+  state.navigationToken += 1;
+  const nextHistoryKey = event.state?.viewKey || navigation.newKey();
+  const snapshot = viewCache.get(nextHistoryKey);
+  if (snapshot) viewCache.delete(nextHistoryKey);
+  storeCurrentView();
+  state.historyKey = nextHistoryKey;
+  if (snapshot) restoreView(snapshot);
+  else {
+    window.scrollTo({ top: 0, behavior: "auto" });
+    loadViewFromLocation();
+  }
+});
+
+$("sets-form").addEventListener("submit", submitSetFilters);
+$("sort").addEventListener("change", submitSetFilters);
 $("timeline-search").addEventListener("click", focusSearch);
 $("timeline-top").addEventListener("click", jumpToTop);
 $("feed-sentinel").addEventListener("click", () => {
@@ -734,10 +837,20 @@ $("feed-sentinel").addEventListener("click", () => {
 window.addEventListener("scroll", scheduleTimelineToolsUpdate, { passive: true });
 refreshSetSentinelObserver();
 $("feed").addEventListener("click", (event) => {
-  const navigation = event.target.closest("button[data-set-nav]");
-  if (navigation) {
-    const card = navigation.closest(".set-card");
-    if (card) navigateSet(card, navigation.dataset.setNav);
+  const titleFilter = event.target.closest("a[data-filter-query]");
+  if (titleFilter) {
+    if (!navigation.isPlainClick(event)) return;
+    event.preventDefault();
+    navigateSets({
+      query: titleFilter.dataset.filterQuery,
+      sort: $("sort").value,
+    });
+    return;
+  }
+  const setNavigation = event.target.closest("button[data-set-nav]");
+  if (setNavigation) {
+    const card = setNavigation.closest(".set-card");
+    if (card) navigateSet(card, setNavigation.dataset.setNav);
     return;
   }
   const control = event.target.closest("button[data-action]");
@@ -745,4 +858,7 @@ $("feed").addEventListener("click", (event) => {
   if (card) handleFeedback(card, control);
 });
 
-loadSets();
+state.historyKey = window.history.state?.viewKey || navigation.newKey();
+window.history.replaceState({ viewKey: state.historyKey }, "", window.location.href);
+if ("scrollRestoration" in window.history) window.history.scrollRestoration = "manual";
+loadViewFromLocation();

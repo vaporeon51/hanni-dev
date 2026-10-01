@@ -7,6 +7,9 @@
 (() => {
   "use strict";
   const $ = (id) => document.getElementById(id);
+  const navigation = window.SiteNavigation;
+  navigation.normalize();
+  $("search").value = navigation.readQuery();
 
   const escape = (value) =>
     String(value ?? "").replace(
@@ -110,7 +113,14 @@
       const items = (catalog.entries || [])
         .filter((item) => item.kind !== "group")
         .sort((a, b) => (a.short || a.name).localeCompare(b.short || b.name));
-      $("search").addEventListener("input", () => render(items, embeds, order));
+      $("search").addEventListener("input", () => {
+        navigation.write(navigation.filterUrl({ query: $("search").value }), { replace: true });
+        render(items, embeds, order);
+      });
+      window.addEventListener("popstate", () => {
+        $("search").value = navigation.readQuery();
+        render(items, embeds, order);
+      });
       render(items, embeds, order);
     } catch {
       wall.innerHTML = '<div class="loading">Could not load photos. Please refresh to try again.</div>';

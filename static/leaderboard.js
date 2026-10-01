@@ -6,7 +6,9 @@
 (() => {
   "use strict";
   const $ = (id) => document.getElementById(id);
-  let kind = "idols";
+  const navigation = window.SiteNavigation;
+  let kind = navigation.readChoice("kind", ["idols", "groups"], "idols");
+  let requestToken = 0;
 
   const escape = (value) =>
     String(value ?? "").replace(
@@ -258,21 +260,25 @@
   }
 
   async function load() {
+    const token = ++requestToken;
+    const requestedKind = kind;
     const board = $("board");
     hideTip();
-    board.innerHTML = '<div class="loading">Gathering idols</div>';
+    board.innerHTML = `<div class="loading">Gathering ${requestedKind}</div>`;
     try {
-      const response = await fetch(`/api/leaderboard?kind=${kind}&include_provisional=false`, {
+      const response = await fetch(`/api/leaderboard?kind=${requestedKind}&include_provisional=false`, {
         credentials: "same-origin",
       });
       if (!response.ok) throw new Error("board " + response.status);
       const data = await response.json();
+      if (token !== requestToken) return;
       if (!data.entries.length) {
-        board.innerHTML = '<div class="loading">No groups ranked yet.</div>';
+        board.innerHTML = `<div class="loading">No ${requestedKind} ranked yet.</div>`;
         return;
       }
-      board.innerHTML = kind === "idols" ? renderIdols(data) : renderGroups(data);
+      board.innerHTML = requestedKind === "idols" ? renderIdols(data) : renderGroups(data);
     } catch {
+      if (token !== requestToken) return;
       board.innerHTML = '<div class="loading">Could not load the board. Please refresh to try again.</div>';
     }
   }
@@ -287,11 +293,20 @@
     button.addEventListener("click", () => {
       if (kind === button.dataset.kind) return;
       kind = button.dataset.kind;
+      navigation.write(navigation.url({ kind }));
       syncTabs();
       load();
     });
   });
 
+  window.addEventListener("popstate", () => {
+    kind = navigation.readChoice("kind", ["idols", "groups"], "idols");
+    syncTabs();
+    load();
+  });
+  if (new URL(window.location.href).searchParams.has("kind")) {
+    navigation.write(navigation.url({ kind }), { replace: true });
+  }
   syncTabs();
   load();
 })();

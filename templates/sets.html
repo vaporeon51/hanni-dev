@@ -9,13 +9,14 @@
     <link rel="stylesheet" href="/static/nav.css?v={{ static_version }}" />
     <link rel="stylesheet" href="/static/app.css?v={{ static_version }}" />
     <link rel="stylesheet" href="/static/nsfw.css?v={{ static_version }}" />
+    <script src="/static/site-navigation.js?v={{ static_version }}" defer></script>
   </head>
   <body class="nsfw">
     {% set active = "sets" %}{% include "_nav.html" %}
     <main class="shell">
       <form id="sets-form" class="search sets-search" role="search">
-        <label class="sr-only" for="query">Search sets by member, group, or link</label>
-        <input id="query" name="query" type="search" placeholder="search sets by member, group, or link" autocomplete="off" />
+        <label class="sr-only" for="query">Search sets by idol, group, or link</label>
+        <input id="query" name="q" type="search" placeholder="search sets by idol, group, or link" autocomplete="off" />
         <label class="sr-only" for="sort">Sort sets</label>
         <select id="sort" name="sort" aria-label="Sort sets">
           <option value="latest" selected>newest</option>

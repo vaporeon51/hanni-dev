@@ -4,18 +4,19 @@
     <meta charset="utf-8" />
     {% include "_social_meta.html" %}
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>hanni♡</title>
+    <title>feed · hanni♡</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext x='32' y='46' text-anchor='middle' font-size='44' fill='%23b84d79'%3E%E2%99%A1%3C/text%3E%3C/svg%3E" />
     <link rel="stylesheet" href="/static/nav.css?v={{ static_version }}" />
     <link rel="stylesheet" href="/static/app.css?v={{ static_version }}" />
     <link rel="stylesheet" href="/static/nsfw.css?v={{ static_version }}" />
+    <script src="/static/site-navigation.js?v={{ static_version }}" defer></script>
   </head>
   <body class="nsfw">
     {% set active = "feed" %}{% include "_nav.html" %}
     <main class="shell">
       <form id="feed-form" class="search feed-search" role="search">
-        <label class="sr-only" for="query">Search by member or group</label>
-        <input id="query" name="query" type="search" placeholder="search a member or group" autocomplete="off" />
+        <label class="sr-only" for="query">Search idols or groups</label>
+        <input id="query" name="q" type="search" placeholder="search an idol or group" autocomplete="off" />
         <label class="sr-only" for="sort">Sort feed</label>
         <select id="sort" name="sort" aria-label="Sort feed">
           <option value="random" selected>random</option>

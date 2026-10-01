@@ -9,6 +9,7 @@
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext x='32' y='46' text-anchor='middle' font-size='44' fill='%23b84d79'%3E%E2%99%A1%3C/text%3E%3C/svg%3E" />
     <link rel="stylesheet" href="/static/nav.css?v={{ static_version }}" />
     <link rel="stylesheet" href="/static/sorter/sorter.css?v={{ static_version }}" />
+    <script src="/static/site-navigation.js?v={{ static_version }}" defer></script>
     <script defer src="/static/sorter/lz-string.min.js?v={{ static_version }}"></script>
     <script defer src="/static/sorter/engine.js?v={{ static_version }}"></script>
     <script defer src="/static/sorter/result-image.js?v={{ static_version }}"></script>
@@ -45,9 +46,10 @@
             </div>
             <label class="search"><span aria-hidden="true">⌕</span><input
                 id="search"
+                name="q"
                 type="search"
-                placeholder="Search groups or idols"
-                aria-label="Search groups and idols"
+                placeholder="Search idols or groups"
+                aria-label="Search idols or groups"
               ><kbd>/</kbd></label>
             <div class="filters" aria-label="Filter groups">
               <button data-gen="all" aria-pressed="true">

@@ -106,6 +106,9 @@
   }
   preload.seen = new Set();
 
+  const navigation = window.SiteNavigation;
+  navigation.normalize();
+
   async function boot() {
     let data;
     try {
@@ -300,6 +303,8 @@
 
     const photo = (item, cls = "") =>
       `<img src="${escape(imageURL(item))}" alt="${escape(item.name)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" class="${cls}">`;
+
+    $("search").value = navigation.readQuery();
 
     function idsFor(g) {
       return mode === "idols" ? g.members.map((i) => i.id) : g.gen?.length && g.photo ? [g.photo.id] : [];
@@ -537,6 +542,7 @@
     let searchTimer = null,
       searchQueued = false;
     $("search").addEventListener("input", () => {
+      navigation.write(navigation.filterUrl({ query: $("search").value }), { replace: true });
       if (searchTimer) {
         searchQueued = true;
         return;
@@ -649,6 +655,8 @@
       if (action === "push" || action === "replace") tagView(next, action);
     }
     if (typeof window.addEventListener === "function") window.addEventListener("popstate", (event) => {
+      $("search").value = navigation.readQuery();
+      if (view === "setup") renderGroups();
       const target = event.state?.sorterView;
       if (!target || target === view || !session || !sorter) return;
       if (target === "setup") {

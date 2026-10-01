@@ -264,6 +264,10 @@ button:disabled { cursor: wait; opacity: .55; }
   gap: 14px;
 }
 .card-title { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Rounded", "Segoe UI", sans-serif; letter-spacing: -.015em; overflow-wrap: anywhere; font-size: .98rem; font-weight: 700; line-height: 1.25; }
+.filter-link { color: inherit; text-decoration: none; }
+.filter-link:hover { text-decoration: underline; }
+.filter-link:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+
 .set-position {
   font-variant-numeric: tabular-nums;
   flex: none;

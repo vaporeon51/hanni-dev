@@ -153,7 +153,7 @@ Deno.test("focus dial improves top precision at fixed effort in reproducible noi
   assert.ok(metrics[1].exposure > metrics[0].exposure * 1.5);
 });
 
-async function browserFixture(saved = null, boardFails = false, hash = "") {
+async function browserFixture(saved = null, boardFails = false, hash = "", search = "") {
   const catalog = JSON.parse(readFileSync(new URL("../static/sorter/catalog.json", import.meta.url), "utf8"));
   const ids = catalog.entries.filter((item) => item.kind === "idol").slice(0, 16).map((item) => item.id);
   const elements = new Map();
@@ -162,7 +162,7 @@ async function browserFixture(saved = null, boardFails = false, hash = "") {
       id, value: id === "result-images" ? "10" : "", hidden: false, disabled: false,
       dataset: {}, classList: { toggle() {}, add() {}, remove() {} },
       innerHTML: "", textContent: "", setAttribute() {}, removeAttribute() {},
-      addEventListener(type, fn) { if (type === "click") this.onclick = fn; }, querySelectorAll() { return []; }, querySelector() { return { append() {} }; },
+      addEventListener(type, fn) { this["on" + type] = fn; }, querySelectorAll() { return []; }, querySelector() { return { append() {} }; },
       contains() { return false; }, focus() {}, appendChild() {},
       click() { this.onclick?.({ currentTarget: this }); },
     });
@@ -185,8 +185,12 @@ async function browserFixture(saved = null, boardFails = false, hash = "") {
   const context = vm.createContext({
     document, console, URL, Blob, AbortController, crypto,
     localStorage: { getItem: (key) => storage.get(key) || null, setItem: (key, value) => storage.set(key, value), removeItem: (key) => storage.delete(key) },
-    location: { hash, search: "", pathname: "/sorter", origin: "https://example.test" },
-    history: { replaceState() { context.location.hash = ""; } },
+    location: { hash, search, pathname: "/sorter", origin: "https://example.test" },
+    history: { state: null, replaceState(state, _title, url) {
+      this.state = state;
+      const next = new URL(url, context.location.href);
+      Object.assign(context.location, {href: next.href, hash: next.hash, search: next.search});
+    } },
     window: { scrollTo() {}, matchMedia: () => ({ matches: true }) },
     navigator: { sendBeacon(url, payload) { beacons.push({ url, payload }); return true; }, clipboard: { async writeText(url) { context.copiedURL = url; } } },
     Image: class {}, setTimeout() { return 0; }, clearTimeout() {},
@@ -202,6 +206,10 @@ async function browserFixture(saved = null, boardFails = false, hash = "") {
       return { ok: true, json: async () => url.includes("catalog") ? catalog : {} };
     },
   });
+  context.location.href = `https://example.test/sorter${search}${hash}`;
+  context.window.location = context.location;
+  context.window.history = context.history;
+  vm.runInContext(readFileSync(new URL("../static/site-navigation.js", import.meta.url), "utf8"), context);
   vm.runInContext(engineSource, context);
   vm.runInContext(readFileSync(new URL("../static/sorter/lz-string.min.js", import.meta.url), "utf8"), context);
   vm.runInContext(readFileSync(new URL("../static/sorter/sorter.js", import.meta.url), "utf8"), context);
@@ -345,4 +353,17 @@ Deno.test("completed sorts submit all evidence once, including ties and undo", a
   assert.ok(ui.session().ballotDone);
   const resumed = await browserFixture(ui.session());
   assert.equal(resumed.ballots.length, 0);
+});
+
+
+Deno.test("sorter search restores q and live edits preserve selections and view state", async () => {
+  const ui = await browserFixture(null, false, "", "?q=Somi");
+  assert.equal(ui.element("search").value, "Somi");
+  assert.ok(ui.element("groups").innerHTML.includes("Somi"));
+  const lineup = ui.storage.get("bias-club-lineup-v1");
+  ui.element("search").value = "aespa";
+  ui.element("search").oninput();
+  assert.equal(new URL(ui.context.location.href).searchParams.get("q"), "aespa");
+  assert.equal(ui.storage.get("bias-club-lineup-v1"), lineup);
+  assert.equal(ui.context.history.state.sorterView, "setup");
 });

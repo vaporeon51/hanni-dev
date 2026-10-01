@@ -26,9 +26,21 @@ const $ = (id) => document.getElementById(id);
 const dateFormatter = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
 const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
 
-function newHistoryKey() {
-  if (window.crypto?.randomUUID) return window.crypto.randomUUID();
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+const navigation = window.SiteNavigation;
+const filterOptions = { sorts: ["random", "latest", "top"], defaultSort: "random" };
+navigation.normalize(filterOptions);
+
+function filtersFromLocation() {
+  return navigation.readFilters(filterOptions);
+}
+
+function filterUrl(filters) {
+  return navigation.filterUrl(filters, { remove: ["collection"] });
+}
+
+function applyFilters(filters) {
+  $("query").value = filters.query;
+  $("sort").value = filters.sort;
 }
 
 function collectionIdFromLocation() {
@@ -39,14 +51,13 @@ function collectionIdFromLocation() {
 function initializeHistory() {
   const collectionId = collectionIdFromLocation();
   state.mode = collectionId ? "collection" : "feed";
-  state.historyKey = window.history.state?.viewKey || newHistoryKey();
+  state.historyKey = window.history.state?.viewKey || navigation.newKey();
   window.history.replaceState(
     { viewKey: state.historyKey, mode: state.mode, collectionId },
     "",
     window.location.href,
   );
   if ("scrollRestoration" in window.history) window.history.scrollRestoration = "manual";
-  return collectionId;
 }
 
 function lockMobileMediaHeight() {
@@ -220,14 +231,15 @@ function captureCurrentView() {
     mode: state.mode,
     collectionLabel: state.collectionLabel,
     statusText: $("status").textContent,
-    query: $("query").value,
-    sort: $("sort").value,
+    query: state.query,
+    sort: state.sort,
     hasMore: state.hasMore,
     scrollY,
   };
 }
 
 function storeCurrentView() {
+  if (state.loadingMore && !state.items.length) return;
   cacheView(state.historyKey, captureCurrentView());
 }
 
@@ -480,7 +492,10 @@ function showCollectionLink(item, count) {
   if (!header || header.querySelector(".collection-link")) return;
   const link = document.createElement("a");
   link.className = "collection-link";
-  link.href = `/feed?collection=${item.content_link_id}`;
+  const url = filterUrl({ query: state.query, sort: state.sort });
+  url.pathname = "/feed";
+  url.searchParams.set("collection", String(item.content_link_id));
+  link.href = url.href;
   link.dataset.collectionId = String(item.content_link_id);
   link.textContent = `view set (${count}) →`;
   header.appendChild(link);
@@ -513,9 +528,14 @@ function renderCard(item) {
   const header = document.createElement("div");
   header.className = "card-header";
 
-  const title = document.createElement("div");
-  title.className = "card-title";
-  title.textContent = item.label || "untitled link";
+  const title = document.createElement("a");
+  title.className = "card-title filter-link";
+  title.dataset.filterQuery = item.label || "untitled link";
+  title.href = filterUrl({
+    query: title.dataset.filterQuery,
+    sort: $("sort").value,
+  }).href;
+  title.textContent = title.dataset.filterQuery;
   header.appendChild(title);
   body.appendChild(header);
 
@@ -604,11 +624,12 @@ function renderFeed() {
 
 function restoreView(snapshot) {
   clearFeed();
+  $("feed-form").querySelector('button[type="submit"]').disabled = false;
   state.items = snapshot.items;
   state.mode = snapshot.mode;
   state.collectionLabel = snapshot.collectionLabel;
   state.query = snapshot.query;
-  state.sort = ["top", "latest"].includes(snapshot.sort) ? snapshot.sort : "random";
+  state.sort = filterOptions.sorts.includes(snapshot.sort) ? snapshot.sort : filterOptions.defaultSort;
   state.hasMore = snapshot.hasMore;
   state.loadingMore = false;
   state.retryContinuation = false;
@@ -742,7 +763,7 @@ async function loadCollection(contentLinkId) {
 
 function navigateToCollection(contentLinkId, href) {
   storeCurrentView();
-  state.historyKey = newHistoryKey();
+  state.historyKey = navigation.newKey();
   window.history.pushState(
     { viewKey: state.historyKey, mode: "collection", collectionId: contentLinkId },
     "",
@@ -751,33 +772,48 @@ function navigateToCollection(contentLinkId, href) {
   loadCollection(contentLinkId);
 }
 
-function beginFeedNavigation() {
-  if (state.mode !== "collection") return;
-  storeCurrentView();
-  state.historyKey = newHistoryKey();
-  window.history.pushState(
-    { viewKey: state.historyKey, mode: "feed", collectionId: null },
-    "",
-    "/",
-  );
-  state.mode = "feed";
-  state.collectionLabel = "";
-  state.items = [];
-  state.hasMore = true;
-  state.loadingMore = false;
-  state.retryContinuation = false;
-  setCollectionHeading();
+function navigateFeed(filters) {
+  const url = filterUrl(filters);
+  if (url.href !== window.location.href) {
+    storeCurrentView();
+    state.historyKey = navigation.newKey();
+    window.history.pushState(
+      { viewKey: state.historyKey, mode: "feed", collectionId: null },
+      "",
+      url.href,
+    );
+  }
+  applyFilters(filters);
+  loadFeed();
+  window.scrollTo({ top: 0, behavior: "auto" });
 }
 
-async function loadFeed(event) {
-  if (event) event.preventDefault();
-  beginFeedNavigation();
+function submitFeedFilters(event) {
+  event.preventDefault();
+  const query = $("query").value.trim();
+  navigateFeed({
+    query,
+    sort: $("sort").value,
+  });
+}
+
+function loadViewFromLocation() {
+  const filters = filtersFromLocation();
+  applyFilters(filters);
+  state.query = $("query").value;
+  state.sort = filters.sort;
+  const collectionId = collectionIdFromLocation();
+  if (collectionId) loadCollection(collectionId);
+  else loadFeed();
+}
+
+async function loadFeed() {
   const navigationToken = ++state.navigationToken;
   state.mode = "feed";
   state.collectionLabel = "";
   state.query = $("query").value.trim();
   const requestedSort = $("sort").value;
-  state.sort = ["top", "latest"].includes(requestedSort) ? requestedSort : "random";
+  state.sort = filterOptions.sorts.includes(requestedSort) ? requestedSort : filterOptions.defaultSort;
   state.items = [];
   state.hasMore = true;
   state.loadingMore = true;
@@ -791,7 +827,7 @@ async function loadFeed(event) {
   const params = new URLSearchParams({ limit: String(BATCH_SIZE), sort: state.sort });
   const submitButton = $("feed-form").querySelector('button[type="submit"]');
   submitButton.disabled = true;
-  if (state.query) params.set("query", state.query);
+  if (state.query) params.set("q", state.query);
   try {
     const response = await fetch(`/api/feed?${params.toString()}`);
     const payload = await response.json().catch(() => ({}));
@@ -843,7 +879,7 @@ async function loadMoreFeed() {
       sort: state.sort,
       continuation: "true",
     });
-    if (state.query) params.set("query", state.query);
+    if (state.query) params.set("q", state.query);
     if (state.sort !== "random") params.set("offset", String(state.items.length));
     const response = await fetch(`/api/feed?${params.toString()}`);
     const payload = await response.json().catch(() => ({}));
@@ -875,7 +911,7 @@ async function loadMoreFeed() {
 
 window.addEventListener("popstate", (event) => {
   state.navigationToken += 1;
-  const nextHistoryKey = event.state?.viewKey || newHistoryKey();
+  const nextHistoryKey = event.state?.viewKey || navigation.newKey();
   const snapshot = viewCache.get(nextHistoryKey);
   if (snapshot) viewCache.delete(nextHistoryKey);
   storeCurrentView();
@@ -884,25 +920,12 @@ window.addEventListener("popstate", (event) => {
     restoreView(snapshot);
     return;
   }
-  const collectionId = collectionIdFromLocation();
-  if (collectionId) {
-    loadCollection(collectionId);
-    return;
-  }
-  clearFeed();
-  state.mode = "feed";
-  state.collectionLabel = "";
-  state.items = [];
-  state.query = $("query").value.trim();
-  state.hasMore = true;
-  state.loadingMore = false;
-  state.retryContinuation = false;
-  setCollectionHeading();
   window.scrollTo({ top: 0, behavior: "auto" });
-  loadFeed();
+  loadViewFromLocation();
 });
 
-$("feed-form").addEventListener("submit", loadFeed);
+$("feed-form").addEventListener("submit", submitFeedFilters);
+$("sort").addEventListener("change", submitFeedFilters);
 $("timeline-search").addEventListener("click", focusSearch);
 $("timeline-top").addEventListener("click", jumpToTop);
 $("feed-sentinel").addEventListener("click", () => {
@@ -912,9 +935,19 @@ $("feed-sentinel").addEventListener("click", () => {
 window.addEventListener("scroll", scheduleTimelineToolsUpdate, { passive: true });
 refreshFeedSentinelObserver();
 $("feed").addEventListener("click", (event) => {
+  const titleFilter = event.target.closest("a[data-filter-query]");
+  if (titleFilter) {
+    if (!navigation.isPlainClick(event)) return;
+    event.preventDefault();
+    navigateFeed({
+      query: titleFilter.dataset.filterQuery,
+      sort: $("sort").value,
+    });
+    return;
+  }
   const collectionLink = event.target.closest("a.collection-link");
   if (collectionLink) {
-    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    if (!navigation.isPlainClick(event)) return;
     event.preventDefault();
     navigateToCollection(Number(collectionLink.dataset.collectionId), collectionLink.href);
     return;
@@ -925,6 +958,5 @@ $("feed").addEventListener("click", (event) => {
   if (card) handleFeedback(card, button);
 });
 
-const initialCollectionId = initializeHistory();
-if (initialCollectionId) loadCollection(initialCollectionId);
-else loadFeed();
+initializeHistory();
+loadViewFromLocation();

@@ -28,6 +28,7 @@ def sample_item(*, content_link_id: int, url: str) -> FeedItem:
 def test_feed_endpoint_serializes_feed_items(monkeypatch):
     async def fake_load_feed(**kwargs):
         assert kwargs["sort"] == "latest"
+        assert kwargs["query"] == "Hanni - NewJeans"
         return [
             FeedItem(
                 content_link_id=42,
@@ -46,7 +47,7 @@ def test_feed_endpoint_serializes_feed_items(monkeypatch):
     async def request():
         transport = httpx.ASGITransport(app=web_app.app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-            return await client.get("/api/feed?sort=latest&limit=1")
+            return await client.get("/api/feed?q=Hanni+-+NewJeans&sort=latest&limit=1")
 
     response = asyncio.run(request())
 
@@ -404,7 +405,7 @@ def test_set_feed_endpoint_serializes_whole_sets(monkeypatch):
             base_url="http://test",
             cookies={web_app.VISITOR_COOKIE: "set-feed-endpoint-test"},
         ) as client:
-            return await client.get("/api/sets?query=hanni&sort=latest&limit=1")
+            return await client.get("/api/sets?q=hanni&sort=latest&limit=1")
 
     response = asyncio.run(request())
 
@@ -500,7 +501,7 @@ def test_scroll_endpoint_returns_and_reserves_a_random_batch(monkeypatch):
             base_url="http://test",
             cookies={web_app.VISITOR_COOKIE: "scroll-feed-endpoint-test"},
         ) as client:
-            return await client.get("/api/scroll?query=hanni&limit=8")
+            return await client.get("/api/scroll?q=hanni&limit=8")
 
     response = asyncio.run(request())
 
@@ -645,7 +646,7 @@ def test_feed_page_renders():
     response = asyncio.run(request())
 
     assert response.status_code == 200
-    assert "search a member or group" in response.text
+    assert "search an idol or group" in response.text
     assert '<a href="/feed" aria-current="page">feed</a>' in response.text
     assert "fonts.googleapis.com" not in response.text
     assert 'id="collection-heading"' in response.text
@@ -662,7 +663,7 @@ def test_sets_page_renders_separately():
     response = asyncio.run(request())
 
     assert response.status_code == 200
-    assert "search sets by member, group, or link" in response.text
+    assert "search sets by idol, group, or link" in response.text
     assert '/static/sets.js?v=' in response.text
     assert '<option value="latest" selected>newest</option>' in response.text
     assert '<option value="oldest">oldest</option>' in response.text
@@ -682,7 +683,7 @@ def test_scroll_page_renders_as_a_separate_reel_surface():
     assert 'id="scroll-form"' in response.text
     assert '/static/scroll.css?v=' in response.text
     assert '/static/scroll.js?v=' in response.text
-    assert 'placeholder="search a member or group"' in response.text
+    assert 'placeholder="search an idol or group"' in response.text
     assert 'id="scroll-hint"' in response.text
     assert "scroll for more" in response.text
 
@@ -867,3 +868,46 @@ def test_asset_404_clears_resolution_cache_without_marking_dead(monkeypatch):
     assert response.status_code == 404
     assert response.headers["cache-control"] == "no-store"
     assert cleared == [True]
+
+
+def test_public_search_pages_load_shared_navigation_and_use_q():
+    from html.parser import HTMLParser
+
+    class PageControls(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.search_names = []
+            self.scripts = []
+
+        def handle_starttag(self, tag, attrs):
+            attrs = dict(attrs)
+            if tag == "input" and attrs.get("type") == "search":
+                self.search_names.append(attrs.get("name"))
+            if tag == "script":
+                self.scripts.append(attrs.get("src", ""))
+
+    async def request():
+        transport = httpx.ASGITransport(app=web_app.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            for path in ("/feed", "/sets", "/scroll", "/photos", "/sorter", "/leaderboard"):
+                response = await client.get(path)
+                assert response.status_code == 200
+                page = PageControls()
+                page.feed(response.text)
+                assert page.search_names == ([] if path == "/leaderboard" else ["q"])
+                helper = next(i for i, src in enumerate(page.scripts) if src.startswith("/static/site-navigation.js"))
+                assert helper < len(page.scripts) - 1
+
+    asyncio.run(request())
+
+
+def test_public_search_apis_limit_q_length():
+    async def request():
+        transport = httpx.ASGITransport(app=web_app.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            for path in ("/api/feed", "/api/sets", "/api/scroll"):
+                response = await client.get(path, params={"q": "x" * 101})
+                assert response.status_code == 422
+                assert response.json()["detail"][0]["loc"] == ["query", "q"]
+
+    asyncio.run(request())

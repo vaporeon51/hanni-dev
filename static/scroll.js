@@ -35,6 +35,9 @@ const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)")
 const collageQuery = window.matchMedia("(min-width: 1024px)");
 const VIEW_STORAGE_KEY = "hanni-scroll-view";
 let viewMode = "feed";
+const navigation = window.SiteNavigation;
+navigation.normalize();
+
 function collageColumns() {
   return viewMode === "collage" && collageQuery.matches ? 3 : 1;
 }
@@ -123,12 +126,13 @@ function renderMeta(meta, item) {
 }
 
 function itemFilterQuery(item) {
+  if (item.label) return item.label;
   const values = [item.member_name, item.group_name]
     .map((value) => String(value || "").trim())
     .filter(Boolean);
   return values.filter(
     (value, index) => values.findIndex((candidate) => candidate.toLocaleLowerCase() === value.toLocaleLowerCase()) === index,
-  ).join(" ");
+  ).join(" - ");
 }
 
 function createMedia(item, onResolved = () => {}, onUnavailable = () => {}) {
@@ -611,11 +615,11 @@ function createReelCell(item) {
 
   const caption = document.createElement("div");
   caption.className = "reel-caption";
-  const title = document.createElement("button");
-  title.type = "button";
+  const title = document.createElement("a");
   title.className = "reel-title";
   title.textContent = item.label || "untitled link";
   title.dataset.filterQuery = itemFilterQuery(item);
+  title.href = navigation.filterUrl({ query: title.dataset.filterQuery }).href;
   title.setAttribute("aria-label", `Filter scroll to ${title.textContent}`);
   const titleRow = document.createElement("div");
   titleRow.className = "reel-title-row";
@@ -697,6 +701,7 @@ function openLightbox(cell) {
   const title = $("lightbox-title");
   title.textContent = item.label || "untitled link";
   title.dataset.filterQuery = itemFilterQuery(item);
+  title.href = navigation.filterUrl({ query: title.dataset.filterQuery }).href;
   title.setAttribute("aria-label", `Filter scroll to ${title.textContent}`);
   const sourceLink = cell.querySelector(".reel-collection-link");
   const collection = $("lightbox-collection");
@@ -738,8 +743,10 @@ $("lightbox").addEventListener("click", (event) => {
     closeLightbox();
     return;
   }
-  const titleFilter = event.target.closest("button[data-filter-query]");
+  const titleFilter = event.target.closest("a[data-filter-query]");
   if (titleFilter) {
+    if (!navigation.isPlainClick(event)) return;
+    event.preventDefault();
     const query = titleFilter.dataset.filterQuery.trim();
     closeLightbox({ refocus: false });
     if (query) {
@@ -940,7 +947,7 @@ async function loadMore({ initial = false } = {}) {
   const token = state.requestToken;
   if (initial) announce("finding little reels…", { sticky: true });
   const params = new URLSearchParams({ limit: String(BATCH_SIZE) });
-  if (state.query) params.set("query", state.query);
+  if (state.query) params.set("q", state.query);
 
   try {
     const response = await fetch(`/api/scroll?${params.toString()}`);
@@ -984,7 +991,7 @@ async function loadMore({ initial = false } = {}) {
   }
 }
 
-function resetFeed(query) {
+function resetFeed(query, { updateHistory = true } = {}) {
   state.requestToken += 1;
   if (state.retryTimer !== null) window.clearTimeout(state.retryTimer);
   state.retryTimer = null;
@@ -1012,14 +1019,7 @@ function resetFeed(query) {
   $("scroll-hint").classList.remove("is-visible");
   $("scroll-hint").hidden = true;
   $("reel-feed").replaceChildren(state.spacer);
-  const url = new URL(window.location.href);
-  if (query) url.searchParams.set("q", query);
-  else url.searchParams.delete("q");
-  window.history.replaceState(
-    { ...(window.history.state || {}), scrollQuery: query },
-    "",
-    url,
-  );
+  if (updateHistory) navigation.write(navigation.filterUrl({ query }));
   loadMore({ initial: true });
 }
 
@@ -1093,8 +1093,10 @@ $("reel-feed").addEventListener("click", (event) => {
       return;
     }
   }
-  const titleFilter = event.target.closest("button[data-filter-query]");
+  const titleFilter = event.target.closest("a[data-filter-query]");
   if (titleFilter) {
+    if (!navigation.isPlainClick(event)) return;
+    event.preventDefault();
     const query = titleFilter.dataset.filterQuery.trim();
     if (query) {
       $("query").value = query;
@@ -1147,12 +1149,15 @@ document.addEventListener("keydown", (event) => {
 });
 
 function restoredQuery() {
-  const urlQuery = new URL(window.location.href).searchParams.get("q");
-  if (urlQuery !== null) return urlQuery.trim();
-  const historyQuery = window.history.state?.scrollQuery;
-  if (typeof historyQuery === "string") return historyQuery.trim();
-  return state.query;
+  return navigation.readQuery();
 }
+
+window.addEventListener("popstate", () => {
+  closeLightbox({ refocus: false });
+  const query = restoredQuery();
+  $("query").value = query;
+  resetFeed(query, { updateHistory: false });
+});
 
 window.addEventListener("pageshow", () => {
   // Safari may clear autocomplete-off fields when restoring from its

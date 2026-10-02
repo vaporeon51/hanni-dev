@@ -2,16 +2,22 @@
 
 Catalog identities include idols without Discord roles. Ratings stay fractional;
 only display scores are rounded. Pair deduplication, budgets and rating
-updates commit together. Groups retain their legacy mapped membership.
+updates commit together. Group scoring uses the same memberships as the sorter filters.
 """
 
 from __future__ import annotations
 
 import datetime
 import hashlib
+import json
+from functools import lru_cache
+from pathlib import Path
+
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from decimal import Decimal
+
+from src.sorter_catalog import catalog_group_memberships
 
 
 _KST = datetime.timezone(datetime.timedelta(hours=9))
@@ -332,18 +338,27 @@ def get_global_leaderboard(limit: int = LEADERBOARD_SNAPSHOT_LIMIT,
             return _build_leaderboard(cur.fetchall(), vote_count)
 
 
+@lru_cache(maxsize=1)
+def _group_memberships():
+    catalog = json.loads((Path(__file__).resolve().parents[2] / "static/sorter/catalog.json").read_text())
+    return catalog_group_memberships(catalog["entries"], catalog["groups"])
+
+
 def get_global_group_leaderboard(limit: int = 15, top_n: int = 3) -> GroupLeaderboard:
     with _pool().connection() as conn:
         with conn.cursor() as cur:
-            cur.execute("""SELECT COALESCE(SUM(r.global_match_count), 0) / 2
-                           FROM idol_ratings r JOIN role_info legacy USING (role_id);""")
+            membership_json = json.dumps(_group_memberships())
+            cur.execute("""SELECT COALESCE(SUM(global_match_count), 0) / 2
+                           FROM idol_ratings;""")
             vote_count = cur.fetchone()[0]
             cur.execute(
                 f"""
-                WITH idol_scores AS (
+                WITH memberships AS (
+                    SELECT * FROM jsonb_to_recordset(%s::jsonb)
+                        AS m(role_id text, group_name text)
+                ), idol_scores AS (
                     SELECT r.group_name, r.member_name, r.image_url,
-                           -- Legacy mapped population, using the same live
-                           -- idol score rather than applying shrinkage twice.
+                           -- One live person score shared by all their groups.
                            r.global_elo AS score,
                            r.global_match_count AS matches,
                            r.global_win_count AS wins,
@@ -352,10 +367,10 @@ def get_global_group_leaderboard(limit: int = 15, top_n: int = 3) -> GroupLeader
                                PARTITION BY r.group_name
                                ORDER BY r.global_elo DESC, r.member_name
                            ) AS member_rank
-                    FROM (SELECT legacy.role_id, legacy.member_name, legacy.group_name,
-                                 legacy.image_url, rating.global_elo, rating.global_match_count,
+                    FROM (SELECT rating.role_id, rating.member_name, m.group_name,
+                                 rating.image_url, rating.global_elo, rating.global_match_count,
                                  rating.global_win_count
-                          FROM role_info legacy JOIN idol_ratings rating USING (role_id)) r
+                          FROM memberships m JOIN idol_ratings rating USING (role_id)) r
                     WHERE {_ACTIVE_IDOL_PREDICATE}
                       AND r.group_name IS NOT NULL
                       AND TRIM(r.group_name) != ''
@@ -377,7 +392,7 @@ def get_global_group_leaderboard(limit: int = 15, top_n: int = 3) -> GroupLeader
                 ORDER BY AVG(score) FILTER (WHERE member_rank <= %s) DESC, group_name
                 LIMIT %s;
                 """,
-                (top_n, top_n, top_n, top_n, limit),
+                (membership_json, top_n, top_n, top_n, top_n, limit),
             )
             return _build_group_leaderboard(cur.fetchall(), vote_count, top_n)
 

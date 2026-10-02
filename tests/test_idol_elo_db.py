@@ -265,7 +265,7 @@ def test_shared_identity_metadata_is_independent_of_catalog_order():
     reverse = {row[0]: row[1:] for row in catalog_rating_rows(list(reversed(entries)))}
     assert forward == reverse
     canonical = next(entry for entry in entries if entry['id'] == 1027)
-    assert forward['779826921613426708'] == ('Hyunjin', 'LOOSSEMBLE', canonical['photo'])
+    assert forward['779826921613426708'] == ('Hyunjin', 'LOOSSEMBLE', canonical['local'] or canonical['photo'])
     # A future duplicate must be resolved deliberately, not silently first/last-wins.
     other = {'kind': 'idol', 'id': 9001, 'leaderboard_id': 'new-duplicate',
              'short': 'Example', 'group': 'Group', 'local': 'photo'}
@@ -323,7 +323,9 @@ def test_ranks_use_unrounded_scores_for_board_cutoff_and_snapshots(db):
     assert snapshot[0][:3] == ('r1', 1, 1300)
 
 
-def test_group_ranks_use_unrounded_average(db):
+def test_group_ranks_use_unrounded_average(db, monkeypatch):
+    monkeypatch.setattr(bias, '_group_memberships', lambda: [
+        {'role_id': 'r0', 'group_name': 'Alpha'}, {'role_id': 'r1', 'group_name': 'Zulu'}])
     with db.connection() as conn:
         conn.execute("UPDATE role_info SET image_url=NULL")
         conn.execute("UPDATE role_info SET group_name='Alpha',image_url='photo' WHERE role_id='r0'")
@@ -332,3 +334,22 @@ def test_group_ranks_use_unrounded_average(db):
         conn.execute("UPDATE idol_ratings SET global_elo=1300.4,global_match_count=50 WHERE role_id='r1'")
     board = bias.get_global_group_leaderboard(1)
     assert [(e.group_name, e.elo) for e in board.entries] == [('Zulu', 1300)]
+
+
+def test_group_board_uses_catalog_members_without_roles_and_shared_scores(db, monkeypatch):
+    monkeypatch.setattr(bias, '_group_memberships', lambda: [
+        {'role_id': 'sorter:0', 'group_name': 'First'},
+        {'role_id': 'sorter:0', 'group_name': 'Second'},
+        {'role_id': 'r0', 'group_name': 'First'},
+    ])
+    with db.connection() as conn:
+        assert conn.execute("SELECT 1 FROM role_info WHERE role_id='sorter:0'").fetchone() is None
+        conn.execute("UPDATE idol_ratings SET global_elo=1500, global_match_count=20 WHERE role_id='sorter:0'")
+        conn.execute("UPDATE idol_ratings SET global_elo=1200, global_match_count=20 WHERE role_id='r0'")
+    board = bias.get_global_group_leaderboard()
+    groups = {e.group_name: e for e in board.entries}
+    assert groups['First'].elo == 1350
+    assert groups['First'].member_count == 2
+    assert groups['Second'].elo == 1500
+    assert groups['Second'].member_count == 1
+    assert len(groups) == 2

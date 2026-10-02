@@ -153,7 +153,7 @@ Deno.test("focus dial improves top precision at fixed effort in reproducible noi
   assert.ok(metrics[1].exposure > metrics[0].exposure * 1.5);
 });
 
-async function browserFixture(saved = null, boardFails = false, hash = "", search = "") {
+async function browserFixture(saved = null, boardFails = false, hash = "", search = "", savedLineup = null) {
   const catalog = JSON.parse(readFileSync(new URL("../static/sorter/catalog.json", import.meta.url), "utf8"));
   const ids = catalog.entries.filter((item) => item.kind === "idol").slice(0, 16).map((item) => item.id);
   const elements = new Map();
@@ -169,6 +169,7 @@ async function browserFixture(saved = null, boardFails = false, hash = "", searc
     return elements.get(id);
   };
   const storage = new Map([["bias-club-lineup-v1", JSON.stringify({ ids, mode: "idols", savedAt: Date.now() })]]);
+  if (savedLineup) storage.set("bias-club-lineup-v1", JSON.stringify(savedLineup));
   if (saved) storage.set("bias-club-session-v1", JSON.stringify(saved));
   const modeButtons = ["idols", "groups"].map((mode) => {
     const button = element(`mode-${mode}`);
@@ -177,7 +178,12 @@ async function browserFixture(saved = null, boardFails = false, hash = "", searc
   });
   const document = {
     body: { dataset: {} }, readyState: "complete", activeElement: null,
-    getElementById: element, querySelectorAll(selector) { return selector === "[data-mode]" ? modeButtons : []; }, querySelector() { return null; }, addEventListener() {},
+    getElementById: element, querySelectorAll(selector) {
+      if (selector === "[data-mode]") return modeButtons;
+      if (selector === "[data-group-check]") return [...element("groups").innerHTML.matchAll(/data-group-check="(\d+)"/g)]
+        .map(match => ({dataset: {groupCheck: match[1]}}));
+      return [];
+    }, querySelector() { return null; }, addEventListener() {},
     createElement() { return element("created"); },
   };
   const beacons = [];
@@ -366,4 +372,146 @@ Deno.test("sorter search restores q and live edits preserve selections and view 
   assert.equal(new URL(ui.context.location.href).searchParams.get("q"), "aespa");
   assert.equal(ui.storage.get("bias-club-lineup-v1"), lineup);
   assert.equal(ui.context.history.state.sorterView, "setup");
+});
+
+
+function groupIndex(ui, name) {
+  const match = [...ui.element("groups").innerHTML.matchAll(/data-group-check="(\d+)" aria-label="Select all ([^"]+)"/g)].find(m => m[2] === name);
+  assert.ok(match, name);
+  return match[1];
+}
+function checkGroup(ui, name, checked = true) {
+  ui.element("groups").onchange({target: {dataset: {groupCheck: groupIndex(ui, name)}, checked}});
+}
+function lineup(ui) { return JSON.parse(ui.storage.get("bias-club-lineup-v1")); }
+
+Deno.test("shared selection survives removing either filter and restoring the draft", async () => {
+  let ui = await browserFixture();
+  ui.element("clear").click();
+  const seoyeon = ui.catalog.entries.find(e => e.name === "Seoyeon (Y:SY)");
+  checkGroup(ui, "fromis_9"); checkGroup(ui, "Seoyeon (Y:SY)");
+  assert.equal(lineup(ui).ids.filter(id => id === seoyeon.id).length, 1);
+  ui = await browserFixture(null, false, "", "", lineup(ui));
+  checkGroup(ui, "Seoyeon (Y:SY)", false);
+  assert.ok(lineup(ui).ids.includes(seoyeon.id));
+  checkGroup(ui, "fromis_9", false);
+  assert.ok(!lineup(ui).ids.includes(seoyeon.id));
+  checkGroup(ui, "Seoyeon (Y:SY)"); checkGroup(ui, "fromis_9");
+  const index = groupIndex(ui, "fromis_9");
+  ui.element("selected-groups").onclick({target: {closest: () => ({dataset: {remove: index}})}});
+  assert.deepEqual(lineup(ui).ids, [seoyeon.id]);
+});
+
+Deno.test("members clicked in a shared filter belong to that filter", async () => {
+  const ui = await browserFixture();
+  ui.element("clear").click();
+  const hyewon = ui.catalog.entries.find(e => e.name === "Hyewon");
+  const index = groupIndex(ui, "IZ*ONE");
+  ui.element("groups").onchange({target: {dataset: {member: String(hyewon.id)}, checked: true,
+    closest: () => ({dataset: {card: index}})}});
+  assert.deepEqual(lineup(ui).sources, [[hyewon.id, ["IZ*ONE"]]]);
+  assert.ok(ui.element("selected-groups").innerHTML.includes('aria-label="Remove IZ*ONE"'));
+  assert.ok(!ui.element("selected-groups").innerHTML.includes('aria-label="Remove Hyewon"'));
+});
+
+Deno.test("all selectable people are reachable and shared Hyunjin enters once", async () => {
+  const ui = await browserFixture();
+  ui.element("clear").click(); ui.element("select-visible").click();
+  const expected = ui.catalog.entries.filter(e => e.kind === "idol" && !e.canonical_id);
+  assert.equal(lineup(ui).ids.length, expected.length);
+  assert.ok(expected.every(e => lineup(ui).ids.includes(e.id)));
+  const identities = lineup(ui).ids.map(id => ui.catalog.entries.find(e => e.id === id).leaderboard_id);
+  assert.equal(new Set(identities).size, identities.length);
+  const hyunjin = expected.find(e => e.id === 1027);
+  assert.deepEqual(hyunjin.groups, ["LATENCY", "LOOSSEMBLE"]);
+  assert.ok(hyunjin.local);
+  ui.element("clear").click(); checkGroup(ui, "LATENCY"); checkGroup(ui, "LOOSSEMBLE");
+  ui.element("start").click();
+  assert.equal(ui.session().ids.filter(id => [718,1027].includes(id)).length, 1);
+  for (let i = 0; i < 300 && !ui.session().finished; i++) ui.element("pick-left").click();
+  assert.ok(ui.session().finished);
+  assert.ok(ui.ballots[0].comparisons.every(([a,b]) => a !== b));
+});
+
+Deno.test("old duplicate Hyunjin IDs restore as one selectable person", async () => {
+  const ui = await browserFixture(null, false, "", "", {ids: [718,1027], mode: "idols", savedAt: Date.now()});
+  assert.deepEqual(lineup(ui).ids, [1027]);
+});
+
+
+Deno.test("completed legacy duplicate sessions replay but display Hyunjin once", async () => {
+  const data = JSON.parse(readFileSync(new URL("../static/sorter/catalog.json", import.meta.url), "utf8"));
+  const ids = [718,1027,0], sorter = Sorter.create(ids);
+  const { choices } = complete(sorter);
+  const saved = {version: data.version, ids, mode: "idols", choices, verifyRounds: [],
+    finished: Date.now(), savedAt: Date.now()};
+  const ui = await browserFixture(saved);
+  assert.equal(ui.context.history.state.sorterView, "results");
+  assert.ok(ui.element("ranking").innerHTML.includes("2 idols"));
+  ui.element("new-lineup").click();
+  assert.equal(lineup(ui).ids.filter(id => [718,1027].includes(id)).length, 1);
+});
+
+
+Deno.test("opening member lists and clicking their surrounding content never selects the group", async () => {
+  const ui = await browserFixture();
+  ui.element("clear").click();
+  const index = groupIndex(ui, "fromis_9");
+  let wholeGroupClicks = 0;
+  const check = {click() {
+    wholeGroupClicks++;
+    ui.element("groups").onchange({target: {dataset: {groupCheck: index}, checked: true}});
+  }};
+  const card = {querySelector: () => check};
+  const details = {dataset: {group: index}, open: true};
+  ui.element("groups").onclick({target: {closest(selector) {
+    if (selector.includes("summary")) return details;
+    if (selector === "[data-card]") return card;
+    return null;
+  }}});
+  ui.element("groups").ontoggle({target: {closest: () => details}});
+  // Padding beside the dropdown must not act like a whole-group checkbox.
+  ui.element("groups").onclick({target: {closest: selector => selector === "[data-card]" ? card : null}});
+  assert.equal(wholeGroupClicks, 0);
+  assert.equal(lineup(ui).ids.length, 0);
+  const member = ui.catalog.entries.find(e => e.name === "fromis_9 Hayoung");
+  ui.element("groups").onchange({target: {dataset: {member: String(member.id)}, checked: true,
+    closest: () => ({dataset: {card: index}})}});
+  assert.deepEqual(lineup(ui).ids, [member.id]);
+  ui.element("groups").onclick({target: {closest: selector => selector === ".group-cover" ? card : null}});
+  assert.equal(wholeGroupClicks, 1);
+  assert.equal(lineup(ui).ids.length, 9);
+});
+
+
+Deno.test("discovery uses current homes while Hyewon stays under IZ*ONE", async () => {
+  const ui = await browserFixture();
+  const expected = {
+    "LE SSERAFIM Sakura": ["LE SSERAFIM"],
+    "LE SSERAFIM Chaewon": ["LE SSERAFIM"],
+    "IVE Wonyoung": ["IVE"], "IVE Yujin": ["IVE"],
+    "SAY MY NAME Hitomi": ["SAY MY NAME"],
+    "Kwon Eunbi": ["Kwon Eunbi"], "Jo Yuri": ["Jo Yuri"],
+    "Yena": ["Yena"], "Lee Chaeyeon": ["Lee Chaeyeon"],
+    "Hyewon": ["IZ*ONE"],
+  };
+  for (const [name, groups] of Object.entries(expected)) {
+    assert.deepEqual(ui.catalog.entries.find(e => e.name === name).groups, groups);
+  }
+  assert.ok(!ui.element("groups").innerHTML.includes('aria-label="Select all Hyewon"'));
+  ui.element("clear").click(); checkGroup(ui, "IZ*ONE");
+  const members = lineup(ui).ids.map(id => ui.catalog.entries.find(e => e.id === id).name).sort();
+  assert.deepEqual(members, ["Hyewon", "IZ*ONE Minju", "IZ*ONE Nako"]);
+  const eunbi = ui.catalog.entries.find(e => e.name === "Kwon Eunbi");
+  checkGroup(ui, "Kwon Eunbi");
+  assert.ok(lineup(ui).ids.includes(eunbi.id));
+});
+
+
+Deno.test("Seoyeon display rename retains search by previous and current names", async () => {
+  for (const query of ["Lee Seoyeon", "Seoyeon", "Y:SY", "Y:SY (Lee Seoyeon)"]) {
+    const ui = await browserFixture(null, false, "", `?q=${encodeURIComponent(query)}`);
+    assert.ok(ui.element("groups").innerHTML.includes("Seoyeon (Y:SY)"));
+    assert.ok(ui.element("groups").innerHTML.includes("fromis_9"));
+  }
 });

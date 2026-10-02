@@ -274,7 +274,7 @@ h2 {
   align-items: start;
 }
 .group-card {
-  cursor: pointer;
+  cursor: default;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: white;
@@ -322,6 +322,7 @@ h2 {
   box-shadow: 0 1px 8px #b84d7918;
 }
 .group-cover {
+  cursor: pointer;
   height: 126px;
   position: relative;
   overflow: hidden;

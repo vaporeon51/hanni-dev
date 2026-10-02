@@ -64,9 +64,10 @@ function documentFor(ids, buttons = []) {
 Deno.test("photos restores q on load and history navigation; live typing replaces the URL", async () => {
   const b = browser("https://test/photos?q=Hanni");
   const {elements, document} = documentFor(["search", "wall", "stats"]);
-  const items = [{name: "Hanni", group: "NewJeans"}, {name: "Karina", group: "aespa"}];
+  const items = [{id: 1, kind: "idol", name: "Hanni", group: "NewJeans", groups: ["NewJeans"]},
+    {id: 2, kind: "idol", name: "Karina", group: "aespa", groups: ["aespa"]}];
   b.context.document = document;
-  b.context.fetch = async url => ({ok: true, json: async () => url.includes("catalog") ? {entries: items} : {}});
+  b.context.fetch = async url => ({ok: true, json: async () => url.includes("catalog") ? {entries: items, groups: [{key: "NewJeans", name: "NewJeans"}, {key: "aespa", name: "aespa"}]} : {}});
   vm.runInContext(Deno.readTextFileSync("static/photos.js"), b.context);
   await settle();
   assert.equal(elements.search.value, "Hanni");
@@ -145,4 +146,47 @@ Deno.test("scroll pushes search history, restores q on Back/Forward, and request
   b.history.forward(); await settle();
   assert.equal(elements.query.value, "Hanni - NewJeans");
   assert.equal(requests.at(-1).searchParams.get("q"), "Hanni - NewJeans");
+});
+
+
+Deno.test("photos groups match sorter filters, including shared cards and current homes", async () => {
+  const b = browser("https://test/photos");
+  const {elements, document} = documentFor(["search", "wall", "stats"]);
+  const catalog = JSON.parse(Deno.readTextFileSync("static/sorter/catalog.json"));
+  b.context.document = document;
+  b.context.fetch = async url => ({ok: true, json: async () => url.includes("catalog") ? catalog : {}});
+  vm.runInContext(Deno.readTextFileSync("static/photos.js"), b.context);
+  await settle();
+  const sections = () => new Map([...elements.wall.innerHTML.matchAll(
+    /<section class="photo-group"><h2>(.*?) <span>· (\d+)<\/span><\/h2><div class="photo-grid">(.*?)<\/div><\/section>/g,
+  )].map(m => [m[1], {count: Number(m[2]), cards: m[3]}]));
+  const all = sections();
+  const escape = s => s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+  const items = catalog.entries.filter(e => e.kind === "idol" && !e.canonical_id);
+  for (const group of catalog.groups) {
+    const members = items.filter(e => e.groups.includes(group.key));
+    if (!members.length) { assert.ok(!all.has(escape(group.name))); continue; }
+    assert.equal(all.get(escape(group.name)).count, members.length);
+    for (const member of members) assert.ok(all.get(escape(group.name)).cards.includes(`</span>${escape(member.short || member.name)}</strong>`));
+  }
+  assert.ok(elements.stats.textContent.startsWith(`${items.length} portraits`));
+  assert.equal(all.get("IZ*ONE").count, 3);
+  assert.ok(!all.has("Hyewon"));
+  assert.ok(all.get("fromis_9").cards.includes("Seoyeon (Y:SY)"));
+  assert.equal((all.get("LATENCY").cards.match(/>Hyunjin<\/strong>/g) || []).length, 1);
+  assert.equal((all.get("LOOSSEMBLE").cards.match(/>Hyunjin<\/strong>/g) || []).length, 1);
+  elements.search.value = "IZ*ONE";
+  elements.search.events.input();
+  assert.deepEqual([...sections().keys()], ["IZ*ONE"]);
+  assert.ok(!elements.wall.innerHTML.includes("Sakura"));
+  assert.ok(elements.stats.textContent.endsWith("showing 3"));
+  elements.search.value = "Y:SY";
+  elements.search.events.input();
+  assert.deepEqual([...sections().keys()].sort(), ["Seoyeon (Y:SY)", "fromis_9"].sort());
+  assert.ok(elements.stats.textContent.endsWith("showing 1"));
+  elements.search.value = "Lee Seoyeon";
+  elements.search.events.input();
+  assert.deepEqual([...sections().keys()].sort(), ["Seoyeon (Y:SY)", "fromis_9"].sort());
+  assert.ok(elements.stats.textContent.endsWith("showing 1"));
 });

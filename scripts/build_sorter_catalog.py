@@ -36,7 +36,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-from src.sorter_catalog import attach_leaderboard_ids, catalog_rating_rows
+from src.sorter_catalog import attach_leaderboard_ids, catalog_rating_rows, normalize_catalog_memberships, DISPLAY_NAME_ALIASES
 
 from dotenv import load_dotenv
 
@@ -474,10 +474,14 @@ def main() -> int:
         for entry in entries:
             old = old_entries.get(entry["id"])
             if old and old.get("leaderboard_id"):
-                if old["name"] != entry["name"]:
+                previous_name = DISPLAY_NAME_ALIASES.get(old["name"], old["name"])
+                rebuilt_name = DISPLAY_NAME_ALIASES.get(entry["name"], entry["name"])
+                rebuilt_name = re.sub(r"\\+u([0-9a-fA-F]{4})", lambda m: chr(int(m[1], 16)), rebuilt_name)
+                if previous_name != rebuilt_name:
                     raise ValueError(f"Catalog ID {entry['id']} changed identity; migrate it explicitly")
                 entry["leaderboard_id"] = old["leaderboard_id"]
     attach_leaderboard_ids(entries)
+    normalize_catalog_memberships(entries, group_defs)
     matched_idols = sum(e["kind"] == "idol" and bool(e.get("role_id")) for e in entries)
     role_photos = {
         entry["role_id"]: entry["local"]
@@ -509,7 +513,7 @@ def main() -> int:
         "stats": {
             "idols": len(idol_entries),
             "manual_idols": manual_count,
-            "group_cards": len(group_cards),
+            "group_cards": sum(e["kind"] == "group" for e in entries),
             "matched_idols": matched_idols,
             "leaderboard_idols": len(catalog_rating_rows(entries)),
             "matched_photos": matched_photos,

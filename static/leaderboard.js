@@ -252,7 +252,7 @@
       html += "</div>";
     }
     const basis = `Based on ${board.vote_count.toLocaleString()} recorded matchups`;
-    html += `<p class="board-foot">${basis} · Group rankings cover the original member catalog · ELO averages the top ${board.top_n} member scores · ♡ counts all members’ combined matchup wins</p>`;
+    html += `<p class="board-foot">${basis} · Group rankings use the members in each sorter filter · ELO averages the top ${board.top_n} member scores · ♡ counts all members’ combined matchup wins</p>`;
     return html;
   }
 

@@ -25,9 +25,8 @@
     return { url: null, kind: "missing" };
   }
 
-  function card(item, resolved) {
+  function card(item, resolved, group) {
     const name = item.short || item.name;
-    const group = item.group || (item.groups || []).join(", ") || "Solo";
     const img = resolved.url
       ? `<img src="${escape(resolved.url)}" alt="${escape(name)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.closest('.photo-card').classList.add('broken');window.__photoBroken=(window.__photoBroken||0)+1;">`
       : "";
@@ -36,7 +35,10 @@
 
   // Same lineup order as idol selection: groups by peak-member score from
   // the group board, anything off-board in alphabetical order at the end.
-  const normKey = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const normKey = (value) => {
+    const key = String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    return ({idle: "gidle", ohmygirl: "omg", girlsgeneration: "snsd"})[key] || key;
+  };
   function peakOrder(board) {
     const entries = [...((board && board.entries) || [])].sort(
       (a, b) => (b.peak_elo ?? b.elo) - (a.peak_elo ?? a.elo),
@@ -49,18 +51,16 @@
     return order;
   }
 
-  function render(items, embeds, order) {
+  function render(items, embeds, order, definitions) {
     const wall = $("wall");
     const query = $("search").value.trim().toLowerCase();
-    const matches = (item) =>
-      !query ||
-      `${item.short || item.name} ${item.group || ""} ${(item.groups || []).join(" ")}`.toLowerCase().includes(query);
     const groups = new Map();
-    items.forEach((item) => {
-      if (!matches(item)) return;
-      const key = item.group || "Solo";
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key).push(item);
+    definitions.forEach((definition) => {
+      const groupMatches = !query || definition.name.toLowerCase().includes(query) ||
+        (normKey(query) && normKey(definition.name).includes(normKey(query)));
+      const members = items.filter((item) => (item.groups || []).includes(definition.key) &&
+        (groupMatches || `${item.short || ""} ${item.name} ${(item.search_aliases || []).join(" ")}`.toLowerCase().includes(query)));
+      if (members.length) groups.set(definition.name, members);
     });
     const rankOf = (name) => {
       const rank = order.get(normKey(name));
@@ -74,7 +74,7 @@
           .map(
             ([name, members]) =>
               `<section class="photo-group"><h2>${escape(name)} <span>· ${members.length}</span></h2><div class="photo-grid">` +
-              members.map((item) => card(item, resolve(item, embeds))).join("") +
+              members.map((item) => card(item, resolve(item, embeds), name)).join("") +
               `</div></section>`,
           )
           .join("")
@@ -83,7 +83,7 @@
     items.forEach((item) => {
       counts[resolve(item, embeds).kind] += 1;
     });
-    const shown = ordered.reduce((n, [, members]) => n + members.length, 0);
+    const shown = new Set(ordered.flatMap(([, members]) => members)).size;
     $("stats").textContent =
       `${items.length} portraits · ${counts.saved} saved · ${counts.discord} discord · ${counts.remote} original · ${counts.missing} missing` +
       (shown !== items.length ? ` · showing ${shown}` : "");
@@ -111,17 +111,17 @@
       }
       const order = peakOrder(board);
       const items = (catalog.entries || [])
-        .filter((item) => item.kind !== "group")
+        .filter((item) => item.kind === "idol" && !item.canonical_id)
         .sort((a, b) => (a.short || a.name).localeCompare(b.short || b.name));
       $("search").addEventListener("input", () => {
         navigation.write(navigation.filterUrl({ query: $("search").value }), { replace: true });
-        render(items, embeds, order);
+        render(items, embeds, order, catalog.groups || []);
       });
       window.addEventListener("popstate", () => {
         $("search").value = navigation.readQuery();
-        render(items, embeds, order);
+        render(items, embeds, order, catalog.groups || []);
       });
-      render(items, embeds, order);
+      render(items, embeds, order, catalog.groups || []);
     } catch {
       wall.innerHTML = '<div class="loading">Could not load photos. Please refresh to try again.</div>';
     }

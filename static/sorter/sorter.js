@@ -142,7 +142,7 @@
     const groups = definitions
       .map((g) => ({
         ...g,
-        members: catalog.filter((i) => i.kind === "idol" && (i.groups || []).includes(g.key)),
+        members: catalog.filter((i) => i.kind === "idol" && !i.canonical_id && (i.groups || []).includes(g.key)),
         photo:
           photoByLabel.get(g.key) ||
           photoByLabel.get(g.name) ||
@@ -321,13 +321,40 @@
           idsFor(g).length &&
           (generation === "all" ||
             (generation === "selected"
-              ? idsFor(g).some((id) => selected.has(id))
+              ? idsFor(g).some((id) => groupOwns(g, id))
               : g.gen?.includes(generation) ||
                 g.members.some((m) => (m.gen || []).includes(generation)))) &&
           (!query ||
             matchesGroupSearch(g, query) ||
-            (mode === "idols" && g.members.some((m) => m.name.toLowerCase().includes(query)))),
+            (mode === "idols" && g.members.some((m) => [m.name, ...(m.search_aliases || [])].some((name) => name.toLowerCase().includes(query))))),
       );
+    }
+    // Remember each filter's contribution so removing one doesn't remove
+    // a shared person still selected through another filter.
+    const selectionSources = new Map();
+    const canonicalId = (id) => byId.get(id)?.canonical_id ?? id;
+    function groupOwns(g, id) {
+      const sources = selectionSources.get(id);
+      return !!sources && (sources.has(g.key) || sources.has("manual"));
+    }
+    function selectFrom(id, source, checked) {
+      id = mode === "idols" ? canonicalId(id) : id;
+      const sources = selectionSources.get(id) || new Set();
+      if (checked) sources.add(source);
+      else { sources.delete(source); sources.delete("manual"); }
+      if (sources.size) { selectionSources.set(id, sources); selected.add(id); }
+      else { selectionSources.delete(id); selected.delete(id); }
+    }
+    function restoreSelection(ids, sources = []) {
+      selected = new Set();
+      selectionSources.clear();
+      const saved = new Map((Array.isArray(sources) ? sources : []).filter((row) => Array.isArray(row) && row.length === 2 && Array.isArray(row[1])));
+      ids.forEach((id) => {
+        const memberships = saved.get(id)?.filter((source) => source === "manual" ||
+          groups.some((g) => g.key === source && idsFor(g).includes(mode === "idols" ? canonicalId(id) : id)));
+        const inferred = groups.filter((g) => idsFor(g).includes(mode === "idols" ? canonicalId(id) : id)).map((g) => g.key);
+        (memberships?.length ? memberships : inferred.length ? inferred : ["manual"]).forEach((source) => selectFrom(id, source, true));
+      });
     }
     const expanded = new Set();
     function summaryText(count, total) {
@@ -336,7 +363,7 @@
     function allVisibleSelected(visible) {
       const list = visible ?? visibleGroups();
       if (!list.length) return false;
-      return list.every((g) => idsFor(g).every((id) => selected.has(id)));
+      return list.every((g) => idsFor(g).every((id) => groupOwns(g, id)));
     }
     function updateSelectVisibleLabel() {
       const button = $("select-visible");
@@ -361,7 +388,7 @@
         .map((g) => {
           const index = groups.indexOf(g),
             ids = idsFor(g),
-            count = ids.filter((id) => selected.has(id)).length;
+            count = ids.filter((id) => groupOwns(g, id)).length;
           const query = $("search").value.trim().toLowerCase();
           const matchedMember = query && !matchesGroupSearch(g, query);
           const open = expanded.has(index) || matchedMember;
@@ -380,7 +407,7 @@
                   .map(
                     (m) =>
                       `<label><input type="checkbox" data-member="${m.id}" ${
-                        selected.has(m.id) ? "checked" : ""
+                        groupOwns(g, m.id) ? "checked" : ""
                       }>${escape(shortName(m))}</label>`,
                   )
                   .join("")}</div></details>`
@@ -389,8 +416,9 @@
         })
         .join("");
       document.querySelectorAll("[data-group-check]").forEach((input) => {
-        const ids = idsFor(groups[Number(input.dataset.groupCheck)]),
-          count = ids.filter((id) => selected.has(id)).length;
+        const g = groups[Number(input.dataset.groupCheck)],
+          ids = idsFor(g),
+          count = ids.filter((id) => groupOwns(g, id)).length;
         input.indeterminate = count > 0 && count < ids.length;
       });
     }
@@ -414,7 +442,7 @@
           const g = groups[index];
           if (!g) return;
           const ids = idsFor(g),
-            count = ids.filter((id) => selected.has(id)).length;
+            count = ids.filter((id) => groupOwns(g, id)).length;
           card.classList?.toggle?.("has-selection", count > 0);
           const check = card.querySelector?.("[data-group-check]");
           if (check) {
@@ -434,7 +462,7 @@
           }
           card.querySelectorAll?.("[data-member]")?.forEach?.((memberInput) => {
             const id = Number(memberInput.dataset?.member ?? memberInput.getAttribute?.("data-member"));
-            const shouldCheck = selected.has(id);
+            const shouldCheck = groupOwns(g, id);
             if (memberInput.checked !== shouldCheck) memberInput.checked = shouldCheck;
           });
           if (mode === "idols" && (changedSet === "all" || changedSet.has(index))) {
@@ -456,7 +484,7 @@
       $("selection-count").textContent = n;
       $("selection-unit").textContent = mode;
       $("selected-groups").innerHTML = groups
-        .filter((g) => idsFor(g).some((id) => selected.has(id)))
+        .filter((g) => idsFor(g).some((id) => groupOwns(g, id)))
         .map(
           (g) =>
             `<button data-remove="${groups.indexOf(g)}" aria-label="Remove ${escape(g.name)}">${escape(g.name)} ×</button>`,
@@ -470,8 +498,9 @@
       const ids = [...selected];
       const previous = read(lineupKey);
       // Rendering or reopening the page must not extend the saved selection.
-      if (previous?.mode !== mode || JSON.stringify(previous?.ids) !== JSON.stringify(ids)) {
-        write(lineupKey, { mode, ids, savedAt: Date.now() });
+      if (previous?.mode !== mode || JSON.stringify(previous?.ids) !== JSON.stringify(ids) ||
+          JSON.stringify(previous?.sources) !== JSON.stringify([...selectionSources].map(([id, sources]) => [id, [...sources]]))) {
+        write(lineupKey, { mode, ids, sources: [...selectionSources].map(([id, sources]) => [id, [...sources]]), savedAt: Date.now() });
       }
     }
     function refresh() {
@@ -501,8 +530,10 @@
       /* test DOM stub */
     }
     $("groups").addEventListener("click", (event) => {
-      if (event.target.closest("details, input, label, button, a")) return;
-      event.target.closest("[data-card]")?.querySelector("[data-group-check]")?.click();
+      // Only the cover shortcuts whole-group selection. The member dropdown
+      // and its surrounding content must remain safe to open and browse.
+      if (event.target.closest("details, summary, input, label, button, a")) return;
+      event.target.closest(".group-cover")?.querySelector("[data-group-check]")?.click();
     });
     $("groups").addEventListener("change", (event) => {
       const input = event.target;
@@ -511,7 +542,7 @@
         changedIndex = Number(input.dataset.groupCheck);
         const g = groups[changedIndex];
         if (g) {
-          idsFor(g).forEach((id) => (input.checked ? selected.add(id) : selected.delete(id)));
+          idsFor(g).forEach((id) => selectFrom(id, g.key, input.checked));
           if (mode === "idols") {
             if (input.checked) expanded.add(changedIndex);
             else expanded.delete(changedIndex);
@@ -519,11 +550,13 @@
         }
       } else if (input.dataset.member) {
         const id = Number(input.dataset.member);
-        input.checked ? selected.add(id) : selected.delete(id);
-        const owner = groups.find((g) => g.members.some((m) => m.id === id));
+        const cardIndex = input.closest?.("[data-card]")?.dataset.card;
+        const owner = cardIndex !== undefined ? groups[Number(cardIndex)] :
+          groups.find((g) => g.members.some((m) => m.id === id));
         if (owner) {
+          selectFrom(id, owner.key, input.checked);
           changedIndex = groups.indexOf(owner);
-          const remaining = idsFor(owner).filter((mid) => selected.has(mid)).length;
+          const remaining = idsFor(owner).filter((mid) => groupOwns(owner, mid)).length;
           if (remaining > 0) expanded.add(changedIndex);
           else expanded.delete(changedIndex);
         }
@@ -534,7 +567,7 @@
       const button = event.target.closest("[data-remove]");
       if (button) {
         const index = Number(button.dataset.remove);
-        idsFor(groups[index]).forEach((id) => selected.delete(id));
+        idsFor(groups[index]).forEach((id) => selectFrom(id, groups[index].key, false));
         expanded.delete(index);
         handleSelectionChange(index);
       }
@@ -568,9 +601,10 @@
       (button) =>
         (button.onclick = () => {
           if (mode === button.dataset.mode) return;
-          const active = groups.filter((g) => idsFor(g).some((id) => selected.has(id)));
+          const active = groups.filter((g) => idsFor(g).some((id) => groupOwns(g, id)));
           mode = button.dataset.mode;
-          selected = new Set(active.flatMap(idsFor));
+          const ids = active.flatMap(idsFor);
+          restoreSelection(ids, ids.map((id) => [id, active.filter((g) => idsFor(g).includes(id)).map((g) => g.key)]));
           document.querySelectorAll("[data-mode]").forEach((b) => b.setAttribute("aria-pressed", b === button));
           // The two modes order differently (peak vs average), so re-sort.
           // Indices shift, so drop expanded state before re-rendering.
@@ -583,18 +617,18 @@
     $("select-visible").onclick = () => {
       const visible = visibleGroups();
       if (!visible.length) return;
-      const ids = visible.flatMap(idsFor);
-      if (ids.every((id) => selected.has(id))) {
-        ids.forEach((id) => selected.delete(id));
+      if (allVisibleSelected(visible)) {
+        visible.forEach((g) => idsFor(g).forEach((id) => selectFrom(id, g.key, false)));
         visible.forEach((g) => expanded.delete(groups.indexOf(g)));
         handleSelectionChange(visible.map((g) => groups.indexOf(g)));
       } else {
-        ids.forEach((id) => selected.add(id));
+        visible.forEach((g) => idsFor(g).forEach((id) => selectFrom(id, g.key, true)));
         handleSelectionChange(null);
       }
     };
     $("clear").onclick = () => {
       selected.clear();
+      selectionSources.clear();
       expanded.clear();
       handleSelectionChange("all");
     };
@@ -807,7 +841,7 @@
         const j = Math.floor(Math.random() * (i + 1));
         [ids[i], ids[j]] = [ids[j], ids[i]];
       }
-      session = { ballotId: crypto.randomUUID(), version: dataSetVersion, mode, ids, algorithm: newAlgorithm(ids), matchups: [], choices: [], verifyRounds: [], verify: null, counted: 0, started: Date.now() };
+      session = { ballotId: crypto.randomUUID(), version: dataSetVersion, mode, ids, lineupSources: [...selectionSources].map(([id, sources]) => [id, [...sources]]), algorithm: newAlgorithm(ids), matchups: [], choices: [], verifyRounds: [], verify: null, counted: 0, started: Date.now() };
       sorter = BiasSorter.create(ids, session.algorithm);
       showFull = false;
       save();
@@ -990,7 +1024,15 @@
     const VERIFY_SLICE = 10;
     const CHALLENGE_TOP = 8;
     function baseBuckets() {
-      return BiasSorter.ranking(sorter, session.verifyRounds);
+      const seen = new Set();
+      return BiasSorter.ranking(sorter, session.verifyRounds).map((bucket) =>
+        bucket.filter((id) => {
+          const identity = session.mode === "idols" ? (byId.get(id).leaderboard_id || id) : id;
+          if (seen.has(identity)) return false;
+          seen.add(identity);
+          return true;
+        })).filter((bucket) => bucket.length);
+
     }
     function pairKey(a, b) {
       return a < b ? `${a}:${b}` : `${b}:${a}`;
@@ -1289,7 +1331,7 @@
     };
     $("new-lineup").onclick = () => {
       mode = session.mode;
-      selected = new Set(session.ids);
+      restoreSelection(session.ids, session.lineupSources);
       document.querySelectorAll("[data-mode]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.mode === mode));
       updateResumeBanner();
       refresh();
@@ -1389,11 +1431,11 @@
     const previous = readSavedState(lineupKey);
     if (previous && ["idols", "groups"].includes(previous.mode) && Array.isArray(previous.ids)) {
       mode = previous.mode;
-      selected = new Set(
+      restoreSelection(
         previous.ids.filter(
           (id) => Number.isInteger(id) && byId.has(id) &&
             (mode === "idols" ? byId.get(id).kind === "idol" : groupSortIds.has(id)),
-        ),
+        ), previous.sources || [],
       );
     }
     document.querySelectorAll("[data-mode]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.mode === mode));

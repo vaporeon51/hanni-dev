@@ -1,0 +1,7281 @@
+{
+  "sources": [
+    {
+      "preset": "classic",
+      "url": "https://raw.githubusercontent.com/adhesivecheese/kinklist/master/classic.txt",
+      "sha256": "eb9910d64e30f22e7ec5fbb5ef046f48196242364574a6d16b672dd6e99191fd"
+    },
+    {
+      "preset": "detailed",
+      "url": "https://raw.githubusercontent.com/adhesivecheese/kinklist/master/detailed.txt",
+      "sha256": "85a24cd4fe2194adccfc64405458ebd61ed05e7a1ddf5dcf126eb2fc0c78b548"
+    },
+    {
+      "preset": "plsno",
+      "url": "https://raw.githubusercontent.com/adhesivecheese/kinklist/master/plsno.txt",
+      "sha256": "e9b24f78e120d9e622c4c65df24b30b7464f5154ec0f2d47a981732c05d0da11"
+    }
+  ],
+  "entries": [
+    {
+      "preset": "classic",
+      "category": "Bodies",
+      "label": "Skinny",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-a494d2f6f5ab"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Bodies",
+      "label": "Chubby",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-d617b01dfafa"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Bodies",
+      "label": "Small breasts",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-a0deedbb83f1"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Bodies",
+      "label": "Large breasts",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-ce760f0adb46"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Bodies",
+      "label": "Small cocks",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-6769b9649dfb"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Bodies",
+      "label": "Large cocks",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-b49d52b0bc5e"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Clothing",
+      "label": "Clothed sex",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "style-10"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Clothing",
+      "label": "Lingerie",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "style-01"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Clothing",
+      "label": "Stockings",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "style-02"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Clothing",
+      "label": "Heels",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "style-03"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Clothing",
+      "label": "Leather",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "style-04"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Clothing",
+      "label": "Latex",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "style-05"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Clothing",
+      "label": "Uniform / costume",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "style-06",
+        "style-07"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Clothing",
+      "label": "Cross-dressing",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-82816bd8f616"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Groupings",
+      "label": "You and 1 male",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-7055a877a79c"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Groupings",
+      "label": "You and 1 female",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-ba4e274dc590"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Groupings",
+      "label": "You and MtF trans",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-5fd893aec39b"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Groupings",
+      "label": "You and FtM trans",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-b561f15cde8d"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Groupings",
+      "label": "You and 1 male, 1 female",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-d239cae0d4df"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Groupings",
+      "label": "You and 2 males",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-d77b734d2a42"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Groupings",
+      "label": "You and 2 females",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-9ec72623bf67"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Groupings",
+      "label": "Orgy",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-15a36d5a4681"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "General",
+      "label": "Romance / Affection",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-2d32a81891bf"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "General",
+      "label": "Handjob / Fingering",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "intimacy-01"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "General",
+      "label": "Blowjob",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-8eb06e8cfb5e"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "General",
+      "label": "Deep throat",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "intimacy-03"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "General",
+      "label": "Swallowing",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-6be484285be3"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "General",
+      "label": "Facials",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-da154e72f52c"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "General",
+      "label": "Cunnilingus",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-169f4e2cb158"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "General",
+      "label": "Face-sitting",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-f45d9d9f3c34"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "General",
+      "label": "Edging",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "intimacy-04"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "General",
+      "label": "Teasing",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-efcd05afd1d5"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Ass play",
+      "label": "Anal toys",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-099ca194500d"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Ass play",
+      "label": "Anal sex/pegging",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-fafd534549b7"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Ass play",
+      "label": "Rimming",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-ef36c2576034"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Ass play",
+      "label": "Double penetration",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-a2f03a775140"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Ass play",
+      "label": "Anal fisting",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-9d6980fa7216"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Restrictive",
+      "label": "Gag",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-854ac0f64ea8"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Restrictive",
+      "label": "Collar",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "toys-07"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Restrictive",
+      "label": "Leash",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "toys-08"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Restrictive",
+      "label": "Chastity",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-ec427e2f0b3c"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Restrictive",
+      "label": "Bondage (Light)",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-54cb240f3bc1"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Restrictive",
+      "label": "Bondage (Heavy)",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-dd29e486eab0"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Restrictive",
+      "label": "Encasement",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-365482320722"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Toys",
+      "label": "Dildos",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "toys-02"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Toys",
+      "label": "Plugs",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "toys-03"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Toys",
+      "label": "Vibrators",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "toys-01"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Toys",
+      "label": "Sounding",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-791b3392cd92"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Domination",
+      "label": "General Dom / General Sub",
+      "fields": [
+        "Dominant",
+        "Submissive"
+      ],
+      "targets": [
+        "ref-4c15613b914a"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Domination",
+      "label": "Domestic servitude",
+      "fields": [
+        "Dominant",
+        "Submissive"
+      ],
+      "targets": [
+        "ref-bb6cad139c76"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Domination",
+      "label": "Slavery",
+      "fields": [
+        "Dominant",
+        "Submissive"
+      ],
+      "targets": [
+        "ref-12e36f21cf87"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Domination",
+      "label": "Pet play",
+      "fields": [
+        "Dominant",
+        "Submissive"
+      ],
+      "targets": [
+        "ref-89feb7be3015"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Domination",
+      "label": "DD/lg, MD/lb",
+      "fields": [
+        "Dominant",
+        "Submissive"
+      ],
+      "targets": [
+        "ref-ba2126c91b52"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Domination",
+      "label": "Discipline",
+      "fields": [
+        "Dominant",
+        "Submissive"
+      ],
+      "targets": [
+        "ref-dbef627b1197"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Domination",
+      "label": "Begging",
+      "fields": [
+        "Dominant",
+        "Submissive"
+      ],
+      "targets": [
+        "ref-28125f022bb9"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Domination",
+      "label": "Forced orgasm",
+      "fields": [
+        "Dominant",
+        "Submissive"
+      ],
+      "targets": [
+        "ref-a248425737be"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Domination",
+      "label": "Orgasm control",
+      "fields": [
+        "Dominant",
+        "Submissive"
+      ],
+      "targets": [
+        "ref-2290887728d2"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Domination",
+      "label": "Orgasm denial",
+      "fields": [
+        "Dominant",
+        "Submissive"
+      ],
+      "targets": [
+        "ref-233ce1a457ef"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Domination",
+      "label": "Power exchange",
+      "fields": [
+        "Dominant",
+        "Submissive"
+      ],
+      "targets": [
+        "ref-4c09bfe89dbc"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "No consent",
+      "label": "Non-con / rape",
+      "fields": [
+        "Aggressor",
+        "Target"
+      ],
+      "targets": [
+        "ref-c34ea3e891bc"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "No consent",
+      "label": "Blackmail / coercion",
+      "fields": [
+        "Aggressor",
+        "Target"
+      ],
+      "targets": [
+        "ref-87d108eafd95"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "No consent",
+      "label": "Kidnapping",
+      "fields": [
+        "Aggressor",
+        "Target"
+      ],
+      "targets": [
+        "ref-e6bbf8e844ab"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "No consent",
+      "label": "Drugs",
+      "fields": [
+        "Aggressor",
+        "Target"
+      ],
+      "targets": [
+        "ref-bba0cf427e92"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "No consent",
+      "label": "Alcohol",
+      "fields": [
+        "Aggressor",
+        "Target"
+      ],
+      "targets": [
+        "ref-cc1dd6719352"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "No consent",
+      "label": "Sleep play",
+      "fields": [
+        "Aggressor",
+        "Target"
+      ],
+      "targets": [
+        "ref-0deb880029e2"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Taboo",
+      "label": "Incest",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-aebf22ed7c27"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Taboo",
+      "label": "Age Gap",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-9bc5e6609fc0"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Taboo",
+      "label": "Interracial",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-1ffde287325d"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Taboo",
+      "label": "Raceplay",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-c1b7f1d86962"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Taboo",
+      "label": "Bestiality",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-1a46cfa53f6b"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Taboo",
+      "label": "Necrophilia",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-dcde76efbbc7"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Taboo",
+      "label": "Cheating",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-32fab352062f"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Taboo",
+      "label": "Exhibitionism",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-5323653cf82f"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Taboo",
+      "label": "Voyeurism",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-3f8c50c009c2"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Surrealism",
+      "label": "Futanari/Futa",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-df76cf69c685"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Surrealism",
+      "label": "Furry",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-86c99721d221"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Surrealism",
+      "label": "Vore",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-a69025bd7162"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Surrealism",
+      "label": "Transformation",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-c8f1906f2e53"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Surrealism",
+      "label": "Tentacles",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-2c91fe91db0f"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Surrealism",
+      "label": "Monster or Alien",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-875b8daf511f"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Surrealism",
+      "label": "Ghost",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-bc3bf70cc782"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Fluids",
+      "label": "Blood",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-fb278f62e96b"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Fluids",
+      "label": "Watersports",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-21aa7d399242"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Fluids",
+      "label": "Scat",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-6f42a6949c44"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Fluids",
+      "label": "Lactation",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-1a788d364c3e"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Fluids",
+      "label": "Diapers",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-0ac426aef535"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Fluids",
+      "label": "Cum play",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-f9c6fd935199"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Degradation",
+      "label": "Glory hole",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-f03083119f60"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Degradation",
+      "label": "Name calling",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-b66de22eb80f"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Degradation",
+      "label": "Humiliation",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-ca9a285cefc9"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Touch & Stimulation",
+      "label": "Cock/Pussy worship",
+      "fields": [
+        "Actor",
+        "Subject"
+      ],
+      "targets": [
+        "ref-fe7cf6056ce1"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Touch & Stimulation",
+      "label": "Ass worship",
+      "fields": [
+        "Actor",
+        "Subject"
+      ],
+      "targets": [
+        "ref-179e6f40cfb1"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Touch & Stimulation",
+      "label": "Foot play",
+      "fields": [
+        "Actor",
+        "Subject"
+      ],
+      "targets": [
+        "ref-323c13276121"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Touch & Stimulation",
+      "label": "Tickling",
+      "fields": [
+        "Actor",
+        "Subject"
+      ],
+      "targets": [
+        "ref-a8d99b8733cd"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Touch & Stimulation",
+      "label": "Sensation play",
+      "fields": [
+        "Actor",
+        "Subject"
+      ],
+      "targets": [
+        "ref-cb41a0c8a155"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Touch & Stimulation",
+      "label": "Electro stimulation",
+      "fields": [
+        "Actor",
+        "Subject"
+      ],
+      "targets": [
+        "ref-6c1916713952"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Misc. Fetish",
+      "label": "Fisting",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-4697242167dd"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Misc. Fetish",
+      "label": "Gangbang",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-e184c4c2a3b0"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Misc. Fetish",
+      "label": "Breath play",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-c671ccdeefee"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Misc. Fetish",
+      "label": "Impregnation",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-e6e4f8b9e332"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Misc. Fetish",
+      "label": "Pregnancy",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-9bfc09d32e88"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Misc. Fetish",
+      "label": "Feminization",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-a9338fcf9a14"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Misc. Fetish",
+      "label": "Cuckold / Cuckquean",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-9e883c1ddd12"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Pain",
+      "label": "Light pain",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-5dab131c407c"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Pain",
+      "label": "Heavy pain",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-e4e3ec335feb"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Pain",
+      "label": "Nipple clamps",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-36c8a156cece"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Pain",
+      "label": "Clothes pins",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-ff44e0eead14"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Pain",
+      "label": "Caning",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-341b8bf201db"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Pain",
+      "label": "Flogging",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-473f09854361"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Pain",
+      "label": "Gagging / Choking",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-2be8c0712f62"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Pain",
+      "label": "Beating",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-a96986b8faee"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Pain",
+      "label": "Spanking",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "touch-09"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Pain",
+      "label": "Cock/Pussy slapping",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-11771c31c7c7"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Pain",
+      "label": "Cock/Pussy torture",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-a5e34b556b3e"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Pain",
+      "label": "Hot Wax",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "restraint-05"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Pain",
+      "label": "Scratching",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "touch-07"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Pain",
+      "label": "Biting",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "touch-08"
+      ]
+    },
+    {
+      "preset": "classic",
+      "category": "Pain",
+      "label": "Cutting",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-2a447b3c2033"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Bodies",
+      "label": "Skinny",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-a494d2f6f5ab"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Bodies",
+      "label": "Chubby",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-d617b01dfafa"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Bodies",
+      "label": "Small breasts",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-a0deedbb83f1"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Bodies",
+      "label": "Large breasts",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-ce760f0adb46"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Bodies",
+      "label": "Small cocks",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-6769b9649dfb"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Bodies",
+      "label": "Large cocks",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-b49d52b0bc5e"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Bodies",
+      "label": "Small butts",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-b15466adfcc3"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Bodies",
+      "label": "Big Butts",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-c4bec5ff45ff"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Clothing",
+      "label": "Clothed sex",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "style-10"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Clothing",
+      "label": "Lingerie",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "style-01"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Clothing",
+      "label": "Stockings",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "style-02"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Clothing",
+      "label": "Heels",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "style-03"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Clothing",
+      "label": "Leather",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "style-04"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Clothing",
+      "label": "Latex",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "style-05"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Clothing",
+      "label": "Uniform / costume",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "style-06",
+        "style-07"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Clothing",
+      "label": "Cross-dressing",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-82816bd8f616"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Roles & Groupings",
+      "label": "as Male",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-8ebc556fc942"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Roles & Groupings",
+      "label": "as Female",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-b1b6ee5dea6e"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Roles & Groupings",
+      "label": "as Femboy",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-b421743f96b6"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Roles & Groupings",
+      "label": "as Futa",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-27b46e8ff215"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Roles & Groupings",
+      "label": "as MtF trans",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-665b7b7435a8"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Roles & Groupings",
+      "label": "as FtM trans",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-e32a72d355a9"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Roles & Groupings",
+      "label": "as male & female",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-61d07f9a022e"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Roles & Groupings",
+      "label": "as multiple males",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-f3acde1d25ee"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Roles & Groupings",
+      "label": "as multiple females",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-2f5c0e124268"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Roles & Groupings",
+      "label": "as multiple males & females",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-1b291938c4c3"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Roles & Groupings",
+      "label": "as Dominant",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-adddf884c103"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Roles & Groupings",
+      "label": "as Submissive",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-03a4c2db1b44"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Roles & Groupings",
+      "label": "as Switch",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-e1726e76981b"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Roles & Groupings",
+      "label": "as Celebrity",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-1cefb651cb3a"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "General",
+      "label": "Romance / Affection",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-2d32a81891bf"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "General",
+      "label": "Handjob / Fingering",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "intimacy-01"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "General",
+      "label": "Blowjob",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-8eb06e8cfb5e"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "General",
+      "label": "Deep throat",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "intimacy-03"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "General",
+      "label": "Swallowing",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-6be484285be3"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "General",
+      "label": "Facials",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-da154e72f52c"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "General",
+      "label": "Cunnilingus",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-169f4e2cb158"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "General",
+      "label": "Face-sitting",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-f45d9d9f3c34"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "General",
+      "label": "Edging",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "intimacy-04"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "General",
+      "label": "Teasing",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-efcd05afd1d5"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Ass play",
+      "label": "Anal toys",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-099ca194500d"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Ass play",
+      "label": "Anal sex/pegging",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-fafd534549b7"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Ass play",
+      "label": "Rimming",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-ef36c2576034"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Ass play",
+      "label": "Double penetration",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-a2f03a775140"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Ass play",
+      "label": "Anal fisting",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-9d6980fa7216"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Restrictive",
+      "label": "Gag",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-854ac0f64ea8"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Restrictive",
+      "label": "Collar",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "toys-07"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Restrictive",
+      "label": "Leash",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "toys-08"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Restrictive",
+      "label": "Chastity",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-ec427e2f0b3c"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Restrictive",
+      "label": "Bondage (Light)",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-54cb240f3bc1"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Restrictive",
+      "label": "Bondage (Heavy)",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-dd29e486eab0"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Restrictive",
+      "label": "Encasement",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-365482320722"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Toys",
+      "label": "Dildos",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "toys-02"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Toys",
+      "label": "Plugs",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "toys-03"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Toys",
+      "label": "Vibrators",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "toys-01"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Toys",
+      "label": "Sounding",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-791b3392cd92"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Domination",
+      "label": "General Dom / General Sub",
+      "fields": [
+        "Dominant",
+        "Submissive"
+      ],
+      "targets": [
+        "ref-4c15613b914a"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Domination",
+      "label": "Domestic servitude",
+      "fields": [
+        "Dominant",
+        "Submissive"
+      ],
+      "targets": [
+        "ref-bb6cad139c76"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Domination",
+      "label": "Slavery",
+      "fields": [
+        "Dominant",
+        "Submissive"
+      ],
+      "targets": [
+        "ref-12e36f21cf87"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Domination",
+      "label": "Pet play",
+      "fields": [
+        "Dominant",
+        "Submissive"
+      ],
+      "targets": [
+        "ref-89feb7be3015"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Domination",
+      "label": "DD/lg, MD/lb",
+      "fields": [
+        "Dominant",
+        "Submissive"
+      ],
+      "targets": [
+        "ref-ba2126c91b52"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Domination",
+      "label": "Discipline",
+      "fields": [
+        "Dominant",
+        "Submissive"
+      ],
+      "targets": [
+        "ref-dbef627b1197"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Domination",
+      "label": "Begging",
+      "fields": [
+        "Dominant",
+        "Submissive"
+      ],
+      "targets": [
+        "ref-28125f022bb9"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Domination",
+      "label": "Forced orgasm",
+      "fields": [
+        "Dominant",
+        "Submissive"
+      ],
+      "targets": [
+        "ref-a248425737be"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Domination",
+      "label": "Orgasm control",
+      "fields": [
+        "Dominant",
+        "Submissive"
+      ],
+      "targets": [
+        "ref-2290887728d2"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Domination",
+      "label": "Orgasm denial",
+      "fields": [
+        "Dominant",
+        "Submissive"
+      ],
+      "targets": [
+        "ref-233ce1a457ef"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Domination",
+      "label": "Power exchange",
+      "fields": [
+        "Dominant",
+        "Submissive"
+      ],
+      "targets": [
+        "ref-4c09bfe89dbc"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "No consent",
+      "label": "Dubious consent",
+      "fields": [
+        "Aggressor",
+        "Target"
+      ],
+      "targets": [
+        "ref-f875fda13867"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "No consent",
+      "label": "Non-con / rape",
+      "fields": [
+        "Aggressor",
+        "Target"
+      ],
+      "targets": [
+        "ref-c34ea3e891bc"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "No consent",
+      "label": "Blackmail / coercion",
+      "fields": [
+        "Aggressor",
+        "Target"
+      ],
+      "targets": [
+        "ref-87d108eafd95"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "No consent",
+      "label": "Kidnapping",
+      "fields": [
+        "Aggressor",
+        "Target"
+      ],
+      "targets": [
+        "ref-e6bbf8e844ab"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "No consent",
+      "label": "Drugs",
+      "fields": [
+        "Aggressor",
+        "Target"
+      ],
+      "targets": [
+        "ref-bba0cf427e92"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "No consent",
+      "label": "Alcohol",
+      "fields": [
+        "Aggressor",
+        "Target"
+      ],
+      "targets": [
+        "ref-cc1dd6719352"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "No consent",
+      "label": "Sleep play",
+      "fields": [
+        "Aggressor",
+        "Target"
+      ],
+      "targets": [
+        "ref-0deb880029e2"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Taboo",
+      "label": "Incest",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-aebf22ed7c27"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Taboo",
+      "label": "Age Gap",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-9bc5e6609fc0"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Taboo",
+      "label": "Interracial",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-1ffde287325d"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Taboo",
+      "label": "Raceplay",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-c1b7f1d86962"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Taboo",
+      "label": "Bestiality",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-1a46cfa53f6b"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Taboo",
+      "label": "Necrophilia",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-dcde76efbbc7"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Taboo",
+      "label": "Cheating",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-32fab352062f"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Taboo",
+      "label": "Exhibitionism",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-5323653cf82f"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Taboo",
+      "label": "Voyeurism",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-3f8c50c009c2"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Surrealism",
+      "label": "Futanari/Futa",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-df76cf69c685"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Surrealism",
+      "label": "Furry",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-86c99721d221"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Surrealism",
+      "label": "Vore",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-a69025bd7162"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Surrealism",
+      "label": "Transformation",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-c8f1906f2e53"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Surrealism",
+      "label": "Tentacles",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-2c91fe91db0f"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Surrealism",
+      "label": "Monster or Alien",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-875b8daf511f"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Surrealism",
+      "label": "Ghost",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-bc3bf70cc782"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Fluids",
+      "label": "Blood",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-fb278f62e96b"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Fluids",
+      "label": "Watersports",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-21aa7d399242"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Fluids",
+      "label": "Scat",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-6f42a6949c44"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Fluids",
+      "label": "Lactation",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-1a788d364c3e"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Fluids",
+      "label": "Diapers",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-0ac426aef535"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Fluids",
+      "label": "Cum play",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-f9c6fd935199"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Fluids",
+      "label": "Saliva/Spit",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-7a8411790b4f"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Degradation",
+      "label": "Glory hole",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-f03083119f60"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Degradation",
+      "label": "Name calling",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-b66de22eb80f"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Degradation",
+      "label": "Humiliation",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-ca9a285cefc9"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Touch & Stimulation",
+      "label": "Cock/Pussy worship",
+      "fields": [
+        "Actor",
+        "Subject"
+      ],
+      "targets": [
+        "ref-fe7cf6056ce1"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Touch & Stimulation",
+      "label": "Ass worship",
+      "fields": [
+        "Actor",
+        "Subject"
+      ],
+      "targets": [
+        "ref-179e6f40cfb1"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Touch & Stimulation",
+      "label": "Foot play",
+      "fields": [
+        "Actor",
+        "Subject"
+      ],
+      "targets": [
+        "ref-323c13276121"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Touch & Stimulation",
+      "label": "Tickling",
+      "fields": [
+        "Actor",
+        "Subject"
+      ],
+      "targets": [
+        "ref-a8d99b8733cd"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Touch & Stimulation",
+      "label": "Sensation play",
+      "fields": [
+        "Actor",
+        "Subject"
+      ],
+      "targets": [
+        "ref-cb41a0c8a155"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Touch & Stimulation",
+      "label": "Electro stimulation",
+      "fields": [
+        "Actor",
+        "Subject"
+      ],
+      "targets": [
+        "ref-6c1916713952"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Misc. Fetish",
+      "label": "Fisting",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-4697242167dd"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Misc. Fetish",
+      "label": "Gangbang",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-e184c4c2a3b0"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Misc. Fetish",
+      "label": "Breath play",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-c671ccdeefee"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Misc. Fetish",
+      "label": "Impregnation",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-e6e4f8b9e332"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Misc. Fetish",
+      "label": "Pregnancy",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-9bfc09d32e88"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Misc. Fetish",
+      "label": "Feminization",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-a9338fcf9a14"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Misc. Fetish",
+      "label": "Cuckold / Cuckquean",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-9e883c1ddd12"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Misc. Fetish",
+      "label": "Shaving",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-be66bcd143f6"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Pain",
+      "label": "Light pain",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-5dab131c407c"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Pain",
+      "label": "Heavy pain",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-e4e3ec335feb"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Pain",
+      "label": "Nipple clamps",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-36c8a156cece"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Pain",
+      "label": "Clothes pins",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-ff44e0eead14"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Pain",
+      "label": "Caning",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-341b8bf201db"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Pain",
+      "label": "Flogging",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-473f09854361"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Pain",
+      "label": "Gagging / Choking",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-2be8c0712f62"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Pain",
+      "label": "Beating",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-a96986b8faee"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Pain",
+      "label": "Spanking",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "touch-09"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Pain",
+      "label": "Cock/Pussy slapping",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-11771c31c7c7"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Pain",
+      "label": "Cock/Pussy torture",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-a5e34b556b3e"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Pain",
+      "label": "Hot Wax",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "restraint-05"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Pain",
+      "label": "Scratching",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "touch-07"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Pain",
+      "label": "Biting",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "touch-08"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Pain",
+      "label": "Cutting",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-2a447b3c2033"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Pain",
+      "label": "Snuff",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-50c492f1d4a5"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Meta",
+      "label": "First Person",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-2a8c2711eec1"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Meta",
+      "label": "Third Person",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-00aacf3b0c3c"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Meta",
+      "label": "Short Post Length (~1-3 sentences)",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-b45ef8b1c04f"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Meta",
+      "label": "Medium Post Length (~3-7 sentences)",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-165bfb7d20d0"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Meta",
+      "label": "Long Post Length (~2-4 paragraphs)",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-28bc20c03cd4"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Meta",
+      "label": "Story (3+ paragraphs)",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-ed74add66a34"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Meta",
+      "label": "Dynamic Post Length",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-5cd8ff1dc3a7"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Medium",
+      "label": "Skype",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-f91ac24d8363"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Medium",
+      "label": "Kik",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-1c384837b441"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Medium",
+      "label": "Reddit",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-c5c65dcba663"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Medium",
+      "label": "E-Mail",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-64fdc66fe152"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Medium",
+      "label": "Discord",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-f6c792485213"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Medium",
+      "label": "Other",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-47607a8681c9"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Time-Scale",
+      "label": "Short-Term Scenes",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-c26780952313"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Time-Scale",
+      "label": "Medium-Term Scenes",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-7391d5327de8"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Time-Scale",
+      "label": "Long-Term Scenes",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-7449bac86a76"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Time-Scale",
+      "label": "Quick Replies (0~10 mins)",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-51f91599770d"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Time-Scale",
+      "label": "Fast Replies (10~30 mins)",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-9f89dd42fb4b"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Time-Scale",
+      "label": "Normal Replies (30min ~ 2hours)",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-161fa93403ce"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Time-Scale",
+      "label": "Slow Replies (2~8 hours)",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-65ab678d2bf8"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Time-Scale",
+      "label": "Glacial Replies (8-24 hours)",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-fa72211f8ebf"
+      ]
+    },
+    {
+      "preset": "detailed",
+      "category": "Time-Scale",
+      "label": "Occasional Replies (24+ hours)",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-ed2bec671cf1"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Body Part Size",
+      "label": "Asses",
+      "fields": [
+        "Small",
+        "Large"
+      ],
+      "targets": [
+        "ref-78140f447a6f"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Body Part Size",
+      "label": "Cocks",
+      "fields": [
+        "Small",
+        "Large"
+      ],
+      "targets": [
+        "ref-9f033339d87e"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Body Part Size",
+      "label": "Balls",
+      "fields": [
+        "Small",
+        "Large"
+      ],
+      "targets": [
+        "ref-d0e1445af87d"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Body Part Size",
+      "label": "Breasts",
+      "fields": [
+        "Small",
+        "Large"
+      ],
+      "targets": [
+        "ref-bc7a8ad5d1a0"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Bodies",
+      "label": "Skinny",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-a494d2f6f5ab"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Bodies",
+      "label": "Chubby",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-d617b01dfafa"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Bodies",
+      "label": "Cut Cocks",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-1131b71f017d"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Bodies",
+      "label": "Glasses",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-4d9f44b4cbd4"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Bodies",
+      "label": "Muscular Partners",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-caf5834c6c67"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Bodies",
+      "label": "Nonsexual Piercings",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-0787879e4f97"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Bodies",
+      "label": "Pubic Hair",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-ce400a4c2764"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Bodies",
+      "label": "Twinks",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-0304c0431938"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Bodies",
+      "label": "Twins",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-26337c3ad2d0"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Bodies",
+      "label": "Uncut Cocks",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-f711fe928763"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Bodies",
+      "label": "Very Fat Partners",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-c062cd61fc3e"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Bodies",
+      "label": "Very Lithe Partners",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-bb259fa9ff81"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Bodies",
+      "label": "Very Muscular Partners",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-049af5c39878"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Bodies",
+      "label": "Voluptuousness",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-ca3b06e93a3f"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Clothing",
+      "label": "Cross-dressing",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-82816bd8f616"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Clothing",
+      "label": "Clothed sex",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "style-10"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Clothing",
+      "label": "Heels",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "style-03"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Clothing",
+      "label": "Latex",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "style-05"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Clothing",
+      "label": "Leather",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "style-04"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Clothing",
+      "label": "Lingerie",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "style-01"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Clothing",
+      "label": "Masks",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-b480e16b0184"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Clothing",
+      "label": "Stockings",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "style-02"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Clothing",
+      "label": "Uniform / costume",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "style-06",
+        "style-07"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Pairings",
+      "label": "as Male",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-8ebc556fc942"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Pairings",
+      "label": "as Female",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-b1b6ee5dea6e"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Pairings",
+      "label": "as Femboy",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-b421743f96b6"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Pairings",
+      "label": "as Futa",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-27b46e8ff215"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Pairings",
+      "label": "as MtF trans",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-665b7b7435a8"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Pairings",
+      "label": "as FtM trans",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-e32a72d355a9"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Pairings",
+      "label": "as male & female",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-61d07f9a022e"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Pairings",
+      "label": "as multiple males",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-f3acde1d25ee"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Pairings",
+      "label": "as multiple females",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-2f5c0e124268"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Pairings",
+      "label": "as multiple males & females",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-1b291938c4c3"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Biting",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "touch-08"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Condoms",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-25931979cf83"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Consensual",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-de12bc725b28"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Cuddling",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-89805c6ac5f2"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Dirty Talking",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-944086caa387"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Docking",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-4740a5103962"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Edging",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "intimacy-04"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Ear Play",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-84005bdfddf8"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Femboys",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-e3714f8ba6be"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Flexibility/Contortionism",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-65a4b316837b"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Face-sitting",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-f45d9d9f3c34"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Facials",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-da154e72f52c"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Frotting",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-361579b46ec3"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Gender Transformation",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-32ef4ff8a68e"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Handjob / Fingering",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "intimacy-01"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Swallowing",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-6be484285be3"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Hotdogging",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-f4f1f5e8629e"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Ice",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "restraint-06"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Intelligent Partners",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-cc9a858c9bae"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Kissing",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-8f8616896a6a"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Leather",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-a844fc2ce5a4"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Licking",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-01291063875d"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Masturbation",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-69fb0ca2866d"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Navel Play",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-d8548639db63"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Photography/Videotaping",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-80531f11042e"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Romance / Affection",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-2d32a81891bf"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Smoking",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-7d9d8313a8d8"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Socks/Stockings",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-7a0088c0e659"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Strip Tease",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-03e3e1abb507"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Teasing",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-efcd05afd1d5"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Tickling",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "touch-03"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Tomboys",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-53fa60b009be"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Transformation",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-fd129eeb6350"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Tribadism / Scissoring",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-d788d032093d"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Underwear",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-7c0dddc2433f"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Unintelligent Partners",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-dd76e1d8d377"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Vanilla Sex",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-97c077f9a866"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General",
+      "label": "Voyeurism/Exhibitionism",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-b2c71b5abbe3"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Oral Sex",
+      "label": "Blowjob",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-8eb06e8cfb5e"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Oral Sex",
+      "label": "Cunnilingus",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-169f4e2cb158"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Oral Sex",
+      "label": "Deep throat",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "intimacy-03"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Oral Sex",
+      "label": "Face-Fucking",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-7241fbd13813"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Oral Sex",
+      "label": "Oral Virginity",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-1247dc94eeb8"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Oral Sex",
+      "label": "Throat Penetration",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-33334bfc1c52"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Ass play",
+      "label": "Ass Worship",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-f24b96ca4b81"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Ass play",
+      "label": "Anal Fisting",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-9d6980fa7216"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Ass play",
+      "label": "Anal Training",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-b1fc30f97927"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Ass play",
+      "label": "Anal Toys",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-099ca194500d"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Ass play",
+      "label": "Anal Virginity",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-2bb7682e5e42"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Ass play",
+      "label": "Anal sex/pegging",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-fafd534549b7"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Ass play",
+      "label": "Double penetration",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-a2f03a775140"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Ass play",
+      "label": "Enemas",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-0fab5923cf7a"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Ass play",
+      "label": "Rimming",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-ef36c2576034"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Ass play",
+      "label": "Gaping (Anal)",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-d68f86dec01f"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Restrictive",
+      "label": "Bondage (Light)",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-54cb240f3bc1"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Restrictive",
+      "label": "Bondage (Heavy)",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-dd29e486eab0"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Restrictive",
+      "label": "Chastity",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-ec427e2f0b3c"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Restrictive",
+      "label": "Collar",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "toys-07"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Restrictive",
+      "label": "Encasement",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-365482320722"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Restrictive",
+      "label": "Gag",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-854ac0f64ea8"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Restrictive",
+      "label": "Leash",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "toys-08"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Toys",
+      "label": "Dildos",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "toys-02"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Toys",
+      "label": "Plugs",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "toys-03"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Toys",
+      "label": "Sounding",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-791b3392cd92"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Toys",
+      "label": "Strap-ons",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "toys-04"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Toys",
+      "label": "Vibrators",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "toys-01"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Domination",
+      "label": "General Dom / General Sub",
+      "fields": [
+        "Dominant",
+        "Submissive"
+      ],
+      "targets": [
+        "ref-4c15613b914a"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Domination",
+      "label": "Domestic servitude",
+      "fields": [
+        "Dominant",
+        "Submissive"
+      ],
+      "targets": [
+        "ref-bb6cad139c76"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Domination",
+      "label": "DD/lg, MD/lb",
+      "fields": [
+        "Dominant",
+        "Submissive"
+      ],
+      "targets": [
+        "ref-ba2126c91b52"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Domination",
+      "label": "Discipline",
+      "fields": [
+        "Dominant",
+        "Submissive"
+      ],
+      "targets": [
+        "ref-dbef627b1197"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Domination",
+      "label": "Forced orgasm",
+      "fields": [
+        "Dominant",
+        "Submissive"
+      ],
+      "targets": [
+        "ref-a248425737be"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Domination",
+      "label": "General Dominant / Submissive",
+      "fields": [
+        "Dominant",
+        "Submissive"
+      ],
+      "targets": [
+        "ref-4c15613b914a"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Domination",
+      "label": "Immobilization",
+      "fields": [
+        "Dominant",
+        "Submissive"
+      ],
+      "targets": [
+        "ref-58abc63c6fc9"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Domination",
+      "label": "Orgasm control",
+      "fields": [
+        "Dominant",
+        "Submissive"
+      ],
+      "targets": [
+        "ref-2290887728d2"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Domination",
+      "label": "Orgasm denial",
+      "fields": [
+        "Dominant",
+        "Submissive"
+      ],
+      "targets": [
+        "ref-233ce1a457ef"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Domination",
+      "label": "Power exchange",
+      "fields": [
+        "Dominant",
+        "Submissive"
+      ],
+      "targets": [
+        "ref-4c09bfe89dbc"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Domination",
+      "label": "Pet play",
+      "fields": [
+        "Dominant",
+        "Submissive"
+      ],
+      "targets": [
+        "ref-89feb7be3015"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Domination",
+      "label": "Slavery",
+      "fields": [
+        "Dominant",
+        "Submissive"
+      ],
+      "targets": [
+        "ref-12e36f21cf87"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "No consent",
+      "label": "Blackmail / coercion",
+      "fields": [
+        "Aggressor",
+        "Target"
+      ],
+      "targets": [
+        "ref-87d108eafd95"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "No consent",
+      "label": "Dubious consent",
+      "fields": [
+        "Aggressor",
+        "Target"
+      ],
+      "targets": [
+        "ref-f875fda13867"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "No consent",
+      "label": "Drugs",
+      "fields": [
+        "Aggressor",
+        "Target"
+      ],
+      "targets": [
+        "ref-bba0cf427e92"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "No consent",
+      "label": "Alcohol",
+      "fields": [
+        "Aggressor",
+        "Target"
+      ],
+      "targets": [
+        "ref-cc1dd6719352"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "No consent",
+      "label": "Kidnapping",
+      "fields": [
+        "Aggressor",
+        "Target"
+      ],
+      "targets": [
+        "ref-e6bbf8e844ab"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "No consent",
+      "label": "Non-con / rape",
+      "fields": [
+        "Aggressor",
+        "Target"
+      ],
+      "targets": [
+        "ref-c34ea3e891bc"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "No consent",
+      "label": "Sleep play",
+      "fields": [
+        "Aggressor",
+        "Target"
+      ],
+      "targets": [
+        "ref-0deb880029e2"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Taboo",
+      "label": "Age Gap",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-9bc5e6609fc0"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Taboo",
+      "label": "Bestiality",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-1a46cfa53f6b"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Taboo",
+      "label": "Cheating",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-32fab352062f"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Taboo",
+      "label": "Exhibitionism",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-5323653cf82f"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Taboo",
+      "label": "Incest",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-aebf22ed7c27"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Taboo",
+      "label": "Interracial",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-1ffde287325d"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Taboo",
+      "label": "Raceplay",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-c1b7f1d86962"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Taboo",
+      "label": "Necrophilia",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-dcde76efbbc7"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Taboo",
+      "label": "Voyeurism",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-3f8c50c009c2"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General Surrealism",
+      "label": "Breast Growth",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-ff2372c0165e"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General Surrealism",
+      "label": "Cock/Ball Growth",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-8c32060d82ad"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General Surrealism",
+      "label": "Cum Inflation (Heavy/Extreme)",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-f30515c73614"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General Surrealism",
+      "label": "Cum Inflation (Light/Medium)",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-07542ee02b99"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General Surrealism",
+      "label": "Extreme Pregnancy",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-fcef1baa7c79"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General Surrealism",
+      "label": "Forced Growth",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-777faf4ec78b"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General Surrealism",
+      "label": "Furry",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-86c99721d221"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General Surrealism",
+      "label": "Futanari/Futa",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-df76cf69c685"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General Surrealism",
+      "label": "Ghost",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-bc3bf70cc782"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General Surrealism",
+      "label": "Growth",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-7d528bf954de"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General Surrealism",
+      "label": "Hyper Muscle Growth",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-dfaf09ca872c"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General Surrealism",
+      "label": "Inflation (Heavy/Extreme)",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-aa36af660334"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General Surrealism",
+      "label": "Inflation (Light/Medium)",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-d43ff72cb5a0"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General Surrealism",
+      "label": "Macrophilia",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-4bd05a7476de"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General Surrealism",
+      "label": "Magic Users",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-4b197313f67b"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General Surrealism",
+      "label": "Male Pregnancy",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-bf41a5f9c3bc"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General Surrealism",
+      "label": "Microphilia",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-008e6d465a66"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General Surrealism",
+      "label": "Monster or Alien",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-875b8daf511f"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General Surrealism",
+      "label": "Multiple Breasts",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-654267711372"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General Surrealism",
+      "label": "Muscle Growth",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-316e04055b9b"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General Surrealism",
+      "label": "Nipple Penetration",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-ee51a2069bc9"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General Surrealism",
+      "label": "Oviposition",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-06896caf37eb"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General Surrealism",
+      "label": "Popping",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-6a4b3ccb3d6d"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General Surrealism",
+      "label": "Prehensile Cocks",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-42168c1328d1"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General Surrealism",
+      "label": "Rubber/Gel Characters",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-156b476cc57d"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General Surrealism",
+      "label": "Sentient Cocks",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-fd84d6d2590f"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General Surrealism",
+      "label": "Shrinking",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-161a23705b2b"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General Surrealism",
+      "label": "Tentacles",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-2c91fe91db0f"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "General Surrealism",
+      "label": "Transformation",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-c8f1906f2e53"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Vore / Unbirth",
+      "label": "Absorption",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-54340e408097"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Vore / Unbirth",
+      "label": "Alternative Vore",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-df75f6d4785d"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Vore / Unbirth",
+      "label": "Anal Vore",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-c51fbda84220"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Vore / Unbirth",
+      "label": "Cock Vore",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-d81b82d13b02"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Vore / Unbirth",
+      "label": "Digestion",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-bde20611e235"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Vore / Unbirth",
+      "label": "Disposal",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-d20cd3482c38"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Vore / Unbirth",
+      "label": "Hard Vore",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-c489a2e033fa"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Vore / Unbirth",
+      "label": "Realistic Vore",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-5ccea6b4657e"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Vore / Unbirth",
+      "label": "Soft Vore",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-973d830a5e15"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Vore / Unbirth",
+      "label": "Unbirthing",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-be9e676845f4"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Vore / Unbirth",
+      "label": "Unrealistic Vore",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-5306daf4092b"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Vore / Unbirth",
+      "label": "Vore - Being Predator",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-41d0b481f1b7"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Vore / Unbirth",
+      "label": "Vore - Being Prey",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-9605c6da8661"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Fluids",
+      "label": "Blood",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-fb278f62e96b"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Fluids",
+      "label": "Cum play",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-f9c6fd935199"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Fluids",
+      "label": "Diapers",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-0ac426aef535"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Fluids",
+      "label": "Lactation",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-1a788d364c3e"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Fluids",
+      "label": "Messy",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-4014b5dddc32"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Fluids",
+      "label": "Saliva",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-7a8411790b4f"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Fluids",
+      "label": "Scat",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-6f42a6949c44"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Fluids",
+      "label": "Sweat",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-9efb9d5e8441"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Fluids",
+      "label": "Watersports",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-21aa7d399242"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Degradation",
+      "label": "Begging",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-f109ee138d6b"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Degradation",
+      "label": "Cock Slapping",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-ce82db313bad"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Degradation",
+      "label": "Forced Nudity",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-b76197cf40c9"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Degradation",
+      "label": "Force Feeding",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-1b8fae8d8345"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Degradation",
+      "label": "Glory hole",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-f03083119f60"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Degradation",
+      "label": "Humiliation",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-ca9a285cefc9"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Degradation",
+      "label": "Name calling",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-b66de22eb80f"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Degradation",
+      "label": "Verbal Abuse",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-ff1983158742"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Touch & Stimulation",
+      "label": "Ass worship",
+      "fields": [
+        "Actor",
+        "Subject"
+      ],
+      "targets": [
+        "ref-179e6f40cfb1"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Touch & Stimulation",
+      "label": "Cock/Pussy worship",
+      "fields": [
+        "Actor",
+        "Subject"
+      ],
+      "targets": [
+        "ref-fe7cf6056ce1"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Touch & Stimulation",
+      "label": "Electro stimulation",
+      "fields": [
+        "Actor",
+        "Subject"
+      ],
+      "targets": [
+        "ref-6c1916713952"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Touch & Stimulation",
+      "label": "Foot play",
+      "fields": [
+        "Actor",
+        "Subject"
+      ],
+      "targets": [
+        "ref-323c13276121"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Touch & Stimulation",
+      "label": "Sensation play",
+      "fields": [
+        "Actor",
+        "Subject"
+      ],
+      "targets": [
+        "ref-cb41a0c8a155"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Touch & Stimulation",
+      "label": "Tickling",
+      "fields": [
+        "Actor",
+        "Subject"
+      ],
+      "targets": [
+        "ref-a8d99b8733cd"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Misc. Fetish",
+      "label": "Breast/Nipple Worship",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-46e984342bb5"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Misc. Fetish",
+      "label": "Breath play",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-c671ccdeefee"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Misc. Fetish",
+      "label": "Breeding",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-009d8e2232a1"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Misc. Fetish",
+      "label": "Crotch Sniffing",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-4ebf30c1d215"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Misc. Fetish",
+      "label": "Cuckold / Cuckquean",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-9e883c1ddd12"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Misc. Fetish",
+      "label": "Double Penetration",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-a2f03a775140"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Misc. Fetish",
+      "label": "Extreme Tightness",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-80500d72bce6"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Misc. Fetish",
+      "label": "Feminization",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-a9338fcf9a14"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Misc. Fetish",
+      "label": "Fisting",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-4697242167dd"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Misc. Fetish",
+      "label": "Food Play",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-edbd46adb142"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Misc. Fetish",
+      "label": "Foot Play",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "touch-05"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Misc. Fetish",
+      "label": "Foreskin Worship",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-16880349c55c"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Misc. Fetish",
+      "label": "Gangbang",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-e184c4c2a3b0"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Misc. Fetish",
+      "label": "Genital/Nipple Piercings",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-16f9ca5f943e"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Misc. Fetish",
+      "label": "Muscle Worship",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-6925c8dddd49"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Misc. Fetish",
+      "label": "Musk",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-b6e7ec0431b7"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Misc. Fetish",
+      "label": "Onomatopoeia",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-bfc54ed3caed"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Misc. Fetish",
+      "label": "Pregnancy",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-9bfc09d32e88"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Misc. Fetish",
+      "label": "Queefing",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-fb2aa6239e9e"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Misc. Fetish",
+      "label": "Sexual Exhaustion",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-19ef4cd1920f"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Misc. Fetish",
+      "label": "Sexual Frustration",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-146b71070085"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Misc. Fetish",
+      "label": "Shaving",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-be66bcd143f6"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Misc. Fetish",
+      "label": "Slob",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-0d9e11a6376d"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Cum-related",
+      "label": "Bukkake",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-5f78795fd75f"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Cum-related",
+      "label": "Creampie",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-592101923dc2"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Cum-related",
+      "label": "Cum Bath",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-fde3250757f3"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Cum-related",
+      "label": "Cum Enemas",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-e74b8076bbf3"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Cum-related",
+      "label": "Cum From Mouth/Nose",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-a6ea571e2308"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Cum-related",
+      "label": "Cum Marking",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-4244ef875ef5"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Cum-related",
+      "label": "Cum Milking",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-feaa0a6f109b"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Cum-related",
+      "label": "Cum on Clothes",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-36c9b812f3fc"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Cum-related",
+      "label": "Excessive Precum",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-ea1619d2156a"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Cum-related",
+      "label": "Excessive Semen",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-135c4d65b6dd"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Cum-related",
+      "label": "Heavily Excessive Precum",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-353f504e03bd"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Cum-related",
+      "label": "Heavily Excessive Semen",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-e47e9c2489b2"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Cum-related",
+      "label": "Premature Ejaculation",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-0fbcab628afa"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Cum-related",
+      "label": "Realistic Cum",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-d835efe0e5ec"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Cum-related",
+      "label": "Shooting Precum",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-ffbb8dda106a"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Cum-related",
+      "label": "Sloppy Seconds",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-e40382cf4196"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Cum-related",
+      "label": "Snowballing",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-3af8f1649e4a"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Cum-related",
+      "label": "Thick/Sticky Cum",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-8b7c0ace058a"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Cum-related",
+      "label": "Stomach Bulging",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-d6579cc49b02"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "BDSM & Related",
+      "label": "Apparatuses",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-e3df0a113879"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "BDSM & Related",
+      "label": "Begging",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-47a4951c4f78"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "BDSM & Related",
+      "label": "Blindfolds",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-1db788417e9d"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "BDSM & Related",
+      "label": "Branding",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-9c4e9b95bb3c"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "BDSM & Related",
+      "label": "Caging",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-0a06259bbdcc"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "BDSM & Related",
+      "label": "Chastity",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-6b240884c9c3"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "BDSM & Related",
+      "label": "Coiling",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-661ae2e84da7"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "BDSM & Related",
+      "label": "Competition",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-e2369cd476f2"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "BDSM & Related",
+      "label": "Degradation",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-f15cd6f0ef5b"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "BDSM & Related",
+      "label": "Discipline/Reinforcement",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-c7bb96e3e8c0"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "BDSM & Related",
+      "label": "Extreme Humiliation",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-25f82050c047"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "BDSM & Related",
+      "label": "Face Slapping",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-3805b88baec6"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "BDSM & Related",
+      "label": "Flogging/Whipping",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-813ea966653d"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "BDSM & Related",
+      "label": "Gags",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-a319e5ce9d14"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "BDSM & Related",
+      "label": "Hand Cuffs",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-014096cee506"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "BDSM & Related",
+      "label": "Heavy/Extreme Bondage",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-5c74c8a59de3"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "BDSM & Related",
+      "label": "Humiliation",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-687bf864e1b4"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "BDSM & Related",
+      "label": "Leash & Collar",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-e8b5d4f44ea2"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "BDSM & Related",
+      "label": "Light/Medium Bondage",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-d90d69bd95d2"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "BDSM & Related",
+      "label": "Master/Pet",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-527b7e7a10e6"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "BDSM & Related",
+      "label": "Master/Slave",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-498977f65514"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "BDSM & Related",
+      "label": "Objectification",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-ba0708d3fbd7"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "BDSM & Related",
+      "label": "Physical Restraints",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-474019f0fe67"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "BDSM & Related",
+      "label": "Public Humiliation",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-3790ab76a498"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "BDSM & Related",
+      "label": "Puppy/Pony Play",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-e08b61196993"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "BDSM & Related",
+      "label": "Sadism/Masochism",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-c08867f5a382"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "BDSM & Related",
+      "label": "Sexual Restraints",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-feea6417d831"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "BDSM & Related",
+      "label": "Sissification",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-9611426c30f3"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "BDSM & Related",
+      "label": "Speech Restrictions",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-badd6a665c1e"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "BDSM & Related",
+      "label": "Suspension Play",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-8e76383cb702"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "BDSM & Related",
+      "label": "Uppity",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-ca1f4ca4bb74"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "BDSM & Related",
+      "label": "Wax Play",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-eab376476f14"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Watersports / Scat",
+      "label": "Bathroom Control",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-4ee516587884"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Watersports / Scat",
+      "label": "Diapers",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-0ac426aef535"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Watersports / Scat",
+      "label": "Farting",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-36d2d005cf08"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Watersports / Scat",
+      "label": "Hyper Scat",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-9a342df6ec11"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Watersports / Scat",
+      "label": "Hyper Watersports",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-d788a11195c4"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Watersports / Scat",
+      "label": "Marking",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-524f9238cf25"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Watersports / Scat",
+      "label": "Piss Enemas",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-97552399aa3c"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Watersports / Scat",
+      "label": "Scat",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-6f42a6949c44"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Watersports / Scat",
+      "label": "Scat Torture",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-6cabbcad75bd"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Watersports / Scat",
+      "label": "Soiling",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-795d2f3aa403"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Watersports / Scat",
+      "label": "Swallowing Feces",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-f8c5f4a6e167"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Watersports / Scat",
+      "label": "Swallowing Urine",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-692c62dbfb36"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Watersports / Scat",
+      "label": "Swallowing Vomit",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-e8185d444213"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Watersports / Scat",
+      "label": "Vomiting",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-8cff7a00aa3f"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Watersports / Scat",
+      "label": "Watersports",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-21aa7d399242"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Watersports / Scat",
+      "label": "Wetting",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-e4468407219b"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Pain",
+      "label": "Light pain",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-5dab131c407c"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Pain",
+      "label": "Heavy pain",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-e4e3ec335feb"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Pain",
+      "label": "Nipple clamps",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-36c8a156cece"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Pain",
+      "label": "Clothes pins",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-ff44e0eead14"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Pain",
+      "label": "Caning",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-341b8bf201db"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Pain",
+      "label": "Flogging",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-473f09854361"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Pain",
+      "label": "Gagging / Choking",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-2be8c0712f62"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Pain",
+      "label": "Beating",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-a96986b8faee"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Pain",
+      "label": "Spanking",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "touch-09"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Pain",
+      "label": "Cock/Pussy slapping",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-11771c31c7c7"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Pain",
+      "label": "Cock/Pussy torture",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-a5e34b556b3e"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Pain",
+      "label": "Hot Wax",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "restraint-05"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Pain",
+      "label": "Scratching",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "touch-07"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Pain",
+      "label": "Biting",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "touch-08"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Pain",
+      "label": "Cutting",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-2a447b3c2033"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Pain",
+      "label": "Snuff",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-50c492f1d4a5"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Pain",
+      "label": "Ballbusting",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-bba0e09e3223"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Pain",
+      "label": "3+ Penetration",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-bf739e64650c"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Pain",
+      "label": "Anal Prolapse",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-3c56572b385c"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Pain",
+      "label": "Breast Smothering",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-6393fe96da2a"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Pain",
+      "label": "Breath Control",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-1361384d66cc"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Pain",
+      "label": "Choking",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-6fa75be8639b"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Pain",
+      "label": "Cock/Ball Smothering",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-5fcd60ab3f35"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Pain",
+      "label": "Cock Fucking",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "ref-20c3305aa971"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Pain",
+      "label": "Hair Pulling",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "targets": [
+        "touch-06"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Blood & Gore / Torture / Death",
+      "label": "Abrasions",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-7a14f8b08887"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Blood & Gore / Torture / Death",
+      "label": "Bloodplay",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-09ff35f6e1d7"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Blood & Gore / Torture / Death",
+      "label": "Breast/Nipple Torture",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-6da96c29e68b"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Blood & Gore / Torture / Death",
+      "label": "Burning",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-6bc616e7f2db"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Blood & Gore / Torture / Death",
+      "label": "Castration",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-b6c3b8807be1"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Blood & Gore / Torture / Death",
+      "label": "Death",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-d9bfa41fb4cc"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Blood & Gore / Torture / Death",
+      "label": "Emasculation",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-e018fb58474a"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Blood & Gore / Torture / Death",
+      "label": "Genital Torture",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-e99eadb1304b"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Blood & Gore / Torture / Death",
+      "label": "Impalement",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-80182ee358de"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Blood & Gore / Torture / Death",
+      "label": "Menses",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-6d5131f7fcc9"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Blood & Gore / Torture / Death",
+      "label": "Mutilation",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-0e0b655dbe92"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Blood & Gore / Torture / Death",
+      "label": "Necrophilia",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-dcde76efbbc7"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Blood & Gore / Torture / Death",
+      "label": "Non-Sexual Pain",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-d47f1d350da5"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Blood & Gore / Torture / Death",
+      "label": "Nonsexual Torture",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-a72f051610ac"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Blood & Gore / Torture / Death",
+      "label": "Nullification",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-b9fb6dd96e1d"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Blood & Gore / Torture / Death",
+      "label": "Piercing",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-36786c410c00"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Blood & Gore / Torture / Death",
+      "label": "Sexual Torture",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-03071679ee4d"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Blood & Gore / Torture / Death",
+      "label": "Swallowing Blood",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-6ae50f854dc8"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Meta",
+      "label": "First Person",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-2a8c2711eec1"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Meta",
+      "label": "Third Person",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-00aacf3b0c3c"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Meta",
+      "label": "Short Post Length (~1-3 sentences)",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-b45ef8b1c04f"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Meta",
+      "label": "Medium Post Length (~3-7 sentences)",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-165bfb7d20d0"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Meta",
+      "label": "Long Post Length (~2-4 paragraphs)",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-28bc20c03cd4"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Meta",
+      "label": "Story (3+ paragraphs)",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-ed74add66a34"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Meta",
+      "label": "Dynamic Post Length",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-5cd8ff1dc3a7"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Medium",
+      "label": "Skype",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-f91ac24d8363"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Medium",
+      "label": "Kik",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-1c384837b441"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Medium",
+      "label": "Reddit",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-c5c65dcba663"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Medium",
+      "label": "E-Mail",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-64fdc66fe152"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Medium",
+      "label": "Discord",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-f6c792485213"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Medium",
+      "label": "Other",
+      "fields": [
+        "General"
+      ],
+      "targets": [
+        "ref-47607a8681c9"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Time-Scale",
+      "label": "Short-Term Scenes",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-c26780952313"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Time-Scale",
+      "label": "Medium-Term Scenes",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-7391d5327de8"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Time-Scale",
+      "label": "Long-Term Scenes",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-7449bac86a76"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Time-Scale",
+      "label": "Quick Replies (0~10 mins)",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-51f91599770d"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Time-Scale",
+      "label": "Fast Replies (10~30 mins)",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-9f89dd42fb4b"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Time-Scale",
+      "label": "Normal Replies (30min ~ 2hours)",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-161fa93403ce"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Time-Scale",
+      "label": "Slow Replies (2~8 hours)",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-65ab678d2bf8"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Time-Scale",
+      "label": "Glacial Replies (8-24 hours)",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-fa72211f8ebf"
+      ]
+    },
+    {
+      "preset": "plsno",
+      "category": "Time-Scale",
+      "label": "Occasional Replies (24+ hours)",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "targets": [
+        "ref-ed2bec671cf1"
+      ]
+    }
+  ]
+}

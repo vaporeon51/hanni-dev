@@ -932,4 +932,4 @@ def test_kinklist_is_unlinked_and_uses_private_local_editor():
         assert 'href="/kinklist"' not in asyncio.run(request(path)).text
     catalog = asyncio.run(request("/static/kinklist/catalog.json"))
     assert catalog.status_code == 200
-    assert len(catalog.json()["categories"]) == 9
+    assert len(catalog.json()["categories"]) >= 9

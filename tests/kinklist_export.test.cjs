@@ -62,15 +62,16 @@ test('partial collections use balanced whole panels and a short canvas', () => {
   assert.equal(new Set(titles.map((entry) => entry.x)).size, 3, 'Every column is used');
 });
 
-test('complete starter collection fits one balanced sheet with every item and role', () => {
+test('complete catalog paginates with every item and role', () => {
   const api = fixture(), state = initial();
   catalog.forEach((cat) => answer(state, cat));
   api.setState(api.validate(state));
   const pages = api.makeCards();
-  assert.equal(pages.length, 1);
-  assert.ok(pages[0].height <= 2400);
+  assert.ok(pages.length > 1);
+  assert.ok(pages.every((page) => page.height <= 2400));
   const text = pages.flatMap((page) => page.text.map((entry) => entry.text));
-  for (const cat of catalog) for (const item of cat.items) assert.ok(text.includes(item.name), item.name);
+  const joined = text.join('').replace(/\s/g, '');
+  for (const cat of catalog) for (const item of cat.items) assert.ok(joined.includes(item.name.replace(/\s/g, '')), item.name);
   assert.equal(text.filter((text) => text === 'Like').length, Object.keys(state.answers).length);
 });
 
@@ -103,4 +104,12 @@ test('single-category and empty previews avoid unused column space', () => {
   api.setState(api.validate(state));
   assert.equal(api.makeCards()[0].width, 900);
   assert.ok(api.makeCards()[0].height < 1100);
+});
+
+
+test('the original 90-item backup retains every saved answer', () => {
+  const api = fixture();
+  const original = JSON.parse(fs.readFileSync(path.join(root, 'tests/fixtures/kinklist-original-backup.json')));
+  const restored = api.validate(original);
+  assert.equal(JSON.stringify(restored.answers), JSON.stringify(original.answers));
 });

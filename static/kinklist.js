@@ -122,6 +122,9 @@
     document.querySelectorAll("[data-category]").forEach((button) => {
       button.setAttribute("aria-current", String(button.dataset.category === id));
     });
+    const next = catalog[(catalog.findIndex((cat) => cat.id === id) + 1) % catalog.length];
+    $("kl-next").textContent = `Next: ${next.name} →`;
+    $("kl-next").setAttribute("aria-label", `Next chapter: ${next.name}`);
     renderItems();
     schedulePreview();
     if (scroll) $("kl-category-title").scrollIntoView({ behavior: "instant", block: "start" });

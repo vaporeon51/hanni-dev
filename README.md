@@ -110,7 +110,7 @@ in local storage.
 
 `/kinklist` is an unlinked 18+ preference builder. It is intentionally absent
 from the homepage and navigation and redirects home on the clean host. Its
-90 starter preferences, custom items, ratings, card name, and theme live only
+431 preferences, custom items, ratings, card name, and theme live only
 in browser storage. PNG generation and JSON backup/restore run locally;
 answers are never sent to the app or an image host. JSON restore validates
 the version, item IDs, categories, and rating values before replacing state,
@@ -129,3 +129,12 @@ clearing, separate giving/receiving answers, reload persistence, custom
 items, undo, search/filtering, all three themes, PNG exports, and JSON
 backup/restore. Large exports expose one download link per image to avoid
 browser restrictions on multiple automatic downloads.
+
+The catalog covers the reference site's Classic, Detailed, and Please Don't
+presets as non-graphic labels and role fields, alongside the original Hanni
+preferences. `static/kinklist/reference-coverage.json` maps all 621 source
+entries to local IDs and records source URLs and content hashes. Equivalent
+labels merge only when their role fields match. Existing IDs and answer keys
+remain stable. Labels use current terminology where appropriate; reference
+definitions are not copied. `scripts/sync_kinklist_catalog.py` can refresh the
+inventory, or accept `--source-dir` containing the three preset text files.

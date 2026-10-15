@@ -67,7 +67,7 @@ _GROUP_ALIASES = {"idle": "gidle", "ohmygirl": "omg"}
 # home, content APIs 404. Override with CLEAN_HOST="" to disable.
 CLEAN_HOST = os.getenv("CLEAN_HOST", "bias.hannibee.art").strip().lower()
 
-_CLEAN_PAGE_PATHS = {"/feed", "/sets", "/scroll", "/disambiguation"}
+_CLEAN_PAGE_PATHS = {"/feed", "/sets", "/scroll", "/kinklist", "/disambiguation"}
 _CLEAN_BLOCKED_API_PREFIXES = (
     "/api/disambiguation",
     "/api/feed",
@@ -384,6 +384,15 @@ async def feed_page(request: Request) -> HTMLResponse:
     )
     _ensure_visitor_cookie(request, response)
     return response
+
+
+@app.get("/kinklist", response_class=HTMLResponse)
+async def kinklist_page(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request=request,
+        name="kinklist.html",
+        context={"static_version": _static_version()},
+    )
 
 
 @app.get("/sets", response_class=HTMLResponse)

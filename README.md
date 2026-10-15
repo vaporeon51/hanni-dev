@@ -105,3 +105,27 @@ keystroke. Pagination stays out of browser history. Every page reads its URL
 on initial load and Back/Forward. Sorter ranking/session links retain their
 existing hash format, and private selections and playback preferences remain
 in local storage.
+
+## Private kinklist preview
+
+`/kinklist` is an unlinked 18+ preference builder. It is intentionally absent
+from the homepage and navigation and redirects home on the clean host. Its
+90 starter preferences, custom items, ratings, card name, and theme live only
+in browser storage. PNG generation and JSON backup/restore run locally;
+answers are never sent to the app or an image host. JSON restore validates
+the version, item IDs, categories, and rating values before replacing state,
+and the replacement can be undone.
+
+To preview this page without opening the database or starting workers:
+
+```bash
+conda activate hanni-web
+uvicorn src.web.app:app --reload --lifespan off --port 8000
+```
+
+Open http://127.0.0.1:8000/kinklist. Use the normal startup command (without
+`--lifespan off`) when testing database-backed pages. Test selection and
+clearing, separate giving/receiving answers, reload persistence, custom
+items, undo, search/filtering, all three themes, PNG exports, and JSON
+backup/restore. Large exports expose one download link per image to avoid
+browser restrictions on multiple automatic downloads.

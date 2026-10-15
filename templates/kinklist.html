@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en" class="age-gate-pending">
+  <head>
+    <meta charset="utf-8" />
+    {% include "_social_meta.html" %}
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="A little map of your tastes. Make a private, personal kinklist and export a pretty card." />
+    <title>kinklist · hanni♡</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext x='32' y='46' text-anchor='middle' font-size='44' fill='%23b84d79'%3E%E2%99%A1%3C/text%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="/static/nav.css?v={{ static_version }}" />
+    <link rel="stylesheet" href="/static/nsfw.css?v={{ static_version }}" />
+    <link rel="stylesheet" href="/static/kinklist.css?v={{ static_version }}" />
+  </head>
+  <body class="nsfw kinklist-page" data-catalog="/static/kinklist/catalog.json?v={{ static_version }}">
+    {% set active = "kinklist" %}{% include "_nav.html" %}
+    <main class="kl-shell">
+      <header class="kl-hero">
+        <div class="kl-eyebrow">A LITTLE SELF-DISCOVERY · 18+</div>
+        <h1>A little map <em>of you.</em><span aria-hidden="true">♡</span></h1>
+        <p>Things you love. Things you’re curious about. Lines you draw.<br />All yours, at your own pace.</p>
+        <div class="kl-privacy"><span class="kl-dot"></span> Stays in this browser. Only shared when you export.</div>
+      </header>
+      <div class="kl-workspace">
+        <aside class="kl-sidebar" aria-label="Categories">
+          <div class="kl-side-heading">YOUR LITTLE COLLECTION</div>
+          <nav id="kl-categories" aria-label="Preference categories"></nav>
+          <div class="kl-progress-box"><div><span id="kl-progress-label">Getting started</span><span id="kl-progress-count">0 / 0</span></div><progress id="kl-progress" value="0" max="1" aria-label="Preferences answered"></progress><p>No rush. You can skip anything.</p></div>
+          <button id="kl-surprise" class="kl-surprise" type="button"><span aria-hidden="true">✧</span> Pick a little prompt</button>
+        </aside>
+        <section class="kl-editor" aria-label="Preference editor">
+          <div class="kl-toolbar">
+            <label class="kl-search"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5"/></svg><input id="kl-search" type="search" placeholder="Find a preference…" aria-label="Search preferences" /></label>
+            <label class="kl-filter-label"><span class="sr-only">Filter preferences</span><select id="kl-filter"><option value="all">All preferences</option><option value="unanswered">Unanswered</option><option value="favorite">Favorites</option><option value="maybe">Curious</option><option value="limit">Limits</option></select></label>
+          </div>
+          <div class="kl-section-heading"><div><span id="kl-category-number" class="kl-eyebrow">01 / THE COLLECTION</span><h2 id="kl-category-title">Your preferences</h2><p id="kl-category-description">Loading your collection…</p></div><button id="kl-undo" class="kl-text-button" type="button" disabled>↶ Undo</button></div>
+          <div class="kl-legend" aria-label="Ratings"><span>♡ Favorite</span><span>✓ Like</span><span>− Neutral</span><span>✧ Curious</span><span>× Limit</span></div>
+          <p class="kl-clear-hint">Tap a selected rating again to clear it.</p>
+          <div id="kl-items" aria-busy="true"></div>
+          <form id="kl-custom-form" class="kl-custom-form"><label for="kl-custom-name">Something missing? Make it yours.</label><div><input id="kl-custom-name" maxlength="80" placeholder="Add your own preference…" required /><button type="submit">+ Add</button></div></form>
+          <div class="kl-editor-footer"><span id="kl-save-state" role="status">Your answers stay on this device</span><button id="kl-next" class="kl-text-button" type="button">Next chapter →</button></div>
+          <p class="kl-consent-note">A preference is a conversation starter, never consent. All entries refer to consenting adults.</p>
+        </section>
+        <aside class="kl-card-panel" aria-label="Your card and exports">
+          <div class="kl-side-heading">THE FINISHING TOUCH</div>
+          <label class="kl-name-label" for="kl-name">A name for your card <span>(optional)</span></label>
+          <input id="kl-name" maxlength="40" placeholder="My little kinklist" autocomplete="off" />
+          <fieldset class="kl-theme-picker"><legend>Pick a mood</legend><button type="button" data-theme="rose" aria-label="Rose theme" aria-pressed="true"></button><button type="button" data-theme="lilac" aria-label="Lilac theme" aria-pressed="false"></button><button type="button" data-theme="mint" aria-label="Mint theme" aria-pressed="false"></button></fieldset>
+          <div class="kl-preview-frame"><canvas id="kl-preview" aria-label="Preview of your exported preference card" role="img"></canvas><span class="kl-preview-tag">MADE OF LITTLE DETAILS</span></div>
+          <p class="kl-preview-note">A keepsake of your tastes. Preview shows the first page.</p>
+          <label class="kl-check"><input id="kl-hide-unanswered" type="checkbox" checked /> Hide unanswered in exports</label>
+          <label class="kl-export-label" for="kl-export-layout">Image layout</label><select id="kl-export-layout"><option value="sheet">Compact full sheet</option><option value="category">This category · larger type</option></select>
+          <button id="kl-export" class="kl-primary" type="button">Save my card <span aria-hidden="true">↓</span></button>
+          <div id="kl-downloads" class="kl-downloads" aria-label="Generated image downloads" hidden></div>
+          <div class="kl-backup-actions"><button id="kl-backup" type="button">Back up JSON</button><button id="kl-import" type="button">Restore JSON</button><input id="kl-import-file" type="file" accept="application/json,.json" hidden /></div>
+          <p class="kl-storage-note">Browser storage isn’t a backup. Save a JSON copy to keep your answers or move devices.</p>
+        </aside>
+      </div>
+      <p id="kl-notice" class="kl-notice" role="status" aria-live="polite"></p>
+    </main>
+    <footer class="kl-footer">a little curiosity looks good on you ♡ <span>made by glaceon</span></footer>
+    <dialog id="kl-import-dialog" class="kl-dialog" aria-labelledby="kl-import-title"><h2 id="kl-import-title">Restore your collection?</h2><p>This replaces the answers, custom items, name, and mood currently saved in this browser.</p><div><button id="kl-import-cancel" type="button">Keep mine</button><button id="kl-import-confirm" class="kl-primary" type="button">Restore collection</button></div></dialog>
+    {% set preference_gate = true %}{% include "_age_gate.html" %}
+    <script src="/static/age-gate.js?v={{ static_version }}" data-page-script="/static/kinklist.js?v={{ static_version }}" defer></script>
+  </body>
+</html>

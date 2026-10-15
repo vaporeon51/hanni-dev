@@ -1,0 +1,469 @@
+{
+  "version": 1,
+  "categories": [
+    {
+      "id": "connection",
+      "name": "The softer side",
+      "description": "Start with the things that make you feel close.",
+      "icon": "heart",
+      "fields": [
+        "General"
+      ],
+      "items": [
+        {
+          "id": "connection-01",
+          "name": "Romance"
+        },
+        {
+          "id": "connection-02",
+          "name": "Affection"
+        },
+        {
+          "id": "connection-03",
+          "name": "Cuddling"
+        },
+        {
+          "id": "connection-04",
+          "name": "Kissing"
+        },
+        {
+          "id": "connection-05",
+          "name": "Eye contact"
+        },
+        {
+          "id": "connection-06",
+          "name": "Slow build-up"
+        },
+        {
+          "id": "connection-07",
+          "name": "Aftercare"
+        },
+        {
+          "id": "connection-08",
+          "name": "Reassurance"
+        },
+        {
+          "id": "connection-09",
+          "name": "Playful teasing"
+        },
+        {
+          "id": "connection-10",
+          "name": "Massage"
+        }
+      ]
+    },
+    {
+      "id": "style",
+      "name": "Dress the part",
+      "description": "A little texture, a little theatre.",
+      "icon": "sparkle",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "items": [
+        {
+          "id": "style-01",
+          "name": "Lingerie"
+        },
+        {
+          "id": "style-02",
+          "name": "Stockings"
+        },
+        {
+          "id": "style-03",
+          "name": "Heels"
+        },
+        {
+          "id": "style-04",
+          "name": "Leather"
+        },
+        {
+          "id": "style-05",
+          "name": "Latex"
+        },
+        {
+          "id": "style-06",
+          "name": "Uniforms"
+        },
+        {
+          "id": "style-07",
+          "name": "Costumes"
+        },
+        {
+          "id": "style-08",
+          "name": "Jewelry"
+        },
+        {
+          "id": "style-09",
+          "name": "Perfume"
+        },
+        {
+          "id": "style-10",
+          "name": "Staying dressed"
+        }
+      ]
+    },
+    {
+      "id": "touch",
+      "name": "Touch & attention",
+      "description": "How you like to give and receive attention.",
+      "icon": "hand",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "items": [
+        {
+          "id": "touch-01",
+          "name": "Sensual touch"
+        },
+        {
+          "id": "touch-02",
+          "name": "Sensory play"
+        },
+        {
+          "id": "touch-03",
+          "name": "Tickling"
+        },
+        {
+          "id": "touch-04",
+          "name": "Body worship"
+        },
+        {
+          "id": "touch-05",
+          "name": "Foot play"
+        },
+        {
+          "id": "touch-06",
+          "name": "Hair pulling"
+        },
+        {
+          "id": "touch-07",
+          "name": "Scratching"
+        },
+        {
+          "id": "touch-08",
+          "name": "Biting"
+        },
+        {
+          "id": "touch-09",
+          "name": "Spanking"
+        },
+        {
+          "id": "touch-10",
+          "name": "Temperature play"
+        }
+      ]
+    },
+    {
+      "id": "intimacy",
+      "name": "Intimacy",
+      "description": "Preferences are personal. Take your time.",
+      "icon": "heart",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "items": [
+        {
+          "id": "intimacy-01",
+          "name": "Manual stimulation"
+        },
+        {
+          "id": "intimacy-02",
+          "name": "Oral sex"
+        },
+        {
+          "id": "intimacy-03",
+          "name": "Deep throating"
+        },
+        {
+          "id": "intimacy-04",
+          "name": "Edging"
+        },
+        {
+          "id": "intimacy-05",
+          "name": "Orgasm control"
+        },
+        {
+          "id": "intimacy-06",
+          "name": "Orgasm denial"
+        },
+        {
+          "id": "intimacy-07",
+          "name": "Anal play"
+        },
+        {
+          "id": "intimacy-08",
+          "name": "Pegging"
+        },
+        {
+          "id": "intimacy-09",
+          "name": "Mutual masturbation"
+        },
+        {
+          "id": "intimacy-10",
+          "name": "Sexting"
+        }
+      ]
+    },
+    {
+      "id": "toys",
+      "name": "Toys & accessories",
+      "description": "Your own little collection of curiosities.",
+      "icon": "sparkle",
+      "fields": [
+        "Self",
+        "Partner"
+      ],
+      "items": [
+        {
+          "id": "toys-01",
+          "name": "Vibrators"
+        },
+        {
+          "id": "toys-02",
+          "name": "Dildos"
+        },
+        {
+          "id": "toys-03",
+          "name": "Plugs"
+        },
+        {
+          "id": "toys-04",
+          "name": "Strap-ons"
+        },
+        {
+          "id": "toys-05",
+          "name": "Blindfolds"
+        },
+        {
+          "id": "toys-06",
+          "name": "Cuffs"
+        },
+        {
+          "id": "toys-07",
+          "name": "Collars"
+        },
+        {
+          "id": "toys-08",
+          "name": "Leashes"
+        },
+        {
+          "id": "toys-09",
+          "name": "Rope"
+        },
+        {
+          "id": "toys-10",
+          "name": "Sensation toys"
+        }
+      ]
+    },
+    {
+      "id": "dynamics",
+      "name": "Power & play",
+      "description": "The roles you enjoy, and the boundaries around them.",
+      "icon": "crown",
+      "fields": [
+        "General"
+      ],
+      "items": [
+        {
+          "id": "dynamics-01",
+          "name": "Dominant role"
+        },
+        {
+          "id": "dynamics-02",
+          "name": "Submissive role"
+        },
+        {
+          "id": "dynamics-03",
+          "name": "Switching roles"
+        },
+        {
+          "id": "dynamics-04",
+          "name": "Gentle dominance"
+        },
+        {
+          "id": "dynamics-05",
+          "name": "Service"
+        },
+        {
+          "id": "dynamics-06",
+          "name": "Praise"
+        },
+        {
+          "id": "dynamics-07",
+          "name": "Brat play"
+        },
+        {
+          "id": "dynamics-08",
+          "name": "Rules & rituals"
+        },
+        {
+          "id": "dynamics-09",
+          "name": "Discipline"
+        },
+        {
+          "id": "dynamics-10",
+          "name": "Pet roleplay"
+        }
+      ]
+    },
+    {
+      "id": "restraint",
+      "name": "Restraint & sensation",
+      "description": "Curiosity is optional. Boundaries belong here too.",
+      "icon": "sparkle",
+      "fields": [
+        "Giving",
+        "Receiving"
+      ],
+      "items": [
+        {
+          "id": "restraint-01",
+          "name": "Light bondage"
+        },
+        {
+          "id": "restraint-02",
+          "name": "Restrictive bondage"
+        },
+        {
+          "id": "restraint-03",
+          "name": "Sensory deprivation"
+        },
+        {
+          "id": "restraint-04",
+          "name": "Impact play"
+        },
+        {
+          "id": "restraint-05",
+          "name": "Wax play"
+        },
+        {
+          "id": "restraint-06",
+          "name": "Ice play"
+        },
+        {
+          "id": "restraint-07",
+          "name": "Feathers"
+        },
+        {
+          "id": "restraint-08",
+          "name": "Clamps"
+        },
+        {
+          "id": "restraint-09",
+          "name": "Restraint furniture"
+        },
+        {
+          "id": "restraint-10",
+          "name": "Being guided"
+        }
+      ]
+    },
+    {
+      "id": "fantasy",
+      "name": "Setting the scene",
+      "description": "Imagination, atmosphere, and adult roleplay.",
+      "icon": "moon",
+      "fields": [
+        "General"
+      ],
+      "items": [
+        {
+          "id": "fantasy-01",
+          "name": "Roleplay"
+        },
+        {
+          "id": "fantasy-02",
+          "name": "Costume roleplay"
+        },
+        {
+          "id": "fantasy-03",
+          "name": "Fantasy characters"
+        },
+        {
+          "id": "fantasy-04",
+          "name": "Sci-fi settings"
+        },
+        {
+          "id": "fantasy-05",
+          "name": "Monster fantasy"
+        },
+        {
+          "id": "fantasy-06",
+          "name": "Tentacle fantasy"
+        },
+        {
+          "id": "fantasy-07",
+          "name": "Consensual exhibitionism"
+        },
+        {
+          "id": "fantasy-08",
+          "name": "Consensual voyeurism"
+        },
+        {
+          "id": "fantasy-09",
+          "name": "Mirrors"
+        },
+        {
+          "id": "fantasy-10",
+          "name": "Photography"
+        }
+      ]
+    },
+    {
+      "id": "together",
+      "name": "Together",
+      "description": "The shape of an experience, on your terms.",
+      "icon": "heart",
+      "fields": [
+        "General"
+      ],
+      "items": [
+        {
+          "id": "together-01",
+          "name": "One-on-one"
+        },
+        {
+          "id": "together-02",
+          "name": "Threesomes"
+        },
+        {
+          "id": "together-03",
+          "name": "Group intimacy"
+        },
+        {
+          "id": "together-04",
+          "name": "Watching together"
+        },
+        {
+          "id": "together-05",
+          "name": "Being watched with consent"
+        },
+        {
+          "id": "together-06",
+          "name": "Long-distance play"
+        },
+        {
+          "id": "together-07",
+          "name": "Playful competition"
+        },
+        {
+          "id": "together-08",
+          "name": "Taking turns"
+        },
+        {
+          "id": "together-09",
+          "name": "Spontaneity"
+        },
+        {
+          "id": "together-10",
+          "name": "Planned scenes"
+        }
+      ]
+    }
+  ]
+}

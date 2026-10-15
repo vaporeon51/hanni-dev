@@ -40,7 +40,7 @@ def test_main_home_still_full():
 
 
 def test_clean_nsfw_pages_bounce_home():
-    for path in ("/feed", "/sets", "/scroll"):
+    for path in ("/feed", "/sets", "/scroll", "/kinklist"):
         response = _get(path, host=CLEAN_HOST)
 
         assert response.status_code == 307

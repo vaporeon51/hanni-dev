@@ -911,3 +911,25 @@ def test_public_search_apis_limit_q_length():
                 assert response.json()["detail"][0]["loc"] == ["query", "q"]
 
     asyncio.run(request())
+
+
+def test_kinklist_is_unlinked_and_uses_private_local_editor():
+    async def request(path):
+        transport = httpx.ASGITransport(app=web_app.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            return await client.get(path)
+
+    response = asyncio.run(request("/kinklist"))
+    assert response.status_code == 200
+    assert 'class="nsfw kinklist-page"' in response.text
+    assert '/static/nsfw.css?v=' in response.text
+    assert 'data-page-script="/static/kinklist.js?v=' in response.text
+    assert 'id="age-gate"' in response.text
+    assert 'consenting adults' in response.text
+    assert '/static/analytics.js' not in response.text
+    assert 'id="kl-import-dialog"' in response.text
+    for path in ("/", "/feed", "/sorter"):
+        assert 'href="/kinklist"' not in asyncio.run(request(path)).text
+    catalog = asyncio.run(request("/static/kinklist/catalog.json"))
+    assert catalog.status_code == 200
+    assert len(catalog.json()["categories"]) == 9

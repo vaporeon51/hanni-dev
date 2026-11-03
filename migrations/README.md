@@ -86,3 +86,11 @@ coverage on the target database with `python scripts/sync_sorter_idols.py --chec
 Apply `table_updates46.sql` before deploying the completed-sort writer. It only
 adds durable submission receipts; existing Elo and daily budgets are preserved.
 The old per-click API becomes a no-op, so refresh open sorter tabs after rollout.
+
+## Discord role metadata (47)
+
+`table_updates47.sql` adds the 12 missing active roles from the October 31,
+2026 ping-role list, refreshes 19 renamed role records and their search tokens,
+and removes numeric role IDs accidentally appended to tags by migration 13.
+It is rerunnable and preserves historical roles, portraits, birthdays and ratings.
+The Goyangi resolver accepts both G-IDLE and i-dle group spellings.

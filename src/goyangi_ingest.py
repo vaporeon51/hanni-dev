@@ -36,6 +36,7 @@ CURSOR_OVERLAP = timedelta(hours=24)
 # Only non-obvious mappings live here; plain lowercase matches need nothing.
 GROUP_ALIASES = {
     "idle": "gidle",
+    "gidle": "idle",
 }
 
 # A 'solo_' prefix means "member acting solo": match the member name only,
@@ -90,7 +91,8 @@ def resolve_role(code: str, lookup: dict[tuple[str, str], str], groups: set[str]
     parts = code.split("_")
     for split in range(len(parts) - 1, 0, -1):
         group_code = _norm("_".join(parts[:split]))
-        group_code = GROUP_ALIASES.get(group_code, group_code)
+        if group_code not in groups:
+            group_code = GROUP_ALIASES.get(group_code, group_code)
         member_code = _norm("_".join(parts[split:]))
         if group_code in groups and (member_code, group_code) in lookup:
             return lookup[(member_code, group_code)]

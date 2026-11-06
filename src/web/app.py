@@ -96,9 +96,8 @@ def _load_sorter_photo_maps() -> tuple[dict[str, str], dict[str, str], dict[str,
 
     Returns ``(embed_by_role, local_by_role, embed_by_source, local_by_source,
     group_photos)``:
-    - ``embed_*``: Discord-proxied kpopping bytes (preferred — the actual
-      kpopping portrait, hotlinkable with no expiry).
-    - ``local_*``: vendored same-origin sorter portraits (fallback).
+    - ``local_*``: vendored same-origin portraits (preferred).
+    - ``embed_*``: Discord-proxied portraits for gaps in local coverage.
     - ``group_photos``: vendored group shots keyed by normalized group name.
     Missing files (fresh checkout before the build scripts run) fall back to
     database image urls.
@@ -126,6 +125,10 @@ def _load_sorter_photo_maps() -> tuple[dict[str, str], dict[str, str], dict[str,
             local = entry.get("local")
             if not local:
                 continue
+            if entry.get("kind") == "idol":
+                for identity in (entry.get("role_id"), entry.get("leaderboard_id")):
+                    if identity:
+                        by_role.setdefault(str(identity), str(local))
             for source in (entry.get("photo"), entry.get("fallback")):
                 if source:
                     by_source.setdefault(str(source), str(local))
@@ -133,6 +136,14 @@ def _load_sorter_photo_maps() -> tuple[dict[str, str], dict[str, str], dict[str,
                 group_photos.setdefault(_resolve_group_name(entry.get("group")), str(local))
     except (OSError, ValueError):
         pass
+    # Group-member portraits arrive as source/proxy URLs without a role ID.
+    # Resolve those to the same local portrait used for the idol's own card.
+    for role_id, embed in embed_by_role.items():
+        if role_id in by_role:
+            by_source.setdefault(embed, by_role[role_id])
+    for source, embed in embed_by_source.items():
+        if embed in by_source:
+            by_source.setdefault(source, by_source[embed])
     return embed_by_role, by_role, embed_by_source, by_source, group_photos
 
 

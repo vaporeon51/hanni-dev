@@ -496,6 +496,42 @@ def test_sorter_catalog_hand_picked_portrait():
         assert (web_app.REPO_ROOT / local.lstrip("/")).exists()
 
 
+@pytest.mark.parametrize("name", ["Kwon Eunbi", "Yena", "Chuu"])
+def test_board_uses_catalog_local_portrait_when_role_photo_map_is_incomplete(name):
+    import json
+
+    catalog = json.loads((web_app.REPO_ROOT / "static/sorter/catalog.json").read_text())
+    entry = next(e for e in catalog["entries"] if e["name"] == name)
+    role_id = entry["role_id"]
+    local = entry["local"]
+    assert (web_app.REPO_ROOT / local.lstrip("/")).is_file()
+    assert web_app._board_image(role_id, None) == local
+    # Proxy URLs are also used for group-member avatars, without a role ID.
+    assert web_app._member_image(web_app.EMBED_PHOTOS[role_id]) == local
+
+
+def test_photo_loader_covers_sorter_identities_and_preserves_explicit_overrides(tmp_path, monkeypatch):
+    import json
+
+    root = tmp_path / "static/sorter"
+    root.mkdir(parents=True)
+    (root / "role-photos.json").write_text(json.dumps({"role": "/static/override.jpg"}))
+    (root / "embed-photos.json").write_text(json.dumps({
+        "by_role": {"role": "https://discord.example/proxy"},
+        "by_source": {"https://source.example/photo": "https://discord.example/proxy"},
+    }))
+    (root / "catalog.json").write_text(json.dumps({"entries": [
+        {"kind": "idol", "role_id": "role", "leaderboard_id": "role", "local": "/static/catalog.jpg"},
+        {"kind": "idol", "leaderboard_id": "sorter:123", "local": "/static/sorter-only.jpg"},
+    ]}))
+    monkeypatch.setattr(web_app, "REPO_ROOT", tmp_path)
+    _, local_by_role, _, local_by_source, _ = web_app._load_sorter_photo_maps()
+    assert local_by_role["role"] == "/static/override.jpg"
+    assert local_by_role["sorter:123"] == "/static/sorter-only.jpg"
+    assert local_by_source["https://discord.example/proxy"] == "/static/override.jpg"
+    assert local_by_source["https://source.example/photo"] == "/static/override.jpg"
+
+
 def test_sorter_page_renders():
     async def request():
         transport = httpx.ASGITransport(app=web_app.app)

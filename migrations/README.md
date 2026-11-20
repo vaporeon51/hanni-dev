@@ -94,3 +94,10 @@ The old per-click API becomes a no-op, so refresh open sorter tabs after rollout
 and removes numeric role IDs accidentally appended to tags by migration 13.
 It is rerunnable and preserves historical roles, portraits, birthdays and ratings.
 The Goyangi resolver accepts both G-IDLE and i-dle group spellings.
+
+## A2O LITE age restriction (48)
+
+`table_updates48.sql` sets A2O LITE's group-role birthday to its youngest
+member Aijing's birthdate, April 24, 2013, replacing the 1900 placeholder.
+The existing search, feed and set age filters then exclude the role and
+uploads made before the youngest member meets the configured minimum age.
